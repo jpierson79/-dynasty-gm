@@ -37,6 +37,7 @@ function leagueSettings(){db.settings=db.settings||{};db.settings.leagueSettings
 function performanceMode(){db.settings=db.settings||{};if(db.settings.performanceMode===undefined)db.settings.performanceMode=true;return db.settings.performanceMode!==false}
 function setPerformanceMode(on){db.settings.performanceMode=!!on;resetAllPages();saveDB(false);renderPerformanceControls();renderActiveView();toast(on?"Performance Mode on":"Performance Mode off")}
 function safeMode(){db.settings=db.settings||{};return !!db.settings.safeMode}
+SAFE_MODE_VIEWS.add("auth");
 function setSafeMode(on){db.settings.safeMode=!!on;resetAllPages();saveDB(false);renderPerformanceControls();renderActiveView();toast(on?"Safe Mode on":"Safe Mode off")}
 function latestImportTimestamp(){const s=db.settings||{},snap=db.snapshots?.[db.snapshots.length-1]?.timestamp;return s.lastImportTimestamp||snap||""}
 function displayTimestamp(ts,empty="Not recorded"){if(!ts)return empty;const d=new Date(ts);return Number.isNaN(d.getTime())?String(ts):d.toLocaleString()}
