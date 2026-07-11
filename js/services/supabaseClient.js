@@ -1,29 +1,97 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config/supabase.js";
 
-const hasConfig=Boolean(
-  SUPABASE_URL&&
-  SUPABASE_ANON_KEY&&
-  !String(SUPABASE_URL).includes("YOUR_")&&
-  !String(SUPABASE_ANON_KEY).includes("YOUR_")
-);
+const INIT_TIMEOUT_MS=10000;
+const LIBRARY_SOURCES=[
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+  "https://esm.sh/@supabase/supabase-js@2"
+];
 
 export const supabaseStatus={
-  available:hasConfig,
+  available:false,
   initialized:false,
   provider:"Supabase",
-  mode:hasConfig?"ready":"local-only",
-  message:hasConfig?"Supabase client ready":"Supabase configuration unavailable. Running in local-only mode."
+  mode:"local-only",
+  message:"Supabase client not initialized.",
+  source:""
 };
 
-export const supabase=hasConfig?createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
-  auth:{
-    persistSession:true,
-    autoRefreshToken:true,
-    detectSessionInUrl:true
-  }
-}):null;
+export let supabase=null;
 
-supabaseStatus.initialized=Boolean(supabase);
+function log(message){
+  console.info(`[Supabase] ${message}`);
+}
+
+export function withTimeout(promise,ms,label){
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(new Error(`${label} timed out`)),ms);
+    })
+  ]).finally(()=>clearTimeout(timer));
+}
+
+function hasConfig(){
+  return Boolean(
+    SUPABASE_URL&&
+    SUPABASE_ANON_KEY&&
+    !String(SUPABASE_URL).includes("YOUR_")&&
+    !String(SUPABASE_ANON_KEY).includes("YOUR_")
+  );
+}
+
+async function importSupabaseLibrary(onStatus){
+  let lastError=null;
+  for(const source of LIBRARY_SOURCES){
+    try{
+      log(`Supabase module import started (${source.includes("jsdelivr")?"jsDelivr":"esm.sh"})`);
+      onStatus?.("library-loading",`Library loading (${source.includes("jsdelivr")?"jsDelivr":"esm.sh"})`);
+      const module=await withTimeout(import(source),INIT_TIMEOUT_MS,"Supabase library import");
+      return { createClient:module.createClient, source };
+    }catch(e){
+      lastError=e;
+      console.warn("[Supabase] library import failed",e?.message||"Unknown import error");
+    }
+  }
+  throw lastError||new Error("Supabase library failed to load");
+}
+
+export async function initializeSupabaseClient({onStatus}={}){
+  if(supabase){
+    supabaseStatus.available=true;
+    supabaseStatus.initialized=true;
+    return supabase;
+  }
+  if(!hasConfig()){
+    supabaseStatus.available=false;
+    supabaseStatus.initialized=false;
+    supabaseStatus.mode="local-only";
+    supabaseStatus.message="Configuration missing";
+    onStatus?.("config-missing","Configuration missing");
+    return null;
+  }
+  log("Configuration loaded");
+  const { createClient, source } = await importSupabaseLibrary(onStatus);
+  if(typeof createClient!=="function")throw new Error("Supabase library failed to load");
+  supabase=createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{
+    auth:{
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+    }
+  });
+  supabaseStatus.available=true;
+  supabaseStatus.initialized=true;
+  supabaseStatus.mode="ready";
+  supabaseStatus.message="Supabase client ready";
+  supabaseStatus.source=source;
+  log("Client created");
+  onStatus?.("client-initialized","Client initialized");
+  return supabase;
+}
+
+export function getSupabaseClient(){
+  return supabase;
+}
 
 export default supabase;

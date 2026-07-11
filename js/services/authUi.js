@@ -2,8 +2,8 @@ const state={
   service:null,
   session:null,
   profile:null,
-  status:"connecting",
-  message:"Connecting",
+  status:"library-loading",
+  message:"Library loading",
   loading:false,
   localOnly:false,
   clientReady:false,
@@ -13,24 +13,21 @@ const state={
 function $(id){return document.getElementById(id)}
 function clean(value){return String(value||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m]))}
 function isFileProtocol(){return window.location.protocol==="file:"}
-function configLooksMissing(config){
-  return !config?.SUPABASE_URL||
-    !config?.SUPABASE_ANON_KEY||
-    String(config.SUPABASE_URL).includes("YOUR_")||
-    String(config.SUPABASE_ANON_KEY).includes("YOUR_");
-}
 
 function statusLabel(){
   const labels={
-    connecting:"Connecting",
-    "account-created":"Account created",
-    confirmation:"Check your email",
+    "library-loading":"Library loading",
+    "client-initialized":"Client initialized",
+    "session-loading":"Session loading",
+    "signed-out":"Signed out",
+    "signed-in":"Signed in",
+    "library-load-failed":"Library load failed",
     "config-missing":"Configuration missing",
+    "network-timeout":"Network timeout",
     "network-error":"Network error",
     "signup-failed":"Signup failed",
-    unavailable:"Supabase unavailable",
-    "signed-in":"Signed in",
-    "signed-out":"Signed out"
+    "account-created":"Account created",
+    confirmation:"Check your email"
   };
   if(labels[state.status])return labels[state.status];
   if(state.localOnly)return"Local-only mode";
@@ -38,8 +35,8 @@ function statusLabel(){
 }
 
 function statusClass(){
-  if(["signed-in","account-created"].includes(state.status))return"good";
-  if(["connecting","confirmation","signed-out"].includes(state.status)||state.localOnly)return"warn";
+  if(["signed-in","account-created","client-initialized"].includes(state.status))return"good";
+  if(["library-loading","session-loading","signed-out","confirmation"].includes(state.status)||state.localOnly)return"warn";
   return"bad";
 }
 
@@ -71,7 +68,7 @@ function setMessage(text,isError=false){
 }
 
 function authButtonsDisabled(){
-  return state.loading||!state.clientReady||state.status==="config-missing"||state.status==="network-error"||state.status==="unavailable";
+  return state.loading||!state.clientReady||["config-missing","network-timeout","network-error","library-load-failed"].includes(state.status);
 }
 
 function renderCloudStatus(){
@@ -100,33 +97,41 @@ function renderAuthView(){
   const signInButton=$("authSignInButton");
   const signUpButton=$("authSignUpButton");
   const signOutButton=$("authSignOutButton");
+  const retryButton=$("authRetryButton");
   if(signInButton)signInButton.disabled=disabled;
   if(signUpButton){
     signUpButton.disabled=disabled;
-    signUpButton.textContent=state.loading&&state.status==="connecting"?"Connecting...":state.loading?"Working...":"Create Account";
+    signUpButton.textContent=state.loading?"Working...":"Create Account";
   }
   if(signOutButton)signOutButton.disabled=state.loading||!state.clientReady;
+  if(retryButton)retryButton.disabled=state.loading||isFileProtocol();
   const localOnly=$("authLocalOnlyNote");
   if(localOnly){
     localOnly.textContent=state.status==="config-missing"?"Supabase configuration is missing. The app is running from this browser only.":
+      state.status==="library-load-failed"?"Supabase library failed to load. Local-only mode is still available.":
+      state.status==="network-timeout"?"Supabase connection timed out. Local-only mode is still available.":
       state.status==="network-error"?"Supabase could not be reached. The app is running from this browser only.":
       state.localOnly?"Local-only mode is active for this browser session.":
       "Local data remains available either way.";
   }
   const message=$("authMessage");
-  if(message&&state.loading)message.textContent=state.message||"Connecting";
+  if(message&&state.loading)message.textContent=state.message||statusLabel();
   else if(message&&!message.textContent)message.textContent=state.message;
 }
 
 function classifyError(error){
   const text=String(error?.message||error||"");
-  if(/fetch|network|load failed|err_network|failed to fetch|cdn|import/i.test(text))return{status:"network-error",message:"Network error. Supabase could not be reached.",isError:true};
+  if(/configuration missing|supabase configuration/i.test(text))return{status:"config-missing",message:"Configuration missing",isError:true};
+  if(/timed out|timeout/i.test(text))return{status:"network-timeout",message:"Network timeout",isError:true};
+  if(/supabase library failed to load|createclient/i.test(text))return{status:"library-load-failed",message:"Supabase library failed to load",isError:true};
+  if(/fetch|network|load failed|err_network|failed to fetch|cdn|import/i.test(text))return{status:"library-load-failed",message:"Supabase library failed to load",isError:true};
   return{status:"signup-failed",message:text||"Signup failed.",isError:true};
 }
 
 async function refreshSession(message){
   if(!state.service||!state.clientReady)return;
   try{
+    setStatus("session-loading","Session loading",false);
     state.session=await state.service.getCurrentSession();
     state.profile=null;
     if(state.session){
@@ -151,7 +156,7 @@ async function refreshSession(message){
 
 async function withLoading(message,task){
   state.loading=true;
-  state.message=message||"Connecting";
+  state.message=message||statusLabel();
   setMessage(state.message,false);
   renderAuthView();
   try{
@@ -164,7 +169,7 @@ async function withLoading(message,task){
 
 async function handleSignIn(event){
   event.preventDefault();
-  await withLoading("Connecting",async()=>{
+  await withLoading("Session loading",async()=>{
     const emailValue=$("authSignInEmail")?.value.trim();
     const passwordValue=$("authSignInPassword")?.value||"";
     if(!emailValue||!passwordValue){setStatus("signup-failed","Enter an email and password to sign in.",true);return}
@@ -182,7 +187,7 @@ async function handleSignIn(event){
 
 async function handleSignUp(event){
   event.preventDefault();
-  await withLoading("Connecting",async()=>{
+  await withLoading("Session loading",async()=>{
     console.info("[Auth] signup begins");
     if(!state.service||typeof state.service.signUp!=="function"){
       setStatus("signup-failed","Signup failed. Auth service is not ready.",true);
@@ -218,7 +223,7 @@ async function handleSignUp(event){
 }
 
 async function handleSignOut(){
-  await withLoading("Connecting",async()=>{
+  await withLoading("Session loading",async()=>{
     try{
       const { error } = await state.service.signOut();
       if(error){setStatus("signup-failed",error.message||"Sign out failed.",true);return}
@@ -242,6 +247,7 @@ function bindAuthEvents(){
     console.info("[Auth] signup submit handler registered");
   }
   $("authSignOutButton")?.addEventListener("click",handleSignOut);
+  $("authRetryButton")?.addEventListener("click",()=>initCloudConnection(true));
   $("authLocalOnlyButton")?.addEventListener("click",()=>{
     state.localOnly=true;
     setMessage("Local-only mode selected. Your current browser data remains available.",false);
@@ -250,43 +256,49 @@ function bindAuthEvents(){
   });
 }
 
-async function initAuth(){
-  bindAuthEvents();
-  renderAuthView();
+async function initCloudConnection(isRetry=false){
   if(isFileProtocol()){
     state.localOnly=true;
     state.clientReady=false;
     setStatus("config-missing","Cloud authentication requires Live Server. Open the app through http://127.0.0.1.",true);
     return;
   }
-  try{
-    setStatus("connecting","Connecting",false);
-    const config=await import("../config/supabase.js");
-    if(configLooksMissing(config)){
+  await withLoading("Library loading",async()=>{
+    try{
+      state.session=null;
+      state.profile=null;
+      state.clientReady=false;
+      state.localOnly=false;
+      setStatus("library-loading",isRetry?"Retrying cloud connection":"Library loading",false);
+      state.service=state.service||await import("./authService.js");
+      const client=await state.service.initializeAuthClient({
+        onStatus:(status,message)=>setStatus(status,message,status==="config-missing")
+      });
+      if(!client){
+        state.localOnly=true;
+        state.clientReady=false;
+        setStatus("config-missing","Configuration missing",true);
+        return;
+      }
+      state.clientReady=true;
+      setStatus("client-initialized","Client initialized",false);
+      await refreshSession();
+      state.service.subscribeToAuthChanges(async()=>{await refreshSession()});
+      setMessage(state.session?"Session restored. Cloud sync is still disabled until the next migration phase.":"Signed out. You can sign in or continue using local browser data.",false);
+    }catch(e){
+      const classified=classifyError(e);
       state.localOnly=true;
       state.clientReady=false;
-      setStatus("config-missing","Configuration missing",true);
-      return;
+      setStatus(classified.status,classified.message,true);
     }
-    state.service=await import("./authService.js");
-    if(!state.service.supabaseStatus?.available||!state.service.supabaseStatus?.initialized){
-      state.localOnly=true;
-      state.clientReady=false;
-      setStatus("config-missing",state.service.supabaseStatus?.message||"Configuration missing",true);
-      return;
-    }
-    state.clientReady=true;
-    await refreshSession();
-    state.service.subscribeToAuthChanges(async()=>{await refreshSession()});
-    setMessage(state.session?"Session restored. Cloud sync is still disabled until the next migration phase.":"Signed out. You can sign in or continue using local browser data.",false);
-    renderAuthView();
-  }catch(e){
-    const classified=classifyError(e);
-    state.localOnly=true;
-    state.clientReady=false;
-    setStatus(classified.status,classified.message,true);
-  }
+  });
 }
 
-window.DynastyAuthUI={refreshSession,renderAuthView,state};
+function initAuth(){
+  bindAuthEvents();
+  renderAuthView();
+  initCloudConnection(false);
+}
+
+window.DynastyAuthUI={refreshSession,renderAuthView,state,initCloudConnection};
 initAuth();
