@@ -181,6 +181,66 @@ function fantraxConflict(row,resolution){
     trace:resolution.trace||[]
   };
 }
+function sourceRowSummary(row){
+  return {
+    sourceRowNumber:row.source_row_number||0,
+    incomingName:row.name||"",
+    fantrax_id:row.fantrax_id||"",
+    mlbam_id:row.mlbam_id||"",
+    team:row.mlb_team||"",
+    positions:Array.isArray(row.positions)?[...row.positions]:[],
+    resolutionReason:row.identityResolution?.reason||"",
+    resolutionKey:row.identityResolution?.resolutionKey||"",
+    matchSource:row.identityResolution?.matchSource||""
+  };
+}
+function populated(value){return value!==undefined&&value!==null&&String(value).trim()!==""}
+function sameStableIdentity(a,b){
+  if(populated(a.fantrax_id)||populated(b.fantrax_id))return populated(a.fantrax_id)&&String(a.fantrax_id)===String(b.fantrax_id);
+  if(populated(a.mlbam_id)||populated(b.mlbam_id))return populated(a.mlbam_id)&&String(a.mlbam_id)===String(b.mlbam_id);
+  return false;
+}
+function rowCompleteness(row){
+  return Object.entries(row||{}).reduce((count,[key,value])=>key==="identityResolution"?count:(populated(value)?count+1:count),0);
+}
+function mergeResolvedUpdateRows(rows){
+  return rows.reduce((merged,row)=>{
+    const out={...merged};
+    Object.entries(row).forEach(([key,value])=>{
+      if(key==="identityResolution"){out[key]=value;return}
+      if(populated(value)||!populated(out[key]))out[key]=value;
+    });
+    return out;
+  },{});
+}
+function collapseResolvedUpdates(updates){
+  const groups=new Map();
+  updates.forEach(row=>{
+    const id=row.id||"";
+    if(!id)return;
+    const group=groups.get(id)||[];
+    group.push(row);
+    groups.set(id,group);
+  });
+  const collapsed=[],conflicts=[];
+  let duplicateResolvedUpdatesCollapsed=0;
+  groups.forEach((rows,id)=>{
+    if(rows.length===1){collapsed.push(rows[0]);return}
+    const allSame=rows.every((row,index)=>index===0||sameStableIdentity(rows[0],row));
+    if(!allSame){
+      conflicts.push({
+        reason:"multiple_source_players_resolved_to_same_internal_id",
+        internalPlayerId:id,
+        candidates:rows.map(sourceRowSummary)
+      });
+      return;
+    }
+    const sorted=[...rows].sort((a,b)=>rowCompleteness(a)-rowCompleteness(b)||(a.source_row_number||0)-(b.source_row_number||0));
+    collapsed.push(mergeResolvedUpdateRows(sorted));
+    duplicateResolvedUpdatesCollapsed+=rows.length-1;
+  });
+  return {updates:collapsed,conflicts,duplicateResolvedUpdatesCollapsed};
+}
 function classifyFantraxRows(playerRows,resolver){
   const prepared=cloudStore.preparePlayerSyncRows(playerRows);
   const updates=[],inserts=[],identityConflicts=[],unmatchedRows=[];
@@ -205,15 +265,18 @@ function classifyFantraxRows(playerRows,resolver){
     }
     unmatchedRows.push({sourceRowNumber:row.source_row_number||0,name:row.name||"",fantrax_id:row.fantrax_id||"",mlbam_id:row.mlbam_id||"",reason:resolution.reason||"unmatched"});
   });
+  const collapsed=collapseResolvedUpdates(updates);
+  identityConflicts.push(...collapsed.conflicts);
   return {
     ...prepared,
-    updates,
+    updates:collapsed.updates,
     inserts,
     identityConflicts,
     unmatchedRows,
     matchedByFantrax,
     matchedByMlbam,
-    matchedByFallback
+    matchedByFallback,
+    duplicateResolvedUpdatesCollapsed:collapsed.duplicateResolvedUpdatesCollapsed
   };
 }
 async function importFantrax({leagueId,file,onProgress,cancelled}){
@@ -228,7 +291,7 @@ async function importFantrax({leagueId,file,onProgress,cancelled}){
     const maps=await cloudMaps(leagueId),owners=rows.map(r=>cleanOwner(cell(r,ix.owner)||cell(r,ix.status)));
     await ensureTeams(leagueId,owners,maps);
     let resolver=new PlayerIdentityResolver({repository:new InMemoryPlayerIdentityRepository(maps.players)});
-    let processed=0,matched=0,unmatched=0,inserted=0,updated=0,duplicateFantraxIds=0,duplicateMlbamIds=0,duplicateFallbackKeys=0,matchedByFantrax=0,matchedByMlbam=0,matchedByFallback=0,identityConflicts=0,skippedInvalidRows=0;
+    let processed=0,matched=0,unmatched=0,inserted=0,updated=0,duplicateFantraxIds=0,duplicateMlbamIds=0,duplicateFallbackKeys=0,matchedByFantrax=0,matchedByMlbam=0,matchedByFallback=0,identityConflicts=0,skippedInvalidRows=0,duplicateResolvedUpdatesCollapsed=0;
     for(const batch of chunk(rows)){
       ensureNotCancelled(ctx);
       const playerRows=[];
@@ -255,14 +318,15 @@ async function importFantrax({leagueId,file,onProgress,cancelled}){
       matchedByFallback+=classified.matchedByFallback||0;
       identityConflicts+=(classified.identityConflicts||[]).length;
       skippedInvalidRows+=(classified.skippedInvalidRows||[]).length;
+      duplicateResolvedUpdatesCollapsed+=classified.duplicateResolvedUpdatesCollapsed||0;
       unmatched+=(classified.unmatchedRows||[]).length+(classified.identityConflicts||[]).length+(classified.skippedInvalidRows||[]).length;
       processed+=batch.length;matched+=saved.length;
       await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});
-      progress(ctx,"Fantrax player/roster import",{processed,total:rows.length,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,unmatched,identityConflicts,skippedInvalidRows,sourceRows:classified.sourceRows,rowsAfterDeduplication:classified.rowsAfterDeduplication,batch:Math.ceil(processed/BATCH_SIZE),message:`Fantrax players ${processed} / ${rows.length}`});
+      progress(ctx,"Fantrax player/roster import",{processed,total:rows.length,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows,sourceRows:classified.sourceRows,rowsAfterDeduplication:classified.rowsAfterDeduplication,batch:Math.ceil(processed/BATCH_SIZE),message:`Fantrax players ${processed} / ${rows.length}`});
       await sleep();
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    return{processed,matched,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,unmatched,identityConflicts,skippedInvalidRows};
+    return{processed,matched,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows};
   }catch(e){
     await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});
     throw e;

@@ -69,6 +69,17 @@ function stripPlayerUpdateRows(rows){
   });
 }
 
+function duplicateIds(rows){
+  const seen=new Set(),duplicates=new Set();
+  rows.forEach(row=>{
+    const id=String(row?.id||"").trim();
+    if(!id)return;
+    if(seen.has(id))duplicates.add(id);
+    seen.add(id);
+  });
+  return [...duplicates].sort();
+}
+
 export async function getCurrentUser(){
   const supabase=await client();
   const result=await timed(supabase.auth.getUser(),"Current user request");
@@ -278,6 +289,10 @@ ${databaseError.message}`);
 }
 
 export async function syncResolvedPlayers({updates=[],inserts=[]},{label="Resolved player import"}={}){
+  const duplicateUpdateIds=duplicateIds(updates);
+  if(duplicateUpdateIds.length){
+    throw new Error(`Resolved update batch contains duplicate player IDs: ${duplicateUpdateIds.join(", ")}`);
+  }
   const supabase=await client();
   const saved=[];
   const meta={inserted:0,updated:0};

@@ -16,8 +16,14 @@ assert.match(importService,/import \{ InMemoryPlayerIdentityRepository \} from "
 assert.match(fantraxBody,/new PlayerIdentityResolver\(\{repository:new InMemoryPlayerIdentityRepository\(maps\.players\)\}\)/);
 assert.match(fantraxBody,/classifyFantraxRows\(playerRows,resolver\)/);
 assert.match(fantraxBody,/cloudStore\.syncResolvedPlayers/);
+assert.match(importService,/function collapseResolvedUpdates\(updates\)/);
+assert.match(fantraxBody,/duplicateResolvedUpdatesCollapsed/);
+assert.match(importService,/multiple_source_players_resolved_to_same_internal_id/);
+assert.match(importService,/sourceRowSummary/);
 assert.ok(!fantraxBody.includes("cloudStore.syncPlayers"),"Fantrax import must not use legacy syncPlayers");
 assert.match(cloudStore,/export async function syncResolvedPlayers/);
+assert.match(cloudStore,/Resolved update batch contains duplicate player IDs/);
+assert.match(cloudStore,/const duplicateUpdateIds=duplicateIds\(updates\)/);
 assert.match(cloudStore,/from\("players"\)\.upsert\(stripPlayerUpdateRows\(updates\),\{onConflict:"id"\}\)\.select\("\*"\)/);
 assert.match(cloudStore,/from\("players"\)\.insert\(stripPlayerInsertRows\(inserts\)\)\.select\("\*"\)/);
 
