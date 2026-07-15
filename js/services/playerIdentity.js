@@ -2,6 +2,12 @@ export function cleanExternalId(value){
   return String(value??"").trim();
 }
 
+export function cleanMlbamId(value){
+  const cleaned=cleanExternalId(value);
+  if(!cleaned||cleaned==="0")return "";
+  return cleaned;
+}
+
 export function normalizeIdentityName(value){
   return String(value||"")
     .normalize("NFD")
@@ -52,7 +58,7 @@ export function buildPlayerIdentityIndexes(players=[]){
   };
   players.forEach(player=>{
     pushIndex(indexes.byFantrax,indexes.duplicateFantrax,cleanExternalId(player.fantrax_id),player);
-    pushIndex(indexes.byMlbam,indexes.duplicateMlbam,cleanExternalId(player.mlbam_id),player);
+    pushIndex(indexes.byMlbam,indexes.duplicateMlbam,cleanMlbamId(player.mlbam_id),player);
     const nameKey=normalizeIdentityName(player.normalized_name||identityPlayerName(player));
     pushIndex(indexes.byName,indexes.duplicateNames,nameKey,player);
   });
@@ -91,7 +97,7 @@ function conflictPayload({row,rowNumber,leagueId,reason,players=[]}){
     sourceRowNumber:rowNumber,
     incomingPlayerName:identityPlayerName(row),
     incomingFantraxId:cleanExternalId(row.fantrax_id),
-    incomingMlbamId:cleanExternalId(row.mlbam_id),
+    incomingMlbamId:cleanMlbamId(row.mlbam_id),
     conflictingInternalPlayerUuids:uniquePlayers.map(player=>player.id).filter(Boolean),
     conflictingPlayerNames:uniquePlayers.map(player=>identityPlayerName(player)).filter(Boolean),
     leagueId:leagueId||row?.league_id||"",
@@ -105,7 +111,7 @@ function uniqueId(player){
 
 export function resolvePlayerIdentity(row,indexes,{leagueId=row?.league_id,rowNumber=0}={}){
   const fantraxId=cleanExternalId(row?.fantrax_id);
-  const mlbamId=cleanExternalId(row?.mlbam_id);
+  const mlbamId=cleanMlbamId(row?.mlbam_id);
   const fantraxMatches=fantraxId?(indexes.byFantrax.get(fantraxId)||[]):[];
   const mlbamMatches=mlbamId?(indexes.byMlbam.get(mlbamId)||[]):[];
 
@@ -121,7 +127,7 @@ export function resolvePlayerIdentity(row,indexes,{leagueId=row?.league_id,rowNu
 
   const stableMatch=fantraxMatches[0]||mlbamMatches[0]||null;
   const stableMatchType=fantraxMatches[0]?"fantrax":mlbamMatches[0]?"mlbam":"";
-  const fallback=findCautiousFallback(row,indexes);
+  const fallback=(!fantraxId&&!mlbamId)?findCautiousFallback(row,indexes):{status:"unmatched"};
   if(stableMatch&&fallback.status==="matched"&&uniqueId(stableMatch)!==uniqueId(fallback.player)){
     return {status:"conflict",conflict:conflictPayload({row,rowNumber,leagueId,reason:"stable_id_conflicts_with_name_context_candidate",players:[stableMatch,fallback.player]})};
   }
@@ -154,7 +160,7 @@ export function dedupeIdentityRows(rows=[]){
       return;
     }
     const fantraxId=cleanExternalId(row.fantrax_id);
-    const mlbamId=cleanExternalId(row.mlbam_id);
+    const mlbamId=cleanMlbamId(row.mlbam_id);
     let key="";
     if(fantraxId){
       key=`${row.league_id}:fantrax:${fantraxId}`;

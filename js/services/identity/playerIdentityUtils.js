@@ -4,6 +4,12 @@ export function cleanExternalId(value){
   return String(value??"").trim();
 }
 
+export function cleanMlbamId(value){
+  const cleaned=cleanExternalId(value);
+  if(!cleaned||cleaned==="0")return "";
+  return cleaned;
+}
+
 export function normalizeName(value){
   return String(value||"")
     .normalize("NFD")
@@ -57,7 +63,7 @@ export function incomingIdentitySummary(player){
     name:playerName(player),
     normalizedName:playerNormalizedName(player),
     fantraxId:cleanExternalId(player?.fantrax_id||player?.fantraxId),
-    mlbamId:cleanExternalId(player?.mlbam_id||player?.mlbamId),
+    mlbamId:cleanMlbamId(player?.mlbam_id||player?.mlbamId),
     team:playerTeam(player),
     positions:playerPositions(player)
   });
@@ -69,7 +75,7 @@ export function candidateIdentitySummary(player){
     name:playerName(player),
     normalizedName:playerNormalizedName(player),
     fantraxId:cleanExternalId(player?.fantrax_id||player?.fantraxId),
-    mlbamId:cleanExternalId(player?.mlbam_id||player?.mlbamId),
+    mlbamId:cleanMlbamId(player?.mlbam_id||player?.mlbamId),
     team:playerTeam(player),
     positions:playerPositions(player)
   });

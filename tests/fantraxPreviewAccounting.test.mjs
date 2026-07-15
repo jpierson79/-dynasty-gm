@@ -82,9 +82,46 @@ const splitIdentityPreview=previewFor([
   ["FT-MATCH","Existing Player","FREE AGENT","SS","ATL","24"],
   ["FT-OTHER","Existing Player","FREE AGENT","SS","ATL","24"]
 ],[existingPlayer]);
-assert.equal(splitIdentityPreview.existingCloudMatches,0);
-assert.equal(splitIdentityPreview.newPlayersToInsert,0);
-assert.equal(splitIdentityPreview.identityConflicts,1);
+assert.equal(splitIdentityPreview.existingCloudMatches,1);
+assert.equal(splitIdentityPreview.newPlayersToInsert,1);
+assert.equal(splitIdentityPreview.identityConflicts,0);
+
+const fallbackTarget={
+  id:"a165a59f-7626-48f3-a925-634ff838e6e3",
+  league_id:leagueId,
+  name:"Repeated Fallback",
+  normalized_name:"repeated fallback",
+  positions:["SS"],
+  mlb_team:"ATL"
+};
+const repeatedFallbackPreview=previewFor(
+  Array.from({length:12},(_,index)=>[`FT-FALLBACK-${index+1}`,"Repeated Fallback","FREE AGENT","SS","ATL","24"]),
+  [fallbackTarget]
+);
+assert.equal(repeatedFallbackPreview.existingCloudMatches,0);
+assert.equal(repeatedFallbackPreview.newPlayersToInsert,12);
+assert.equal(repeatedFallbackPreview.updateDecisionDiagnostics.totalUpdateDecisions,0);
+assert.equal(repeatedFallbackPreview.updateDecisionDiagnostics.uniqueMatchedPlayerUuids,0);
+assert.equal(repeatedFallbackPreview.updateDecisionDiagnostics.largestSourceRowsPerUuid,0);
+assert.deepEqual(repeatedFallbackPreview.updateDecisionDiagnostics.groups,[]);
+assert.equal(repeatedFallbackPreview.resolverEdgeCaseDiagnostics.fallbackRequiresNameTeamPosition,true);
+
+const blankFantraxPreview=previewFor([
+  ["","Blank Fantrax","FREE AGENT","SS","ATL","24"]
+],[{...existingPlayer,id:"blank-fantrax-existing",fantrax_id:"",name:"Blank Fantrax",normalized_name:"blank fantrax"}]);
+assert.equal(blankFantraxPreview.resolverEdgeCaseDiagnostics.blankFantraxNeverMatchesBlankFantrax,true);
+assert.equal(blankFantraxPreview.resolverEdgeCaseDiagnostics.blankFantraxUpdateMatches,0);
+
+const zeroMlbamPreview=buildFantraxPreviewSummary({
+  leagueId,
+  file,
+  rows:[["FT-ZERO","Zero MLBAM","FREE AGENT","SS","ATL","24","0"]],
+  head:["ID","Player","Status","Position","Team","Age","MLBAM ID"],
+  maps:{players:[{...existingPlayer,id:"zero-mlbam-existing",fantrax_id:"",mlbam_id:0,name:"Zero MLBAM",normalized_name:"zero mlbam"}],teams:new Map()}
+});
+assert.equal(zeroMlbamPreview.resolverEdgeCaseDiagnostics.zeroLikeMlbamRows,1);
+assert.equal(zeroMlbamPreview.resolverEdgeCaseDiagnostics.zeroLikeMlbamIdentityDecisions,0);
+assert.equal(zeroMlbamPreview.resolverEdgeCaseDiagnostics.zeroLikeMlbamTreatedAsMissing,true);
 
 assert.ok(!oneMatchPreview.updateResolutionDiagnostics.duplicateResolvedUuidGroups.length);
 assert.equal(oneMatchPreview.previewPlayerCollectionSource,"cloud players");

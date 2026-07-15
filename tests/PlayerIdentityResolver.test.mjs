@@ -187,11 +187,12 @@ function assertIncomingShape(candidate){
   const stable=player({id:"p-stable",fantrax_id:"FTX-STABLE",name:"Stable Candidate",normalized_name:"stable candidate"});
   const fallback=player({id:"p-context",name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
   const result=resolve([stable,fallback],{fantrax_id:"FTX-STABLE",name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
-  assert.equal(result.action,"conflict");
-  assert.equal(result.reason,"stable_identifier_conflicts_with_fallback_candidate");
-  assert.deepEqual(result.conflict.conflictingPlayerIds.sort(),["p-context","p-stable"]);
-  assertIncomingShape(result.conflict.incoming);
-  result.conflict.candidates.forEach(assertCandidateShape);
+  assert.equal(result.action,"update");
+  assert.equal(result.matchedPlayerId,"p-stable");
+  assert.equal(result.matchSource,"fantrax_id");
+  assert.equal(result.reason,"fantrax_id_match");
+  assert.equal(result.diagnostics.candidateCounts.fallback,0);
+  assert.ok(result.trace.includes("fallback_skipped_stable_id_present"));
 }
 
 {
@@ -199,9 +200,30 @@ function assertIncomingShape(candidate){
   const fallbackA=player({id:"p-context-a",name:"Many Context",normalized_name:"many context",mlb_team:"BOS",positions:["2B"]});
   const fallbackB=player({id:"p-context-b",name:"Many Context",normalized_name:"many context",mlb_team:"BOS",positions:["2B"]});
   const result=resolve([stable,fallbackB,fallbackA],{fantrax_id:"FTX-STABLE-MANY",name:"Many Context",normalized_name:"many context",mlb_team:"BOS",positions:["2B"]});
-  assert.equal(result.action,"conflict");
-  assert.equal(result.reason,"stable_identifier_conflicts_with_fallback_candidate");
-  assert.deepEqual(result.conflict.conflictingPlayerIds,["p-context-a","p-context-b","p-stable-many"]);
+  assert.equal(result.action,"update");
+  assert.equal(result.matchedPlayerId,"p-stable-many");
+  assert.equal(result.matchSource,"fantrax_id");
+  assert.equal(result.diagnostics.candidateCounts.fallback,0);
+}
+
+{
+  const fallback=player({id:"p-context-blocked",name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
+  const result=resolve([fallback],{fantrax_id:"FTX-NEW",name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
+  assert.equal(result.action,"insert");
+  assert.equal(result.matchSource,"fantrax_id");
+  assert.equal(result.reason,"no_existing_stable_identifier_match");
+  assert.equal(result.diagnostics.candidateCounts.fallback,0);
+  assert.ok(result.trace.includes("fallback_skipped_stable_id_present"));
+}
+
+{
+  const fallback=player({id:"p-context-blocked-mlbam",name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
+  const result=resolve([fallback],{mlbam_id:876543,name:"Context Candidate",normalized_name:"context candidate",mlb_team:"BOS",positions:["2B"]});
+  assert.equal(result.action,"insert");
+  assert.equal(result.matchSource,"mlbam_id");
+  assert.equal(result.reason,"no_existing_stable_identifier_match");
+  assert.equal(result.diagnostics.candidateCounts.fallback,0);
+  assert.ok(result.trace.includes("fallback_skipped_stable_id_present"));
 }
 
 {
@@ -268,7 +290,7 @@ function assertIncomingShape(candidate){
     "mlbam_id_present",
     "mlbam_match_not_found",
     "mlbam_validation_complete",
-    "safe_fallback_not_found",
+    "fallback_skipped_stable_id_present",
     "fallback_validation_complete",
     "resolved_insert_by_mlbam_id"
   ]);
@@ -288,6 +310,23 @@ function assertIncomingShape(candidate){
   assert.equal(resolve([existing],{fantrax_id:null,mlbam_id:444}).matchedPlayerId,"resilient-mlbam");
   assert.equal(resolve([existing],{fantrax_id:"   ",mlbam_id:444}).matchedPlayerId,"resilient-mlbam");
   assert.equal(resolve([existing],{mlbam_id:"444"}).matchedPlayerId,"resilient-mlbam");
+}
+
+{
+  const zeroExisting=player({id:"zero-mlbam",mlbam_id:0,name:"Zero MLBAM",normalized_name:"zero mlbam",mlb_team:"NYY",positions:["OF"]});
+  const result=resolve([zeroExisting],{mlbam_id:0,name:"Zero MLBAM",normalized_name:"zero mlbam",mlb_team:"NYY",positions:["OF"]});
+  assert.equal(result.action,"update");
+  assert.equal(result.matchSource,"fallback");
+  assert.equal(result.diagnostics.incoming.mlbamId,"");
+  assert.ok(result.trace.includes("mlbam_id_missing"));
+}
+
+{
+  const zeroExisting=player({id:"zero-mlbam-no-context",mlbam_id:0,name:"Zero MLBAM",normalized_name:"zero mlbam",mlb_team:"NYY",positions:["OF"]});
+  const result=resolve([zeroExisting],{mlbam_id:0,name:"Different Zero",normalized_name:"different zero",mlb_team:"LAD",positions:["P"]});
+  assert.equal(result.action,"unmatched");
+  assert.equal(result.reason,"missing_stable_identifier_and_no_safe_fallback");
+  assert.equal(result.diagnostics.incoming.mlbamId,"");
 }
 
 {

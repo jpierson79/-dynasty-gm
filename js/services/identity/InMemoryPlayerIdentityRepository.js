@@ -1,6 +1,7 @@
 import {
   candidateIdentitySummary,
   cleanExternalId,
+  cleanMlbamId,
   fallbackIdentityKey,
   playerId,
   playerNormalizedName
@@ -42,7 +43,7 @@ export class InMemoryPlayerIdentityRepository{
         return;
       }
       add(this.#byFantrax,cleanExternalId(player.fantrax_id),player);
-      add(this.#byMlbam,cleanExternalId(player.mlbam_id),player);
+      add(this.#byMlbam,cleanMlbamId(player.mlbam_id),player);
       add(this.#byName,playerNormalizedName(player),player);
     });
   }
@@ -52,7 +53,7 @@ export class InMemoryPlayerIdentityRepository{
   }
 
   findByMlbamId(id){
-    return cloneRows(this.#byMlbam.get(cleanExternalId(id)));
+    return cloneRows(this.#byMlbam.get(cleanMlbamId(id)));
   }
 
   findByNormalizedName(name){
@@ -70,8 +71,8 @@ export class InMemoryPlayerIdentityRepository{
 
   findInvalidMatches(importedPlayer){
     const incomingFantrax=cleanExternalId(importedPlayer?.fantrax_id);
-    const incomingMlbam=cleanExternalId(importedPlayer?.mlbam_id);
-    const incomingFallback=fallbackIdentityKey(importedPlayer);
+    const incomingMlbam=cleanMlbamId(importedPlayer?.mlbam_id);
+    const incomingFallback=!incomingFantrax&&!incomingMlbam?fallbackIdentityKey(importedPlayer):"";
     return this.#invalidRecords.filter(record=>{
       const summary=record.summary;
       return Boolean(

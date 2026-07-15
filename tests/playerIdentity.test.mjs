@@ -61,8 +61,9 @@ function resolve(row,players){
   const nameCandidate=player({id:"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",name:"Same Name",normalized_name:"same name",mlb_team:"BOS"});
   const fantraxCandidate=player({id:"ffffffff-ffff-ffff-ffff-ffffffffffff",fantrax_id:"FTX-7",name:"Different Name",normalized_name:"different name"});
   const result=resolve({fantrax_id:"FTX-7",name:"Same Name",normalized_name:"same name",mlb_team:"BOS"},[nameCandidate,fantraxCandidate]);
-  assert.equal(result.status,"conflict");
-  assert.equal(result.conflict.reason,"stable_id_conflicts_with_name_context_candidate");
+  assert.equal(result.status,"matched");
+  assert.equal(result.matchType,"fantrax");
+  assert.equal(result.player.id,fantraxCandidate.id);
 }
 
 {

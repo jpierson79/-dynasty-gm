@@ -3,6 +3,7 @@ import {
   RESOLVER_VERSION,
   candidateIdentitySummary,
   cleanExternalId,
+  cleanMlbamId,
   cloneSummary,
   createResolutionKey,
   incomingIdentitySummary,
@@ -212,7 +213,7 @@ export class PlayerIdentityResolver{
   resolve(importedPlayer){
     const incoming=importedPlayer||{};
     const fantraxId=cleanExternalId(incoming.fantrax_id);
-    const mlbamId=cleanExternalId(incoming.mlbam_id);
+    const mlbamId=cleanMlbamId(incoming.mlbam_id);
     const trace=[];
 
     if(fantraxId)trace.push("fantrax_id_present");
@@ -228,8 +229,9 @@ export class PlayerIdentityResolver{
     if(mlbamId)trace.push(mlbamMatches.length>1?"multiple_mlbam_matches_found":mlbamMatches.length?"mlbam_match_found":"mlbam_match_not_found");
     trace.push("mlbam_validation_complete");
 
-    const fallback=fallbackMatches(incoming,this.#repository);
-    trace.push(fallback.length>1?"multiple_safe_fallback_matches_found":fallback.length?"safe_fallback_found":"safe_fallback_not_found");
+    const fallback=(!fantraxId&&!mlbamId)?fallbackMatches(incoming,this.#repository):[];
+    if(fantraxId||mlbamId)trace.push("fallback_skipped_stable_id_present");
+    else trace.push(fallback.length>1?"multiple_safe_fallback_matches_found":fallback.length?"safe_fallback_found":"safe_fallback_not_found");
     trace.push("fallback_validation_complete");
 
     const repositoryDiagnostic=repositoryDiagnostics(this.#repository,incoming);
