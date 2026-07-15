@@ -1,7 +1,7 @@
 import * as cloudStore from "./cloudStore.js";
 import { PlayerIdentityResolver } from "./PlayerIdentityResolver.js";
 import { InMemoryPlayerIdentityRepository } from "./identity/InMemoryPlayerIdentityRepository.js";
-import { buildPlayerIdentityIndexes, resolvePlayerIdentity } from "./playerIdentity.js";
+import { buildPlayerIdentityIndexes, cleanMlbamId, resolvePlayerIdentity } from "./playerIdentity.js";
 import { SUPABASE_URL } from "../config/supabase.js";
 
 const BATCH_SIZE=150;
@@ -23,6 +23,13 @@ function now(){return new Date().toISOString()}
 function norm(value){return window.DynastyMigrationService?.normalizeName?window.DynastyMigrationService.normalizeName(value):String(value||"").trim().toLowerCase()}
 function clean(value){return String(value??"").trim()}
 function num(value){const n=Number(String(value??"").replace(/[^0-9.\-]/g,""));return Number.isFinite(n)?n:null}
+function serializeMlbamId(value){
+  const cleaned=cleanMlbamId(value);
+  if(!cleaned)return null;
+  if(!/^\d+$/.test(cleaned))return null;
+  const numericValue=Number(cleaned);
+  return Number.isSafeInteger(numericValue)&&numericValue>0?numericValue:null;
+}
 function chunk(rows,size=BATCH_SIZE){const out=[];for(let i=0;i<rows.length;i+=size)out.push(rows.slice(i,i+size));return out}
 function cleanOwner(value){
   const s=clean(value);
@@ -93,7 +100,7 @@ function buildFantraxPlayerRows(rows,ix,leagueId,maps,startRowNumber=2){
     if(!name)return;
     const owner=cleanOwner(cell(row,ix.owner)||cell(row,ix.status));
     const fantraxId=textCell(row,ix.fantrax);
-    const mlbam=num(cell(row,ix.mlbam));
+    const mlbam=serializeMlbamId(cell(row,ix.mlbam));
     const normalized=norm(name);
     playerRows.push(cleanObject({
       source_row_number:startRowNumber+index,
@@ -235,6 +242,88 @@ function sourceRowSummary(row){
     matchSource:row.identityResolution?.matchSource||""
   };
 }
+function stableIdSet(rows,key){
+  return new Set(rows.map(row=>String(row?.[key]??"").trim()).filter(Boolean));
+}
+function updateDecisionRow(row){
+  const resolution=row.identityResolution||{};
+  return {
+    sourceRowNumber:row.source_row_number||0,
+    importedPlayerName:row.name||"",
+    importedFantraxId:row.fantrax_id||"",
+    importedMlbamId:row.mlbam_id??"",
+    normalizedName:row.normalized_name||"",
+    team:row.mlb_team||"",
+    positions:Array.isArray(row.positions)?[...row.positions]:[],
+    matchedPlayerId:resolution.matchedPlayerId||row.id||"",
+    matchedExistingPlayerName:resolution.playerSummary?.name||"",
+    matchSource:resolution.matchSource||"",
+    exactRule:resolution.reason||"",
+    trace:Array.isArray(resolution.trace)?[...resolution.trace]:[],
+    resolverBranch:Array.isArray(resolution.trace)?resolution.trace[resolution.trace.length-1]||"": "",
+    resolutionKey:resolution.resolutionKey||""
+  };
+}
+function buildUpdateDecisionDiagnostics(updates){
+  const grouped=new Map();
+  updates.forEach(row=>{
+    const id=row.id||row.identityResolution?.matchedPlayerId||"";
+    if(!id)return;
+    const group=grouped.get(id)||[];
+    group.push(row);
+    grouped.set(id,group);
+  });
+  const groups=[...grouped.entries()].map(([matchedPlayerId,rows])=>{
+    const fantraxIds=stableIdSet(rows,"fantrax_id");
+    const mlbamIds=stableIdSet(rows,"mlbam_id");
+    return {
+      matchedPlayerId,
+      sourceRowCount:rows.length,
+      first10ImportedPlayers:rows.slice(0,10).map(updateDecisionRow),
+      stableIdsDiffer:fantraxIds.size>1||mlbamIds.size>1,
+      distinctFantraxIds:fantraxIds.size,
+      distinctMlbamIds:mlbamIds.size,
+      matchSources:[...new Set(rows.map(row=>row.identityResolution?.matchSource).filter(Boolean))].sort(),
+      exactRules:[...new Set(rows.map(row=>row.identityResolution?.reason).filter(Boolean))].sort()
+    };
+  }).sort((a,b)=>b.sourceRowCount-a.sourceRowCount||a.matchedPlayerId.localeCompare(b.matchedPlayerId));
+  return {
+    totalUpdateDecisions:updates.length,
+    uniqueMatchedPlayerUuids:groups.length,
+    largestSourceRowsPerUuid:groups[0]?.sourceRowCount||0,
+    groups
+  };
+}
+function buildResolverEdgeCaseDiagnostics(playerRows,preparedRows,updates,inserts,unmatchedRows){
+  const rawBlankFantraxRows=playerRows.filter(row=>!String(row.fantrax_id??"").trim()).length;
+  const fantraxBlankMatches=updates.filter(row=>row.identityResolution?.matchSource==="fantrax_id"&&!String(row.fantrax_id??"").trim());
+  const zeroLikeMlbamValues=new Set(["0", "", "null", "undefined"]);
+  const rowsWithZeroLikeMlbam=preparedRows.filter(row=>zeroLikeMlbamValues.has(String(row.mlbam_id??"").trim().toLowerCase()));
+  const zeroLikeMlbamIdentityRows=[...updates,...inserts].filter(row=>row.identityResolution?.matchSource==="mlbam_id"&&zeroLikeMlbamValues.has(String(row.mlbam_id??"").trim().toLowerCase()));
+  const fallbackUpdates=updates.filter(row=>row.identityResolution?.matchSource==="fallback");
+  const unsafeFallbackUpdates=fallbackUpdates.filter(row=>{
+    const incoming=row.identityResolution?.diagnostics?.incoming||{};
+    const candidate=row.identityResolution?.playerSummary||{};
+    const incomingPositions=Array.isArray(incoming.positions)?incoming.positions:[];
+    const candidatePositions=Array.isArray(candidate.positions)?candidate.positions:[];
+    const overlaps=incomingPositions.some(pos=>candidatePositions.includes(pos));
+    return !(incoming.normalizedName&&candidate.normalizedName&&incoming.normalizedName===candidate.normalizedName&&incoming.team&&candidate.team&&incoming.team===candidate.team&&overlaps);
+  });
+  return {
+    blankFantraxRows:rawBlankFantraxRows,
+    blankFantraxUpdateMatches:fantraxBlankMatches.length,
+    blankFantraxNeverMatchesBlankFantrax:fantraxBlankMatches.length===0,
+    zeroLikeMlbamRows:rowsWithZeroLikeMlbam.length,
+    zeroLikeMlbamIdentityDecisions:zeroLikeMlbamIdentityRows.length,
+    zeroLikeMlbamTreatedAsMissing:zeroLikeMlbamIdentityRows.length===0,
+    fallbackUpdateDecisions:fallbackUpdates.length,
+    unsafeFallbackUpdateDecisions:unsafeFallbackUpdates.length,
+    fallbackRequiresNameTeamPosition:unsafeFallbackUpdates.length===0,
+    zeroLikeMlbamExamples:zeroLikeMlbamIdentityRows.slice(0,10).map(updateDecisionRow),
+    unsafeFallbackExamples:unsafeFallbackUpdates.slice(0,10).map(updateDecisionRow),
+    unmatchedMissingIdentityRows:unmatchedRows.filter(row=>row.reason==="missing_stable_identifier_and_no_safe_fallback").length
+  };
+}
 function populated(value){return value!==undefined&&value!==null&&String(value).trim()!==""}
 function sameStableIdentity(a,b){
   if(populated(a.fantrax_id)||populated(b.fantrax_id))return populated(a.fantrax_id)&&String(a.fantrax_id)===String(b.fantrax_id);
@@ -324,6 +413,8 @@ function classifyFantraxRows(playerRows,resolver){
     }
     unmatchedRows.push({sourceRowNumber:row.source_row_number||0,name:row.name||"",fantrax_id:row.fantrax_id||"",mlbam_id:row.mlbam_id||"",reason:resolution.reason||"unmatched"});
   });
+  const updateDecisionDiagnostics=buildUpdateDecisionDiagnostics(updates);
+  const resolverEdgeCaseDiagnostics=buildResolverEdgeCaseDiagnostics(playerRows,prepared.rows,updates,inserts,unmatchedRows);
   const collapsed=collapseResolvedUpdates(updates);
   identityConflicts.push(...collapsed.conflicts);
   return {
@@ -336,10 +427,15 @@ function classifyFantraxRows(playerRows,resolver){
     matchedByMlbam,
     matchedByFallback,
     duplicateResolvedUpdatesCollapsed:collapsed.duplicateResolvedUpdatesCollapsed,
-    updateResolutionDiagnostics:collapsed.updateResolutionDiagnostics
+    updateResolutionDiagnostics:collapsed.updateResolutionDiagnostics,
+    updateDecisionDiagnostics,
+    resolverEdgeCaseDiagnostics
   };
 }
 export function buildFantraxPreviewSummary({leagueId,file,rows,head,maps}){
+  const PLAYER_IDENTITY_BUILD="resolver-build-2026-07-15-fallback-fix";
+  console.info("[PlayerIdentityResolver]",PLAYER_IDENTITY_BUILD);
+  try{globalThis.__PLAYER_IDENTITY_PREVIEW_SESSION__={build:PLAYER_IDENTITY_BUILD,policyLogged:false}}catch(e){}
   const ix=fantraxPlayerIndexes(head);
   const blocking=[],warnings=[];
   if(ix.name<0)blocking.push("Fantrax import needs a Player or Name column.");
@@ -372,6 +468,7 @@ export function buildFantraxPreviewSummary({leagueId,file,rows,head,maps}){
     localPlayersLoaded:localPlayerCount(),
     previewPlayerCollectionSource:"cloud players",
     matchingAgainst:"cloud players from Supabase public.players for the selected league",
+    playerIdentityBuild:PLAYER_IDENTITY_BUILD,
     selectedLeagueId:leagueId||"",
     supabaseProjectHost:supabaseProjectHost(),
     matchedByFantrax:classified.matchedByFantrax||0,
@@ -381,7 +478,9 @@ export function buildFantraxPreviewSummary({leagueId,file,rows,head,maps}){
     duplicateMlbamIds:classified.duplicateMlbamIds||0,
     duplicateFallbackKeys:classified.duplicateFallbackKeys||0,
     duplicateResolvedUpdatesCollapsed:classified.duplicateResolvedUpdatesCollapsed||0,
-    updateResolutionDiagnostics:classified.updateResolutionDiagnostics||{}
+    updateResolutionDiagnostics:classified.updateResolutionDiagnostics||{},
+    updateDecisionDiagnostics:classified.updateDecisionDiagnostics||{},
+    resolverEdgeCaseDiagnostics:classified.resolverEdgeCaseDiagnostics||{}
   };
 }
 async function importFantrax({leagueId,file,onProgress,cancelled}){

@@ -1,5 +1,5 @@
 import { getSupabaseClient, initializeSupabaseClient, withTimeout } from "./supabaseClient.js";
-import { buildPlayerIdentityIndexes, cleanExternalId, dedupeIdentityRows, resolvePlayerIdentity } from "./playerIdentity.js";
+import { buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, dedupeIdentityRows, resolvePlayerIdentity } from "./playerIdentity.js";
 
 const REQUEST_TIMEOUT_MS=10000;
 
@@ -29,6 +29,15 @@ export function preparePlayerSyncRows(rows){
   };
 }
 
+export function serializeMlbamId(value){
+  const cleaned=cleanMlbamId(value);
+  if(!cleaned)return null;
+  if(!/^\d+$/.test(cleaned))return null;
+  const numericValue=Number(cleaned);
+  if(!Number.isSafeInteger(numericValue)||numericValue<=0)return null;
+  return numericValue;
+}
+
 function stripPlayerWriteRow(row){
   const out={...(row||{})};
   delete out.id;
@@ -36,6 +45,7 @@ function stripPlayerWriteRow(row){
   delete out.source_player_id;
   delete out.source_row_number;
   delete out.identityResolution;
+  if("mlbam_id" in out)out.mlbam_id=serializeMlbamId(out.mlbam_id);
   return out;
 }
 
