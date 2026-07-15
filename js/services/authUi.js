@@ -11,7 +11,24 @@ const migrationState={
   lastResult:null,
   verification:null
 };
-const importState={running:false,cancelRequested:false,lastStep:null,lastResult:null,verification:null};
+const importState={
+  running:false,
+  cancelRequested:false,
+  lastStep:null,
+  lastResult:null,
+  verification:null,
+  previews:{},
+  stages:{
+    fantrax:"Not started",
+    hkb:"Not started",
+    statcastHitters:"Not started",
+    statcastPitchers:"Not started",
+    trades:"Not started",
+    custom:"Not started",
+    verification:"Not started",
+    enable:"Not started"
+  }
+};
 
 const state={
   service:null,
@@ -89,15 +106,16 @@ function authButtonsDisabled(){
 function renderCloudStatus(){
   const label=statusLabel();
   const cls=statusClass();
+  const provider=window.db?.settings?.preferredDataProvider==="supabase"?"Supabase":"Browser Local Storage";
   const header=$("cloudStatusIndicator");
   if(header){
     header.className=`cloud-status pill ${cls}`;
-    header.textContent=state.localOnly&&state.status==="signed-out"?"Local-only mode":label;
-    header.title="Cloud sync remains disabled during Phase 2D.";
+    header.textContent=state.localOnly&&state.status==="signed-out"?"Local-only mode":`${label} · ${provider}`;
+    header.title=`Current data provider: ${provider}`;
   }
   const authStatus=$("authCloudStatus");
   if(authStatus){
-    authStatus.innerHTML=`<div class="debug-grid"><div><span>Cloud account</span><b>${clean(label)}</b></div><div><span>Signed-in user</span><b>${clean(displayName()||email()||"None")}</b></div><div><span>Supabase client</span><b>${state.clientReady?"Ready":"Not ready"}</b></div><div><span>Cloud synchronization</span><b>Disabled until next phase</b></div><div><span>Browser data</span><b>Kept locally</b></div></div>`;
+    authStatus.innerHTML=`<div class="debug-grid"><div><span>Cloud account</span><b>${clean(label)}</b></div><div><span>Signed-in user</span><b>${clean(displayName()||email()||"None")}</b></div><div><span>Supabase client</span><b>${state.clientReady?"Ready":"Not ready"}</b></div><div><span>Current provider</span><b>${clean(provider)}</b></div><div><span>Browser data</span><b>Kept locally</b></div></div>`;
   }
 }
 
@@ -144,9 +162,55 @@ function countGridHTML(items){
   return `<div class="debug-grid">${items.map(([label,value])=>`<div><span>${clean(label)}</span><b>${clean(value)}</b></div>`).join("")}</div>`;
 }
 
+const importSteps=["fantrax","hkb","statcastHitters","statcastPitchers","trades","custom","verification","enable"];
+const importLabels={
+  fantrax:"Fantrax player pool and roster",
+  hkb:"HarryKnowsBall values",
+  statcastHitters:"Statcast hitters",
+  statcastPitchers:"Statcast pitchers",
+  trades:"Fantrax trade history",
+  custom:"Custom Intelligence JSON",
+  verification:"Verification",
+  enable:"Enable Cloud Data"
+};
+const confirmIds={fantrax:"cloudConfirmFantrax",hkb:"cloudConfirmHkb",statcastHitters:"cloudConfirmStatcastHitters",statcastPitchers:"cloudConfirmStatcastPitchers",trades:"cloudConfirmTrades",custom:"cloudConfirmCustom"};
+const previewButtonIds={fantrax:"cloudPreviewFantraxButton",hkb:"cloudPreviewHkbButton",statcastHitters:"cloudPreviewStatcastHittersButton",statcastPitchers:"cloudPreviewStatcastPitchersButton",trades:"cloudPreviewTradesButton",custom:"cloudPreviewCustomButton"};
+const importButtonIds={fantrax:"cloudImportFantraxButton",hkb:"cloudImportHkbButton",statcastHitters:"cloudImportStatcastHittersButton",statcastPitchers:"cloudImportStatcastPitchersButton",trades:"cloudImportTradesButton",custom:"cloudImportCustomButton"};
+
+function priorRequiredComplete(step){
+  if(step==="fantrax")return true;
+  if(step==="hkb"||step==="statcastHitters"||step==="statcastPitchers"||step==="trades"||step==="custom")return importState.stages.fantrax==="Completed";
+  if(step==="verification")return importState.stages.fantrax==="Completed";
+  if(step==="enable")return importState.stages.fantrax==="Completed"&&importState.verification?.passed;
+  return true;
+}
+
+function renderImportStageSummary(){
+  const el=$("cloudImportStageSummary");
+  if(!el)return;
+  el.innerHTML=`<table><thead><tr><th>Stage</th><th>Status</th></tr></thead><tbody>${importSteps.map(step=>`<tr><td>${clean(importLabels[step])}</td><td>${clean(importState.stages[step]||"Not started")}</td></tr>`).join("")}</tbody></table>`;
+}
+
+function renderActivationStatus(){
+  const provider=window.db?.settings?.preferredDataProvider==="supabase"?"Supabase":"Browser Local Storage";
+  const header=$("cloudStatusIndicator");
+  if(header&&state.session){
+    header.textContent=provider==="Supabase"?"Signed in · Supabase data mode":"Signed in · Local data mode";
+    header.className=`cloud-status pill ${provider==="Supabase"?"good":"warn"}`;
+  }
+  const msg=$("cloudActivationMessage");
+  if(msg){
+    msg.textContent=provider==="Supabase"?"Supabase is the active data source. Player scores need recalculation from cloud data.":"Cloud data mode is not active. Local browser data remains the active source.";
+  }
+  const recalc=$("cloudRecalculateScoresButton");
+  if(recalc)recalc.disabled=provider!=="Supabase";
+}
+
 function renderCloudMigration(){
   const summary=$("cloudMigrationSummary");
   if(!summary)return;
+  renderImportStageSummary();
+  renderActivationStatus();
   const preview=localDatasetSummary();
   const league=migrationState.selectedLeague;
   const counts=migrationState.cloudCounts||{};
@@ -173,11 +237,17 @@ function renderCloudMigration(){
   if(runButton)runButton.disabled=!canUseCloud||!league||!migrationState.preview?.canRun||!$("cloudBackupReviewed")?.checked||migrationState.running;
   if(cancelButton)cancelButton.disabled=!migrationState.running;
   if(retryButton)retryButton.disabled=!migrationState.lastResult?.error||migrationState.running;
-  ["cloudImportFantraxButton","cloudImportHkbButton","cloudImportStatcastHittersButton","cloudImportStatcastPitchersButton","cloudImportTradesButton","cloudImportCustomButton","cloudVerifyButton"].forEach(id=>{const button=$(id);if(button)button.disabled=!canUseCloud||!league||importState.running});
+  Object.entries(previewButtonIds).forEach(([step,id])=>{const button=$(id);if(button)button.disabled=!canUseCloud||!league||importState.running||!priorRequiredComplete(step)});
+  Object.entries(importButtonIds).forEach(([step,id])=>{
+    const button=$(id);
+    if(button)button.disabled=!canUseCloud||!league||importState.running||!priorRequiredComplete(step)||!importState.previews[step]||!$(confirmIds[step])?.checked||importState.previews[step]?.blockingErrors?.length;
+  });
+  const verifyButton=$("cloudVerifyButton");
+  if(verifyButton)verifyButton.disabled=!canUseCloud||!league||importState.running||!priorRequiredComplete("verification");
   const cancelImport=$("cloudCancelImportButton"),retryImport=$("cloudRetryImportButton");
   if(cancelImport)cancelImport.disabled=!importState.running;
   if(retryImport)retryImport.disabled=!importState.lastStep||importState.running;
-  if(enableButton)enableButton.disabled=!(migrationState.verification?.passed||importState.verification?.passed);
+  if(enableButton)enableButton.disabled=!(importState.stages.fantrax==="Completed"&&importState.verification?.passed&&$("cloudActivationReviewed")?.checked);
 }
 
 function previewHTML(preview){
@@ -220,10 +290,55 @@ function renderImportProgress(payload){
   const el=$("cloudImportProgress");
   if(!el)return;
   if(payload?.checks){
-    el.innerHTML=`<h3>Cloud Import Verification</h3><table><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody>${payload.checks.map(check=>`<tr><td>${clean(check.name)}</td><td>${clean(check.status)}</td><td>${clean(check.detail)}</td></tr>`).join("")}</tbody></table>`;
+    const counts=payload.counts||{};
+    el.innerHTML=`<h3>Cloud Import Verification</h3>${countGridHTML([["Teams",counts.teams||0],["Managers",counts.managers||0],["Players",counts.players||0],["Player metrics",counts.player_metrics||0],["Calculated scores",counts.calculated_player_scores||0],["Trades",counts.trades||0],["Trade assets",counts.trade_assets||0],["Snapshots",counts.player_snapshots||0]])}<table class="mt-12"><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody>${payload.checks.map(check=>`<tr><td>${clean(check.name)}</td><td>${clean(check.status)}</td><td>${clean(check.detail)}</td></tr>`).join("")}</tbody></table>`;
     return;
   }
   el.innerHTML=`<div class="debug-grid"><div><span>Stage</span><b>${clean(payload?.stage||"Not started")}</b></div><div><span>Processed</span><b>${clean(payload?.processed??0)} / ${clean(payload?.total??0)}</b></div><div><span>Inserted</span><b>${clean(payload?.inserted??0)}</b></div><div><span>Updated</span><b>${clean(payload?.updated??0)}</b></div><div><span>Unmatched</span><b>${clean(payload?.unmatched??0)}</b></div></div><p class="note mt-10">${clean(payload?.message||"")}</p>`;
+}
+
+function renderImportPreview(step,preview){
+  const el=$("cloudImportPreview");
+  if(!el)return;
+  const errors=preview.blockingErrors?.length?`<h3>Blocking Errors</h3><ul class="edge-reasons">${preview.blockingErrors.map(x=>`<li>${clean(x)}</li>`).join("")}</ul>`:"<p class='note'>No blocking errors detected.</p>";
+  const warnings=preview.warnings?.length?`<h3>Warnings</h3><ul class="edge-reasons">${preview.warnings.map(x=>`<li>${clean(x)}</li>`).join("")}</ul>`:"";
+  const columns=(preview.columns||[]).slice(0,30).map(clean).join(", ");
+  const categories=preview.categories?`<details class="mt-10"><summary><b>Inspect Custom Intelligence Categories</b></summary><table><thead><tr><th>Category</th><th>Records</th></tr></thead><tbody>${Object.entries(preview.categories).map(([key,value])=>`<tr><td>${clean(key)}</td><td>${clean(value)}</td></tr>`).join("")}</tbody></table></details>`:"";
+  const fantraxCounts=preview.previewSchema==="fantrax-identity-v2"?[
+    ["Parsed rows",preview.parsedRows??preview.totalRows??0],
+    ["Valid rows",preview.validRows??0],
+    ["Invalid rows",preview.invalidRows??0],
+    ["Duplicate source rows",preview.duplicateSourceRows??preview.duplicateRows??0],
+    ["Rows after deduplication",preview.validRowsAfterDeduplication??preview.sourceRowsAfterDeduplication??0],
+    ["Existing cloud matches",preview.existingCloudMatches??0],
+    ["New players to insert",preview.newPlayersToInsert??0],
+    ["Identity conflicts",preview.identityConflicts??0],
+    ["Unmatched",preview.unmatchedRows??0],
+    ["Cloud players loaded",preview.cloudPlayersLoaded??0],
+    ["Local players loaded",preview.localPlayersLoaded??0],
+    ["Matching against",preview.matchingAgainst||preview.previewPlayerCollectionSource||"Cloud players"],
+    ["Supabase project",preview.supabaseProjectHost||"Unknown"],
+    ["Selected league",preview.selectedLeagueId||"None"],
+    ["Unique matched UUIDs",preview.updateResolutionDiagnostics?.uniqueMatchedPlayerUuids??0],
+    ["Largest UUID group",preview.updateResolutionDiagnostics?.largestResolvedUuidGroupSize??0],
+    ["Estimated batches",preview.estimatedBatches??0],
+    ["Status",preview.blockingErrors?.length?"Failed":"Preview ready"]
+  ]:[
+    ["File",preview.fileName||"None"],
+    ["Detected source",preview.sourceType||"Unknown"],
+    ["Total rows",preview.totalRows??0],
+    ["Valid rows",preview.validRows??0],
+    ["Invalid rows",preview.invalidRows??0],
+    ["Duplicate rows",preview.duplicateRows??0],
+    ["Matched records",preview.matchedRecords??0],
+    ["Unmatched records",preview.unmatchedRecords??0],
+    ["Estimated batches",preview.estimatedBatches??0],
+    ["Status",preview.blockingErrors?.length?"Failed":"Preview ready"]
+  ];
+  const duplicateGroups=preview.previewSchema==="fantrax-identity-v2"&&preview.updateResolutionDiagnostics?.duplicateResolvedUuidGroups?.length
+    ?`<details class="mt-10"><summary><b>Duplicate Matched UUID Groups</b></summary><table><thead><tr><th>Player UUID</th><th>Rows</th><th>Safe collapse</th></tr></thead><tbody>${preview.updateResolutionDiagnostics.duplicateResolvedUuidGroups.map(group=>`<tr><td>${clean(group.internalPlayerId)}</td><td>${clean(group.count)}</td><td>${group.safeToCollapse?"Yes":"No"}</td></tr>`).join("")}</tbody></table></details>`
+    :"";
+  el.innerHTML=`<h3>${clean(importLabels[step])} Preview</h3>${countGridHTML(fantraxCounts)}<p class="note mt-10"><b>Detected columns:</b> ${columns||"JSON file"}</p>${errors}${warnings}${categories}${duplicateGroups}`;
 }
 
 function classifyError(error){
@@ -425,32 +540,68 @@ function handleCancelMigration(){
 }
 
 function handleEnableCloudMode(){
-  if(!migrationState.verification?.passed)return;
-  if(confirm("Enable cloud data mode for future phases? Local data will remain untouched.")){
-    if(window.db){window.db.settings={...(window.db.settings||{}),cloudModeEnabled:true};window.saveDB?.(false)}
-    setMessage("Cloud data mode flag enabled. Local data remains available.",false);
+  if(!(importState.stages.fantrax==="Completed"&&importState.verification?.passed&&$("cloudActivationReviewed")?.checked))return;
+  if(window.db){
+    window.db.settings={...(window.db.settings||{}),cloudModeEnabled:true,preferredDataProvider:"supabase",selectedCloudLeagueId:migrationState.selectedLeague?.id||cloudMigration.getSelectedLeagueId(),cloudScoresNeedRecalculation:true};
+    window.saveDB?.(false);
   }
+  importState.stages.enable="Completed";
+  setMessage("Supabase data mode enabled. Local browser data was not deleted.",false);
+  const msg=$("cloudActivationMessage");
+  if(msg)msg.textContent="Player scores need recalculation from cloud data.";
+  renderCloudMigration();
 }
 
 function handleLocalMode(){
-  if(window.db){window.db.settings={...(window.db.settings||{}),cloudModeEnabled:false};window.saveDB?.(false)}
+  if(window.db){window.db.settings={...(window.db.settings||{}),cloudModeEnabled:false,preferredDataProvider:"local"};window.saveDB?.(false)}
   setMessage("Switched back to Local Mode. Local browser data remains the active source.",false);
   renderCloudMigration();
 }
 
+function handleCloudRecalculateScores(){
+  setMessage("Player scores need recalculation from cloud data. Cloud score recalculation will be implemented in Phase 2G.",false);
+}
+
 function fileForStep(step){
-  const ids={fantrax:"cloudFantraxFile",hkb:"cloudHkbFile",statcastHitters:"cloudStatcastHittersFile",statcastPitchers:"cloudStatcastPitchersFile",trades:"cloudTradesFile"};
+  const ids={fantrax:"cloudFantraxFile",hkb:"cloudHkbFile",statcastHitters:"cloudStatcastHittersFile",statcastPitchers:"cloudStatcastPitchersFile",trades:"cloudTradesFile",custom:"cloudCustomFile"};
   return ids[step]?$(ids[step])?.files?.[0]:null;
+}
+
+async function previewCloudImportStep(step){
+  if(!migrationState.selectedLeague){setMessage("Create or select a cloud league before previewing imports.",true);return}
+  if(!priorRequiredComplete(step)){setMessage("Complete the required earlier import stage first.",true);return}
+  const file=fileForStep(step);
+  if(!file){setMessage("Choose the source file for this import step.",true);return}
+  importState.stages[step]="Parsing";
+  renderCloudMigration();
+  try{
+    const preview=await cloudCsvImport.previewStep({step,leagueId:migrationState.selectedLeague.id,file});
+    importState.previews[step]=preview;
+    importState.stages[step]=preview.blockingErrors?.length?"Failed":"Preview ready";
+    const confirm=$(confirmIds[step]);
+    if(confirm)confirm.checked=false;
+    renderImportPreview(step,preview);
+    setMessage(preview.blockingErrors?.length?"Preview found blocking errors.":"Preview ready. Review it, then confirm before uploading.",Boolean(preview.blockingErrors?.length));
+  }catch(e){
+    importState.stages[step]="Failed";
+    setMessage(String(e?.message||"Preview failed.").replace(/eyJ[a-zA-Z0-9_\-.]+/g,"[redacted]"),true);
+  }finally{
+    renderCloudMigration();
+  }
 }
 
 async function runCloudImportStep(step){
   if(!migrationState.selectedLeague){setMessage("Create or select a cloud league before importing CSV files.",true);return}
-  const needsFile=!["custom","verification"].includes(step);
+  if(!priorRequiredComplete(step)){setMessage("Complete the required earlier import stage first.",true);return}
+  const needsFile=!["verification"].includes(step);
   const file=fileForStep(step);
   if(needsFile&&!file){setMessage("Choose the source CSV file for this import step.",true);return}
+  if(needsFile&&(!importState.previews[step]||!$(confirmIds[step])?.checked)){setMessage("Preview this file and confirm the upload before importing.",true);return}
+  if(importState.previews[step]?.blockingErrors?.length){setMessage("Fix blocking preview errors before uploading.",true);return}
   importState.running=true;
   importState.cancelRequested=false;
   importState.lastStep={step,file};
+  importState.stages[step]="Uploading";
   renderCloudMigration();
   try{
     const result=await cloudCsvImport.runStep({
@@ -461,12 +612,19 @@ async function runCloudImportStep(step){
       onProgress:payload=>renderImportProgress(payload)
     });
     importState.lastResult=result;
-    if(step==="verification"){importState.verification=result;renderImportProgress(result)}
+    if(step==="verification"){
+      importState.verification=result;
+      importState.stages.verification=result.passed?"Completed":"Partial";
+      renderImportProgress(result);
+    }else{
+      importState.stages[step]=result.unmatched||result.errors?"Partial":"Completed";
+    }
     setMessage(step==="verification"?"Verification completed.":"Cloud import step completed.",false);
     migrationState.cloudCounts=await cloudMigration.cloudStore.getLeagueCounts(migrationState.selectedLeague.id).catch(()=>migrationState.cloudCounts);
   }catch(e){
     const message=String(e?.message||"Cloud import failed.").replace(/eyJ[a-zA-Z0-9_\-.]+/g,"[redacted]");
     importState.lastResult={error:message};
+    importState.stages[step]=message==="Import cancelled"?"Cancelled":"Failed";
     setMessage(message,true);
     renderImportProgress({stage:"Cloud import failed",message,unmatched:0});
   }finally{
@@ -477,6 +635,7 @@ async function runCloudImportStep(step){
 
 function cancelCloudImport(){
   importState.cancelRequested=true;
+  if(importState.lastStep?.step)importState.stages[importState.lastStep.step]="Cancelled";
   setMessage("Cancel requested. The current batch will finish, then import will stop.",false);
   renderCloudMigration();
 }
@@ -502,7 +661,11 @@ function bindAuthEvents(){
   $("cloudRetryMigrationButton")?.addEventListener("click",handleRunMigration);
   $("cloudEnableButton")?.addEventListener("click",handleEnableCloudMode);
   $("cloudLocalModeButton")?.addEventListener("click",handleLocalMode);
+  $("cloudRecalculateScoresButton")?.addEventListener("click",handleCloudRecalculateScores);
   $("cloudBackupReviewed")?.addEventListener("change",renderCloudMigration);
+  $("cloudActivationReviewed")?.addEventListener("change",renderCloudMigration);
+  Object.entries(previewButtonIds).forEach(([step,id])=>$(id)?.addEventListener("click",()=>previewCloudImportStep(step)));
+  Object.values(confirmIds).forEach(id=>$(id)?.addEventListener("change",renderCloudMigration));
   $("cloudImportFantraxButton")?.addEventListener("click",()=>runCloudImportStep("fantrax"));
   $("cloudImportHkbButton")?.addEventListener("click",()=>runCloudImportStep("hkb"));
   $("cloudImportStatcastHittersButton")?.addEventListener("click",()=>runCloudImportStep("statcastHitters"));
