@@ -2,10 +2,12 @@ import { getSupabaseClient, initializeSupabaseClient, withTimeout } from "./supa
 import { buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, dedupeIdentityRows, resolvePlayerIdentity } from "./playerIdentity.js";
 
 const REQUEST_TIMEOUT_MS=10000;
+const PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID="*05rat*";
 
 async function client(){
   const supabase=getSupabaseClient()||await initializeSupabaseClient();
   if(!supabase)throw new Error("Supabase client is not initialized.");
+  if(typeof supabase.from!=="function")throw new Error("Supabase client is invalid; cloud import cannot continue.");
   return supabase;
 }
 
@@ -195,7 +197,43 @@ async function getRows(table,leagueId){
   return requireOk(result,`${table} rows request`)||[];
 }
 
-export const getPlayers=leagueId=>getRows("players",leagueId);
+export async function getPlayers(leagueId,{pageSize=1000}={}){
+  const supabase=await client();
+  const rows=[];
+  let exactCount=null;
+  for(let from=0;;from+=pageSize){
+    const to=from+pageSize-1;
+    const selectOptions=from===0?{count:"exact"}:{};
+    const result=await timed(
+      supabase
+        .from("players")
+        .select("*",selectOptions)
+        .eq("league_id",leagueId)
+        .order("id",{ascending:true})
+        .range(from,to),
+      `players rows request ${from}-${to}`
+    );
+    const page=requireOk(result,`players rows request ${from}-${to}`)||[];
+    if(from===0)exactCount=result.count??null;
+    rows.push(...page);
+    if(page.length<pageSize)break;
+  }
+  const target=rows.find(row=>String(row?.fantrax_id||"").trim()===PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID);
+  console.info("[Cloud Store getPlayers diagnostic]",{
+    leagueId,
+    returnedRows:rows.length,
+    exactCount,
+    pageSize,
+    pages:Math.ceil(rows.length/pageSize),
+    truncatedLikely:Number.isFinite(exactCount)&&exactCount>rows.length,
+    targetFantraxId:PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID,
+    containsTargetFantraxId:Boolean(target),
+    targetPlayerId:target?.id||null,
+    targetPlayerName:target?.name||null,
+    query:"supabase.from(\"players\").select(\"*\",{count:\"exact\"}).eq(\"league_id\",leagueId).order(\"id\",{ascending:true}).range(from,to)"
+  });
+  return rows;
+}
 export const getManagers=leagueId=>getRows("managers",leagueId);
 export const getTeams=leagueId=>getRows("teams",leagueId);
 export const getTrades=leagueId=>getRows("trades",leagueId);

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 const importService=await readFile(new URL("../js/services/cloudCsvImportService.js",import.meta.url),"utf8");
 const cloudStore=await readFile(new URL("../js/services/cloudStore.js",import.meta.url),"utf8");
 const authUi=await readFile(new URL("../js/services/authUi.js",import.meta.url),"utf8");
+const supabaseClient=await readFile(new URL("../js/services/supabaseClient.js",import.meta.url),"utf8");
 
 const fantraxStart=importService.indexOf("async function importFantrax");
 const hkbStart=importService.indexOf("async function importHkb");
@@ -47,9 +48,18 @@ assert.match(authUi,/Identity build/);
 assert.match(authUi,/playerIdentityBuild/);
 assert.ok(!fantraxBody.includes("cloudStore.syncPlayers"),"Fantrax import must not use legacy syncPlayers");
 assert.match(cloudStore,/export async function syncResolvedPlayers/);
+assert.match(cloudStore,/export async function getPlayers\(leagueId,\{pageSize=1000\}=\{\}\)/);
+assert.match(cloudStore,/\.order\("id",\{ascending:true\}\)\s*\.range\(from,to\)/);
+assert.match(cloudStore,/for\(let from=0;;from\+=pageSize\)/);
+assert.ok(!cloudStore.includes("export const getPlayers=leagueId=>getRows(\"players\",leagueId)"),"getPlayers must not use unpaged generic getRows");
 assert.match(cloudStore,/Resolved update batch contains duplicate player IDs/);
 assert.match(cloudStore,/const duplicateUpdateIds=duplicateIds\(updates\)/);
 assert.match(cloudStore,/from\("players"\)\.upsert\(stripPlayerUpdateRows\(updates\),\{onConflict:"id"\}\)\.select\("\*"\)/);
 assert.match(cloudStore,/from\("players"\)\.insert\(stripPlayerInsertRows\(inserts\)\)\.select\("\*"\)/);
+assert.ok(!cloudStore.includes("fetch("),"cloudStore must not perform raw REST fetches");
+assert.match(supabaseClient,/export function supabaseAuthenticatedFetch/);
+assert.match(supabaseClient,/headers\.set\("apikey",SUPABASE_ANON_KEY\)/);
+assert.match(supabaseClient,/headers\.set\("Authorization",`Bearer \$\{SUPABASE_ANON_KEY\}`\)/);
+assert.match(supabaseClient,/global:\{\s*headers:\{apikey:SUPABASE_ANON_KEY\},\s*fetch:supabaseAuthenticatedFetch\s*\}/);
 
 console.log("fantraxImportPipeline tests passed");

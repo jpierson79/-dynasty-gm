@@ -46,6 +46,8 @@ const REASONS=Object.freeze({
   INVALID_EXISTING_PLAYER:"invalid_existing_player_identity"
 });
 
+const PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID="*05rat*";
+
 const CONFIDENCE_SCORES=Object.freeze({
   FANTRAX_UPDATE:1.00,
   MLBAM_UPDATE:0.98,
@@ -76,6 +78,20 @@ function candidateSummaries(players){
   return sortCandidateSummaries(players.map(candidateIdentitySummary));
 }
 
+function logDiagnosticFantraxDecision(incoming,result){
+  if(cleanExternalId(incoming?.fantrax_id)!==PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID)return;
+  const repositoryLookup=result?.diagnostics?.repository?.diagnosticFantraxLookup||{};
+  const repositoryMatch=Array.isArray(repositoryLookup.matches)?repositoryLookup.matches[0]:null;
+  console.info("[PlayerIdentityResolver diagnostic]",{
+    incomingFantraxId:PLAYER_IDENTITY_DIAGNOSTIC_FANTRAX_ID,
+    repositoryContainsFantraxId:Boolean(repositoryLookup.repositoryContainsFantraxId),
+    matchedPlayerId:result?.matchedPlayerId||null,
+    repositoryPlayerName:result?.playerSummary?.name||repositoryMatch?.name||null,
+    resolverDecision:result?.action||null,
+    resolverBranch:Array.isArray(result?.trace)?result.trace[result.trace.length-1]||null:null
+  });
+}
+
 function repositoryDiagnostics(repository,importedPlayer){
   const diagnostics=hasMethod(repository,"getDiagnostics")?repository.getDiagnostics():{};
   const invalidRecords=Array.isArray(diagnostics?.invalidRecords)?diagnostics.invalidRecords:[];
@@ -83,6 +99,8 @@ function repositoryDiagnostics(repository,importedPlayer){
     ?asArray(repository.findInvalidMatches(importedPlayer))
     :[];
   return {
+    counts:diagnostics?.counts||{},
+    diagnosticFantraxLookup:diagnostics?.diagnosticFantraxLookup||{},
     invalidRecords:invalidRecords.map(record=>({
       ...record,
       summary:record.summary?cloneSummary(record.summary):record.summary
@@ -115,7 +133,7 @@ function baseResult(incoming,diagnosticContext,trace,payload){
   const relevantKeys=new Set((diagnosticContext.repositoryDiagnostics.relevantInvalidRecords||[]).map(record=>`${record.index}:${record.reason}`));
   const repositoryWarnings=(diagnosticContext.repositoryDiagnostics.invalidRecords||[])
     .filter(record=>!relevantKeys.has(`${record.index}:${record.reason}`));
-  return Object.freeze({
+  const result=Object.freeze({
     resolverVersion:RESOLVER_VERSION,
     resolvedAt:new Date().toISOString(),
     resolutionKey:createResolutionKey(incoming),
@@ -127,6 +145,13 @@ function baseResult(incoming,diagnosticContext,trace,payload){
         mlbam:diagnosticContext.mlbamMatches.length,
         fallback:diagnosticContext.fallback.length
       }),
+      repository:Object.freeze({
+        counts:Object.freeze({...(diagnosticContext.repositoryDiagnostics.counts||{})}),
+        diagnosticFantraxLookup:Object.freeze({
+          ...(diagnosticContext.repositoryDiagnostics.diagnosticFantraxLookup||{}),
+          matches:Object.freeze([...(diagnosticContext.repositoryDiagnostics.diagnosticFantraxLookup?.matches||[])])
+        })
+      }),
       warnings:Object.freeze(repositoryWarnings.map(record=>`ignored_invalid_existing_player:${record.reason}`))
     }),
     matchedPlayerId:null,
@@ -135,6 +160,8 @@ function baseResult(incoming,diagnosticContext,trace,payload){
     matchSource:null,
     ...payload
   });
+  logDiagnosticFantraxDecision(incoming,result);
+  return result;
 }
 
 function conflictResult(reason,incoming,diagnosticContext,players,trace){

@@ -40,6 +40,13 @@ function hasConfig(){
   );
 }
 
+export function supabaseAuthenticatedFetch(input,init={}){
+  const headers=new Headers(init.headers||{});
+  if(!headers.has("apikey"))headers.set("apikey",SUPABASE_ANON_KEY);
+  if(!headers.has("Authorization"))headers.set("Authorization",`Bearer ${SUPABASE_ANON_KEY}`);
+  return globalThis.fetch(input,{...init,headers});
+}
+
 async function importSupabaseLibrary(onStatus){
   let lastError=null;
   for(const source of LIBRARY_SOURCES){
@@ -78,6 +85,10 @@ export async function initializeSupabaseClient({onStatus}={}){
       persistSession:true,
       autoRefreshToken:true,
       detectSessionInUrl:true
+    },
+    global:{
+      headers:{apikey:SUPABASE_ANON_KEY},
+      fetch:supabaseAuthenticatedFetch
     }
   });
   supabaseStatus.available=true;
