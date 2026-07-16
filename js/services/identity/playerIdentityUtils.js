@@ -6,7 +6,7 @@ export function cleanExternalId(value){
 
 export function cleanMlbamId(value){
   const cleaned=cleanExternalId(value);
-  if(!cleaned||cleaned==="0")return "";
+  if(!cleaned||["0","nan","null","undefined"].includes(cleaned.toLowerCase()))return "";
   return cleaned;
 }
 

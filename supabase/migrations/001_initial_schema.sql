@@ -94,6 +94,7 @@ create table if not exists public.teams (
 create table if not exists public.players (
   id uuid primary key default gen_random_uuid(),
   league_id uuid not null references public.leagues(id) on delete cascade,
+  fantrax_id text,
   mlbam_id bigint,
   name text not null,
   normalized_name text not null,
@@ -110,13 +111,23 @@ create table if not exists public.players (
   is_free_agent boolean not null default false,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (league_id, normalized_name)
+  updated_at timestamptz not null default now()
 );
+
+alter table public.players
+drop constraint if exists players_league_id_normalized_name_key;
+
+create unique index if not exists players_league_fantrax_unique
+on public.players (league_id, fantrax_id)
+where fantrax_id is not null
+  and btrim(fantrax_id) <> '';
 
 create unique index if not exists players_league_mlbam_unique
 on public.players (league_id, mlbam_id)
 where mlbam_id is not null;
+
+create index if not exists players_league_normalized_name_idx
+on public.players (league_id, normalized_name);
 
 create index if not exists players_league_idx
 on public.players (league_id);

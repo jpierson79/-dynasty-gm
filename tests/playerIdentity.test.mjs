@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildPlayerIdentityIndexes,
   cleanExternalId,
+  cleanMlbamId,
   dedupeIdentityRows,
   resolvePlayerIdentity
 } from "../js/services/playerIdentity.js";
@@ -85,8 +86,22 @@ function resolve(row,players){
 
 {
   assert.equal(cleanExternalId("  FTX-55  "),"FTX-55");
+  assert.equal(cleanMlbamId(0),"");
+  assert.equal(cleanMlbamId("0"),"");
+  assert.equal(cleanMlbamId(""),"");
+  assert.equal(cleanMlbamId(null),"");
+  assert.equal(cleanMlbamId(12345),"12345");
   const result=resolve({fantrax_id:"FTX-55",name:"Missing MLBAM",normalized_name:"missing mlbam"},[]);
   assert.equal(result.status,"unmatched");
+}
+
+{
+  const rows=[
+    {league_id:leagueId,fantrax_id:"FTX-ZERO",mlbam_id:0,name:"Zero",normalized_name:"zero"}
+  ];
+  const deduped=dedupeIdentityRows(rows);
+  assert.equal(deduped.rows[0].mlbam_id,null);
+  assert.equal(deduped.duplicateMlbamIds,0);
 }
 
 {

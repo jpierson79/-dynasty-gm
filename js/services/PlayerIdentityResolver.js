@@ -229,6 +229,15 @@ export class PlayerIdentityResolver{
     if(mlbamId)trace.push(mlbamMatches.length>1?"multiple_mlbam_matches_found":mlbamMatches.length?"mlbam_match_found":"mlbam_match_not_found");
     trace.push("mlbam_validation_complete");
 
+    const previewSession=globalThis.__PLAYER_IDENTITY_PREVIEW_SESSION__;
+    if(previewSession&&!previewSession.policyLogged){
+      console.info("[Resolver Policy]",{
+        fallbackAllowed:!fantraxId&&!mlbamId,
+        fantraxPresent:!!fantraxId,
+        mlbamPresent:!!mlbamId
+      });
+      previewSession.policyLogged=true;
+    }
     const fallback=(!fantraxId&&!mlbamId)?fallbackMatches(incoming,this.#repository):[];
     if(fantraxId||mlbamId)trace.push("fallback_skipped_stable_id_present");
     else trace.push(fallback.length>1?"multiple_safe_fallback_matches_found":fallback.length?"safe_fallback_found":"safe_fallback_not_found");

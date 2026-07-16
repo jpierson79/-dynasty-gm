@@ -317,6 +317,7 @@ function renderImportPreview(step,preview){
     ["Cloud players loaded",preview.cloudPlayersLoaded??0],
     ["Local players loaded",preview.localPlayersLoaded??0],
     ["Matching against",preview.matchingAgainst||preview.previewPlayerCollectionSource||"Cloud players"],
+    ["Identity build",preview.playerIdentityBuild||"Unknown"],
     ["Supabase project",preview.supabaseProjectHost||"Unknown"],
     ["Selected league",preview.selectedLeagueId||"None"],
     ["Unique matched UUIDs",preview.updateResolutionDiagnostics?.uniqueMatchedPlayerUuids??0],
@@ -338,7 +339,13 @@ function renderImportPreview(step,preview){
   const duplicateGroups=preview.previewSchema==="fantrax-identity-v2"&&preview.updateResolutionDiagnostics?.duplicateResolvedUuidGroups?.length
     ?`<details class="mt-10"><summary><b>Duplicate Matched UUID Groups</b></summary><table><thead><tr><th>Player UUID</th><th>Rows</th><th>Safe collapse</th></tr></thead><tbody>${preview.updateResolutionDiagnostics.duplicateResolvedUuidGroups.map(group=>`<tr><td>${clean(group.internalPlayerId)}</td><td>${clean(group.count)}</td><td>${group.safeToCollapse?"Yes":"No"}</td></tr>`).join("")}</tbody></table></details>`
     :"";
-  el.innerHTML=`<h3>${clean(importLabels[step])} Preview</h3>${countGridHTML(fantraxCounts)}<p class="note mt-10"><b>Detected columns:</b> ${columns||"JSON file"}</p>${errors}${warnings}${categories}${duplicateGroups}`;
+  const resolverDiagnostics=preview.previewSchema==="fantrax-identity-v2"
+    ?`<details class="mt-10" open><summary><b>Resolver Diagnostics</b></summary>${countGridHTML([["Identity build",preview.playerIdentityBuild||"Unknown"],["Blank Fantrax matched by Fantrax",preview.resolverEdgeCaseDiagnostics?.blankFantraxUpdateMatches??0],["MLBAM 0/null/blank identity decisions",preview.resolverEdgeCaseDiagnostics?.zeroLikeMlbamIdentityDecisions??0],["Unsafe fallback decisions",preview.resolverEdgeCaseDiagnostics?.unsafeFallbackUpdateDecisions??0]])}</details>`
+    :"";
+  const updateTrace=preview.previewSchema==="fantrax-identity-v2"&&preview.updateDecisionDiagnostics?.groups?.length
+    ?`<details class="mt-10"><summary><b>Inspect Update Decision Trace</b></summary>${countGridHTML([["Update decisions",preview.updateDecisionDiagnostics.totalUpdateDecisions||0],["Unique matched UUIDs",preview.updateDecisionDiagnostics.uniqueMatchedPlayerUuids||0],["Largest UUID group",preview.updateDecisionDiagnostics.largestSourceRowsPerUuid||0],["Blank Fantrax matched by Fantrax",preview.resolverEdgeCaseDiagnostics?.blankFantraxUpdateMatches??0],["MLBAM 0/null/blank identity decisions",preview.resolverEdgeCaseDiagnostics?.zeroLikeMlbamIdentityDecisions??0],["Unsafe fallback decisions",preview.resolverEdgeCaseDiagnostics?.unsafeFallbackUpdateDecisions??0]])}<table class="mt-12"><thead><tr><th>Matched UUID</th><th>Rows</th><th>Stable IDs differed</th><th>First imported players</th><th>Rules</th></tr></thead><tbody>${preview.updateDecisionDiagnostics.groups.slice(0,25).map(group=>`<tr><td>${clean(group.matchedPlayerId)}</td><td>${clean(group.sourceRowCount)}</td><td>${group.stableIdsDiffer?"Yes":"No"}</td><td>${group.first10ImportedPlayers.map(player=>`${clean(player.importedPlayerName)} (${clean(player.importedFantraxId||"no Fantrax ID")}, ${clean(player.importedMlbamId||"no MLBAM ID")}) via ${clean(player.matchSource)} / ${clean(player.resolverBranch)}`).join("<br>")}</td><td>${clean((group.exactRules||[]).join(", "))}</td></tr>`).join("")}</tbody></table></details>`
+    :"";
+  el.innerHTML=`<h3>${clean(importLabels[step])} Preview</h3>${countGridHTML(fantraxCounts)}<p class="note mt-10"><b>Detected columns:</b> ${columns||"JSON file"}</p>${errors}${warnings}${categories}${resolverDiagnostics}${duplicateGroups}${updateTrace}`;
 }
 
 function classifyError(error){

@@ -82,6 +82,9 @@ function mlbam(player){
   const value=num(raw);
   return value&&Number.isInteger(value)?value:null;
 }
+function fantraxId(player){
+  return compact(player?.fantraxId||player?.fantrax_id||player?.fantraxID);
+}
 function positions(player){
   if(Array.isArray(player.positions))return player.positions;
   return String(player.pos||"").split(/[\/,\s]+/).map(x=>x.trim()).filter(Boolean);
@@ -121,6 +124,7 @@ function playerRow(player,leagueId,teamMap){
   const normalized=norm(player.name);
   return cleanObject({
     league_id:leagueId,
+    fantrax_id:fantraxId(player),
     mlbam_id:mlbam(player),
     name:player.name,
     normalized_name:normalized,
@@ -253,11 +257,12 @@ async function migratePlayers(ctx){
       if(existingId){ctx.maps.playersByName.set(nameKey,existingId);if(mlbamKey)ctx.maps.playersByMlbam.set(mlbamKey,existingId);result.skipped++;continue}
       inserts.push(item.row);
     }
-    const saved=await cloudStore.upsertRows("players",inserts,"league_id,normalized_name");
+    const {data:saved,meta}=await cloudStore.syncPlayers(inserts,{label:"Local player migration"});
     saved.forEach(row=>{
       ctx.maps.playersByName.set(norm(row.normalized_name||row.name),row.id);
       if(row.mlbam_id)ctx.maps.playersByMlbam.set(String(row.mlbam_id),row.id);
     });
+    result.skipped+=meta.skippedMissingKeys.length+meta.duplicateKeysRemoved;
     result.inserted+=saved.length;
     patchProgress(ctx,"Players",result,`Players migrated: ${result.inserted+result.skipped} / ${result.total}`);
     await sleep();

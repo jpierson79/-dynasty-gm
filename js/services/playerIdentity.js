@@ -4,7 +4,7 @@ export function cleanExternalId(value){
 
 export function cleanMlbamId(value){
   const cleaned=cleanExternalId(value);
-  if(!cleaned||cleaned==="0")return "";
+  if(!cleaned||["0","nan","null","undefined"].includes(cleaned.toLowerCase()))return "";
   return cleaned;
 }
 
@@ -181,7 +181,7 @@ export function dedupeIdentityRows(rows=[]){
       if(seenFallback.has(key))duplicateFallbackKeys++;
       seenFallback.add(key);
     }
-    unique.set(key,{...row,fantrax_id:fantraxId||undefined});
+    unique.set(key,{...row,fantrax_id:fantraxId||undefined,mlbam_id:mlbamId||null});
   });
 
   return {
