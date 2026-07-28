@@ -1,0 +1,26 @@
+import { importTypes } from "../imports/cloudImportController.js";
+
+const DESCRIPTIONS={
+  fantrax:"Canonical player pool, fantasy-team ownership, and roster slots.",
+  hkb:"HarryKnowsBall values, ranks, and supplemental player valuation fields.",
+  statcastHitters:"Statcast hitter metrics keyed by MLBAM player_id when safely matched.",
+  statcastPitchers:"Statcast pitcher metrics keyed by MLBAM player_id when safely matched.",
+  trades:"Historical trade records and traded assets for the active cloud league.",
+  custom:"Manager intelligence, preferences, and league notes exported from the app."
+};
+
+export function renderImports(state,importState={}){
+  return `<section class="view-panel"><h2>Cloud Imports</h2><p class="note">Every import requires preview, review confirmation, and writes directly to Supabase in batches for the active league. Choosing a different file invalidates the preview.</p><div class="import-grid">${importTypes.map(item=>`<article class="import-card"><h3>${item.label}</h3><p class="note">${DESCRIPTIONS[item.key]||"Cloud source import."}</p><input id="file-${item.key}" data-import-file="${item.key}" type="file" accept="${item.accept}"><label class="review-control"><input data-import-reviewed="${item.key}" type="checkbox" ${importState.reviewed?.[item.key]?"checked":""} ${importState.previews?.[item.key]?"":"disabled"}> I reviewed this preview.</label><div class="import-actions"><button class="secondary" data-preview-import="${item.key}">Preview</button><button class="primary" data-run-import="${item.key}" ${importState.previews?.[item.key]&&importState.reviewed?.[item.key]?"":"disabled"}>Upload</button></div><p class="note">${importState.previews?.[item.key]?"Preview ready. Confirm review to upload.":"No active preview."}</p></article>`).join("")}</div><section id="importPreviewPanel" class="panel">${renderImportPreview(importState.preview)}</section><section id="importProgressPanel" class="panel">${renderImportProgress(importState.result)}</section></section>`;
+}
+function renderImportPreview(preview){
+  if(!preview)return"<p class='note'>Choose a file and preview it before uploading.</p>";
+  const headers=(preview.columns||[]).join(", ")||"JSON file";
+  const teams=(preview.fantasyTeamsDetected||[]).join(", ")||"None";
+  const tokens=(preview.nonTeamStatusTokensDetected||[]).join(", ")||"None";
+  return `<h3>Preview</h3><div class="grid"><div class="metric"><span>Matched</span><b>${preview.matchedRecords||preview.existingCloudMatches||0}</b></div><div class="metric"><span>Inserted</span><b>${preview.newPlayersToInsert||0}</b></div><div class="metric"><span>Updated</span><b>${preview.existingCloudMatches||0}</b></div><div class="metric"><span>Ambiguous</span><b>${preview.identityConflicts||0}</b></div><div class="metric"><span>Skipped</span><b>${preview.unmatchedRows||preview.unmatchedRecords||0}</b></div><div class="metric"><span>Errors</span><b>${preview.blockingErrors?.length||0}</b></div></div><p class="note"><b>Detected headers:</b> ${headers}</p><p class="note"><b>Teams detected:</b> ${teams}</p><p class="note"><b>Status tokens excluded:</b> ${tokens}</p>`;
+}
+function renderImportProgress(result){
+  if(!result)return"<p class='note'>No import has run yet.</p>";
+  const details=result.exceptionDetails||[];
+  return `<h3>Import Result</h3><div class="grid"><div class="metric"><span>Matched</span><b>${result.matched||0}</b></div><div class="metric"><span>Inserted</span><b>${result.inserted||0}</b></div><div class="metric"><span>Updated</span><b>${result.updated||0}</b></div><div class="metric"><span>Skipped</span><b>${result.skipped||result.unmatched||0}</b></div><div class="metric"><span>Warnings</span><b>${result.warnings||details.length||0}</b></div><div class="metric"><span>Errors</span><b>${result.errors||0}</b></div></div>${details.length?`<details open><summary><b>View Details</b></summary><table class="exception-table"><thead><tr><th>CSV row</th><th>Player</th><th>Fantrax</th><th>MLBAM</th><th>Team</th><th>Action</th><th>Reason</th><th>Suggested resolution</th></tr></thead><tbody>${details.map(row=>`<tr><td>${row.csvRow||""}</td><td>${row.playerName||""}</td><td>${row.fantraxId||""}</td><td>${row.mlbamId||""}</td><td>${row.team||""}</td><td>${row.actionAttempted||""}</td><td>${row.failureReason||""}</td><td>${row.suggestedResolution||""}</td></tr>`).join("")}</tbody></table></details>`:""}`;
+}
