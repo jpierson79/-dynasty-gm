@@ -109,6 +109,16 @@ function assertIncomingShape(candidate){
 }
 
 {
+  const authoritative=player({id:"p-auth-name",name:"Authoritative Name",normalized_name:"authoritative name",fantrax_id:"FTX-AUTH",mlb_team:"SEA",positions:["SS"]});
+  const result=resolve([authoritative],{name:"Authoritative Name",normalized_name:"authoritative name",mlb_team:"SEA",positions:["SS"]});
+  assert.equal(result.action,"unmatched");
+  assert.equal(result.reason,"authoritative_name_candidate_blocks_name_only_fallback");
+  assert.equal(result.matchSource,"fallback");
+  assert.equal(result.candidates.length,1);
+  assert.equal(result.candidates[0].id,"p-auth-name");
+}
+
+{
   const existing=player({id:"p-name-only",name:"Name Only",normalized_name:"name only",mlb_team:"SEA",positions:["SS"]});
   const result=resolve([existing],{name:"Name Only",normalized_name:"name only"});
   assert.equal(result.action,"unmatched");

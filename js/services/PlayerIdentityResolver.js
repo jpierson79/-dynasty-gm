@@ -42,6 +42,7 @@ const REASONS=Object.freeze({
   SPLIT_STABLE_IDS:"fantrax_id_and_mlbam_id_match_different_players",
   STABLE_FALLBACK_CONFLICT:"stable_identifier_conflicts_with_fallback_candidate",
   AMBIGUOUS_FALLBACK:"ambiguous_fallback_match",
+  AUTHORITATIVE_NAME_BLOCKS_FALLBACK:"authoritative_name_candidate_blocks_name_only_fallback",
   MISSING_IDENTITY:"missing_stable_identifier_and_no_safe_fallback",
   INVALID_EXISTING_PLAYER:"invalid_existing_player_identity"
 });
@@ -97,7 +98,9 @@ function repositoryDiagnostics(repository,importedPlayer){
 function fallbackMatches(incoming,repository){
   const nameKey=playerNormalizedName(incoming);
   if(!nameKey)return [];
-  return safeRepositoryCall(repository,"findByNormalizedName",nameKey)
+  const nameCandidates=safeRepositoryCall(repository,"findByNormalizedName",nameKey);
+  if(nameCandidates.some(candidate=>cleanExternalId(candidate?.fantrax_id)||cleanMlbamId(candidate?.mlbam_id)))return [];
+  return nameCandidates
     .filter(candidate=>{
       const incomingSummary=incomingIdentitySummary(incoming);
       const candidateSummary=candidateIdentitySummary(candidate);
@@ -229,6 +232,8 @@ export class PlayerIdentityResolver{
     if(mlbamId)trace.push(mlbamMatches.length>1?"multiple_mlbam_matches_found":mlbamMatches.length?"mlbam_match_found":"mlbam_match_not_found");
     trace.push("mlbam_validation_complete");
 
+    const sameNameCandidates=(!fantraxId&&!mlbamId&&playerNormalizedName(incoming))?safeRepositoryCall(this.#repository,"findByNormalizedName",playerNormalizedName(incoming)):[];
+    const authoritativeNameCandidates=sameNameCandidates.filter(candidate=>cleanExternalId(candidate?.fantrax_id)||cleanMlbamId(candidate?.mlbam_id));
     const fallback=(!fantraxId&&!mlbamId)?fallbackMatches(incoming,this.#repository):[];
     if(fantraxId||mlbamId)trace.push("fallback_skipped_stable_id_present");
     else trace.push(fallback.length>1?"multiple_safe_fallback_matches_found":fallback.length?"safe_fallback_found":"safe_fallback_not_found");
@@ -279,6 +284,10 @@ export class PlayerIdentityResolver{
         matchSource:MATCH_SOURCE.FALLBACK,
         confidenceScore:CONFIDENCE_SCORES.FALLBACK_UPDATE
       });
+    }
+
+    if(authoritativeNameCandidates.length){
+      return unmatchedResult(REASONS.AUTHORITATIVE_NAME_BLOCKS_FALLBACK,incoming,diagnosticContext,trace,{matchSource:MATCH_SOURCE.FALLBACK,candidates:candidateSummaries(authoritativeNameCandidates)});
     }
 
     if(fallback.length>1){

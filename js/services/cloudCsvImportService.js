@@ -1,11 +1,23 @@
 import * as cloudStore from "./cloudStore.js";
 import { PlayerIdentityResolver } from "./PlayerIdentityResolver.js";
 import { InMemoryPlayerIdentityRepository } from "./identity/InMemoryPlayerIdentityRepository.js";
-import { buildPlayerIdentityIndexes, cleanMlbamId, resolvePlayerIdentity } from "./playerIdentity.js";
+import { buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, normalizeIdentityName, resolvePlayerIdentity } from "./playerIdentity.js";
 import { SUPABASE_URL } from "../config/supabase.js";
 
 const BATCH_SIZE=150;
 const CHECKPOINT_KEY="dynasty_cloud_import_checkpoint_v1";
+const EXCEPTION_DETAIL_LIMIT=5000;
+const COMMON_IMPORT_EXCEPTION_REASONS=[
+  "No matching player",
+  "Duplicate Fantrax ID",
+  "Duplicate MLBAM ID",
+  "Ambiguous normalized name",
+  "Unknown team",
+  "Unknown manager",
+  "Malformed CSV",
+  "Missing required column",
+  "Skipped because preview mismatch"
+];
 const STEP_ORDER=["fantrax","hkb","statcastHitters","statcastPitchers","trades","custom","verification","enable"];
 const STEP_LABELS={
   fantrax:"Fantrax player pool and roster",
@@ -13,14 +25,14 @@ const STEP_LABELS={
   statcastHitters:"Statcast hitters",
   statcastPitchers:"Statcast pitchers",
   trades:"Fantrax trade history",
-  custom:"Custom Intelligence JSON",
+  custom:"Manager Intelligence",
   verification:"Verification",
   enable:"Enable Cloud Data"
 };
 
 function sleep(){return new Promise(resolve=>setTimeout(resolve,0))}
 function now(){return new Date().toISOString()}
-function norm(value){return window.DynastyMigrationService?.normalizeName?window.DynastyMigrationService.normalizeName(value):String(value||"").trim().toLowerCase()}
+function norm(value){return globalThis.window?.DynastyMigrationService?.normalizeName?window.DynastyMigrationService.normalizeName(value):normalizeIdentityName(value)}
 function clean(value){return String(value??"").trim()}
 function num(value){const n=Number(String(value??"").replace(/[^0-9.\-]/g,""));return Number.isFinite(n)?n:null}
 function serializeMlbamId(value){
@@ -32,12 +44,63 @@ function serializeMlbamId(value){
 }
 function chunk(rows,size=BATCH_SIZE){const out=[];for(let i=0;i<rows.length;i+=size)out.push(rows.slice(i,i+size));return out}
 function cleanOwner(value){
-  const s=clean(value);
+  const s=stripHtml(value);
   if(!s)return"FREE AGENT";
   const low=s.toLowerCase();
   return ["fa","free agent","waivers","available","-","--","none","n/a"].includes(low)?"FREE AGENT":s;
 }
 function isFantasyTeamName(value){return cleanOwner(value)!=="FREE AGENT"}
+const NON_TEAM_STATUS_TOKENS=new Set(["","fa","free agent","waivers","waiver","w","available","active","starter","starting","lineup","reserve","reserved","bench","bn","il","il10","il15","il60","ir","injured reserve","injured list","injured","minors","minor league","minor","milb","farm","prospect","n/a","na","none","-","--"]);
+function stripHtml(value){return String(value??"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim()}
+function statusToken(value){return stripHtml(value).replace(/\([^)]*\)/g," ").replace(/\s+/g," ").trim()}
+function normalizedStatusToken(value){return statusToken(value).toLowerCase()}
+function isNonTeamStatusToken(value){
+  const token=normalizedStatusToken(value);
+  return NON_TEAM_STATUS_TOKENS.has(token)||/^w\s*\(?[a-z]{3}\)?$/i.test(statusToken(value))||/waiver|claim/i.test(token);
+}
+function isFreeAgentToken(value){return ["fa","free agent","available","waivers","waiver"].includes(normalizedStatusToken(value))}
+export function normalizeFantraxRosterStatus(value,{owned=false,freeAgent=false,source="rosterSlot"}={}){
+  const token=statusToken(value);
+  if(freeAgent)return"FREE_AGENT";
+  const low=normalizedStatusToken(token);
+  if(owned&&["fa","free agent","waivers","waiver","w","available"].includes(low))return"UNCLASSIFIED";
+  if(["fa","free agent","waivers","waiver","w","available"].includes(low))return"FREE_AGENT";
+  if(["active","starter","starting","lineup"].includes(low))return"ACTIVE";
+  if(["reserve","reserved","bench","bn"].includes(low))return"RESERVE";
+  if(["il","il10","il15","il60","ir","injured reserve","injured list","injured"].includes(low))return"IL";
+  if(["minors","minor league","milb","farm"].includes(low)||source==="rosterSlot"&&["na","n/a"].includes(low))return"MINORS";
+  return"UNCLASSIFIED";
+}
+function fantraxOwnershipToken(row,ix){
+  return statusToken(cell(row,ix.owner));
+}
+function fantraxRosterSlotToken(row,ix){
+  return statusToken(ix.rosterSlot>=0?cell(row,ix.rosterSlot):"");
+}
+function headerName(head,ix){return ix>=0?String(head[ix]||""):""}
+function detectedFantasyTeamTokens(rows,ix){
+  return [...new Set(rows.map(row=>fantraxOwnershipToken(row,ix)).filter(token=>token&&!isNonTeamStatusToken(token)).map(clean))].sort();
+}
+function nonTeamStatusTokens(rows,ix){
+  return [...new Set(rows.map(row=>fantraxOwnershipToken(row,ix)).filter(token=>token&&isNonTeamStatusToken(token)).map(statusToken))].sort();
+}
+function fantraxRosterSlotDiagnostics(rows,ix){
+  const rawTokens=[...new Set(rows.map(row=>fantraxRosterSlotToken(row,ix)).filter(Boolean))].sort();
+  const mappingCounts={ACTIVE:0,RESERVE:0,IL:0,MINORS:0,UNCLASSIFIED:0,FREE_AGENT:0};
+  const unknownTokens=new Set();
+  const unclassifiedExamples=[];
+  rows.forEach((row,index)=>{
+    const token=fantraxRosterSlotToken(row,ix);
+    const ownershipToken=fantraxOwnershipToken(row,ix);
+    const status=normalizeFantraxRosterStatus(token,{owned:Boolean(ownershipToken&&!isNonTeamStatusToken(ownershipToken)),source:"rosterSlot"});
+    mappingCounts[status]=(mappingCounts[status]||0)+1;
+    if(status==="UNCLASSIFIED"){
+      if(token)unknownTokens.add(token);
+      if(unclassifiedExamples.length<25)unclassifiedExamples.push({csvRow:index+2,playerName:cell(row,ix.name),rawRosterSlot:token,ownershipToken});
+    }
+  });
+  return {rawTokens,mappingCounts,unknownTokens:[...unknownTokens].sort(),unclassifiedExamples};
+}
 function cleanObject(obj){
   const out={};
   Object.entries(obj||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=="")out[k]=v});
@@ -77,32 +140,77 @@ function exactHeaderIndex(head,names){
 }
 function cell(row,ix){return ix>=0?clean(row[ix]):""}
 function textCell(row,ix){return ix>=0?String(row[ix]??"").trim():""}
+function exceptionDetail({rowNumber="",row=null,ix={},name="",fantraxId="",mlbamId="",team="",action="",reason="",suggestedResolution=""}={}){
+  return {
+    csvRow:rowNumber||"",
+    playerName:name||cell(row,ix.name),
+    fantraxId:fantraxId||textCell(row,ix.fantrax),
+    mlbamId:mlbamId||cell(row,ix.mlbam),
+    team:team||cell(row,ix.owner)||cell(row,ix.team)||cell(row,ix.org),
+    actionAttempted:action,
+    failureReason:reason,
+    suggestedResolution
+  };
+}
+function pushException(list,detail){
+  if(list.length<EXCEPTION_DETAIL_LIMIT)list.push(detail);
+}
+function reasonSuggestion(reason){
+  const text=String(reason||"").toLowerCase();
+  if(text.includes("duplicate fantrax"))return"Keep one row for that Fantrax ID or correct the duplicate ID before importing again.";
+  if(text.includes("duplicate mlbam"))return"Keep one row for that MLBAM ID or correct the duplicate MLBAM value before importing again.";
+  if(text.includes("ambiguous")||text.includes("normalized"))return"Add or correct Fantrax ID or MLBAM ID so the row can match a single cloud player.";
+  if(text.includes("team"))return"Review the team/owner value and make sure the fantasy team exists in the selected cloud league.";
+  if(text.includes("manager"))return"Review the manager team name and import or create that manager first.";
+  if(text.includes("column"))return"Use the expected export format and include the required column before previewing again.";
+  if(text.includes("malformed")||text.includes("json")||text.includes("csv"))return"Fix the source file format, then preview the file again.";
+  if(text.includes("preview"))return"Preview the currently selected file again and confirm it before upload.";
+  return"Review the source row, confirm stable IDs and names, then preview/import again.";
+}
+function warningSummary({matched=0,inserted=0,updated=0,skipped=0,warnings=0,errors=0,details=[]}={}){
+  return {matched,inserted,updated,skipped,warnings,errors,details};
+}
 function splitPositions(value){return clean(value).split(/[\/,\s]+/).map(x=>x.trim()).filter(Boolean)}
 function fantraxPlayerIndexes(head){
   const map=headerMap(head);
   return {
     map,
     name:map.find(["player","player name","name"]),
-    owner:map.find(["status","owner","fantasy team","team owner","roster status"]),
+    owner:map.find(["status","owner","fantasy team","team owner"]),
     pos:map.find(["position","positions","pos"]),
     org:map.find(["team","mlb team","org","organization"]),
     age:map.find(["age"]),
     fantrax:exactHeaderIndex(head,["ID","Fantrax ID","Fantrax Player ID"]),
     mlbam:exactHeaderIndex(head,["MLBAM ID","MLB ID","MLB Player ID"]),
     status:map.find(["status","roster status"]),
+    rosterSlot:map.find(["roster slot","slot","lineup slot","roster position"]),
     minor:map.find(["minor","minors","minor league","level"])
   };
+}
+function cleanPlayerRow(row){
+  const out=cleanObject(row);
+  if("owner_team_id" in row)out.owner_team_id=row.owner_team_id;
+  if("availability_status" in row)out.availability_status=row.availability_status;
+  return out;
 }
 function buildFantraxPlayerRows(rows,ix,leagueId,maps,startRowNumber=2){
   const playerRows=[];
   rows.forEach((row,index)=>{
     const name=cell(row,ix.name);
     if(!name)return;
-    const owner=cleanOwner(cell(row,ix.owner)||cell(row,ix.status));
+    const ownershipToken=fantraxOwnershipToken(row,ix);
+    const rosterSlotToken=fantraxRosterSlotToken(row,ix);
+    const normalizedOwner=norm(ownershipToken);
+    const matchedTeam=!isNonTeamStatusToken(ownershipToken)?maps?.teams?.get(normalizedOwner):null;
+    const freeAgent=!matchedTeam&&isFreeAgentToken(ownershipToken);
+    const availabilityStatus=!matchedTeam&&isNonTeamStatusToken(ownershipToken)?statusToken(ownershipToken):"";
+    const rosterStatus=matchedTeam
+      ?normalizeFantraxRosterStatus(rosterSlotToken,{owned:true,source:"rosterSlot"})
+      :normalizeFantraxRosterStatus(ownershipToken,{freeAgent,source:"ownership"});
     const fantraxId=textCell(row,ix.fantrax);
     const mlbam=serializeMlbamId(cell(row,ix.mlbam));
     const normalized=norm(name);
-    playerRows.push(cleanObject({
+    playerRows.push(cleanPlayerRow({
       source_row_number:startRowNumber+index,
       league_id:leagueId,
       fantrax_id:fantraxId,
@@ -112,10 +220,11 @@ function buildFantraxPlayerRows(rows,ix,leagueId,maps,startRowNumber=2){
       age:num(cell(row,ix.age)),
       positions:splitPositions(cell(row,ix.pos)),
       mlb_team:cell(row,ix.org),
-      owner_team_id:isFantasyTeamName(owner)?maps?.teams?.get(norm(owner))?.id:undefined,
-      roster_status:owner,
-      is_minor_leaguer:/minor|milb|prospect/i.test(cell(row,ix.minor)||cell(row,ix.status)),
-      is_free_agent:owner==="FREE AGENT"
+      owner_team_id:matchedTeam?matchedTeam.id:null,
+      roster_status:rosterStatus,
+      availability_status:availabilityStatus,
+      is_minor_leaguer:rosterStatus==="MINORS"||/minor|milb|farm|prospect/i.test(cell(row,ix.minor)),
+      is_free_agent:freeAgent
     }));
   });
   return playerRows;
@@ -196,7 +305,7 @@ async function cloudMaps(leagueId){
   return maps;
 }
 async function ensureTeams(leagueId,owners,maps){
-  const missing=[...new Set(owners.map(cleanOwner).filter(isFantasyTeamName))].filter(name=>!maps.teams.has(norm(name)));
+  const missing=[...new Set(owners.map(statusToken).filter(token=>token&&!isNonTeamStatusToken(token)))].filter(name=>!maps.teams.has(norm(name)));
   if(!missing.length)return;
   const rows=missing.map(name=>({league_id:leagueId,name,is_user_team:false}));
   const saved=await cloudStore.upsertRows("teams",rows,"league_id,name");
@@ -205,6 +314,48 @@ async function ensureTeams(leagueId,owners,maps){
 function playerMatch(maps,row){
   const resolved=resolvePlayerIdentity(row,maps.identityIndexes||buildPlayerIdentityIndexes(maps.players||[]),{leagueId:row.league_id});
   return resolved.status==="matched"?resolved.player:null;
+}
+function hasConflictingStableId(player,row){
+  const incomingFantrax=cleanExternalId(row?.fantrax_id);
+  const existingFantrax=cleanExternalId(player?.fantrax_id);
+  if(incomingFantrax&&existingFantrax&&incomingFantrax!==existingFantrax)return true;
+  const incomingMlbam=cleanMlbamId(row?.mlbam_id);
+  const existingMlbam=cleanMlbamId(player?.mlbam_id);
+  return Boolean(incomingMlbam&&existingMlbam&&incomingMlbam!==existingMlbam);
+}
+export function supplementalPlayerMatch(maps,row){
+  const stableMatch=playerMatch(maps,row);
+  if(stableMatch)return stableMatch;
+  const nameKey=norm(row?.normalized_name||row?.name||row?.player_name||row?.playerName);
+  if(!nameKey||maps?.ambiguousNames?.has(nameKey))return null;
+  const candidate=maps?.playersByName?.get(nameKey);
+  if(!candidate||hasConflictingStableId(candidate,row))return null;
+  return candidate;
+}
+export function resolveStatcastPlayer(maps,row){
+  const fantraxId=cleanExternalId(row?.fantrax_id);
+  const mlbamId=serializeMlbamId(row?.mlbam_id);
+  const nameKey=norm(row?.normalized_name||row?.name||row?.player_name||row?.playerName);
+  const incoming={...row,fantrax_id:fantraxId,mlbam_id:mlbamId,normalized_name:nameKey};
+  if(fantraxId){
+    const fantraxMatch=maps?.playersByFantrax?.get(fantraxId);
+    if(fantraxMatch){
+      const mlbamMatch=mlbamId?maps?.playersByMlbam?.get(String(mlbamId)):null;
+      if(mlbamMatch?.id&&mlbamMatch.id!==fantraxMatch.id)return {status:"conflict",reason:"MLBAM conflict",player:fantraxMatch,matchSource:"fantrax_id"};
+      if(mlbamId&&cleanMlbamId(fantraxMatch.mlbam_id)&&cleanMlbamId(fantraxMatch.mlbam_id)!==String(mlbamId))return {status:"conflict",reason:"MLBAM conflict",player:fantraxMatch,matchSource:"fantrax_id"};
+      return {status:"matched",player:fantraxMatch,matchSource:"fantrax_id"};
+    }
+  }
+  if(mlbamId){
+    const mlbamMatch=maps?.playersByMlbam?.get(String(mlbamId));
+    if(mlbamMatch)return {status:"matched",player:mlbamMatch,matchSource:"mlbam_id"};
+  }
+  if(!nameKey)return {status:"unmatched",reason:"No matching player"};
+  if(maps?.ambiguousNames?.has(nameKey))return {status:"ambiguous",reason:"Ambiguous normalized name"};
+  const candidate=maps?.playersByName?.get(nameKey);
+  if(!candidate)return {status:"unmatched",reason:"No matching player"};
+  if(hasConflictingStableId(candidate,incoming))return {status:"conflict",reason:"MLBAM conflict",player:candidate,matchSource:"unambiguous_name"};
+  return {status:"matched",player:candidate,matchSource:"unambiguous_name"};
 }
 function rememberPlayer(maps,player){
   if(!player?.id)return;
@@ -244,6 +395,30 @@ function sourceRowSummary(row){
 }
 function stableIdSet(rows,key){
   return new Set(rows.map(row=>String(row?.[key]??"").trim()).filter(Boolean));
+}
+function duplicateIdentityExceptionDetails(rows,key,label){
+  const grouped=new Map();
+  rows.forEach(row=>{
+    const value=String(row?.[key]??"").trim();
+    if(!value)return;
+    if(!grouped.has(value))grouped.set(value,[]);
+    grouped.get(value).push(row);
+  });
+  const out=[];
+  grouped.forEach(group=>{
+    if(group.length<2)return;
+    group.forEach(row=>out.push(exceptionDetail({
+      rowNumber:row.source_row_number||"",
+      name:row.name||"",
+      fantraxId:row.fantrax_id||"",
+      mlbamId:row.mlbam_id||"",
+      team:row.mlb_team||row.roster_status||"",
+      action:"Skipped",
+      reason:`Duplicate ${label}`,
+      suggestedResolution:reasonSuggestion(`Duplicate ${label}`)
+    })));
+  });
+  return out;
 }
 function updateDecisionRow(row){
   const resolution=row.identityResolution||{};
@@ -417,6 +592,38 @@ function classifyFantraxRows(playerRows,resolver){
   const resolverEdgeCaseDiagnostics=buildResolverEdgeCaseDiagnostics(playerRows,prepared.rows,updates,inserts,unmatchedRows);
   const collapsed=collapseResolvedUpdates(updates);
   identityConflicts.push(...collapsed.conflicts);
+  const exceptionDetails=[
+    ...duplicateIdentityExceptionDetails(playerRows,"fantrax_id","Fantrax ID"),
+    ...duplicateIdentityExceptionDetails(playerRows,"mlbam_id","MLBAM ID"),
+    ...(prepared.skippedInvalidRows||[]).map(row=>exceptionDetail({
+      rowNumber:row.source_row_number||row.sourceRowNumber||"",
+      name:row.name||row.incomingName||"",
+      fantraxId:row.fantrax_id||row.incomingFantraxId||"",
+      mlbamId:row.mlbam_id||row.incomingMlbamId||"",
+      team:row.mlb_team||row.team||"",
+      action:"Skipped",
+      reason:"Malformed CSV or missing required identity fields",
+      suggestedResolution:reasonSuggestion("Malformed CSV")
+    })),
+    ...identityConflicts.map(row=>exceptionDetail({
+      rowNumber:row.sourceRowNumber,
+      name:row.incomingPlayerName,
+      fantraxId:row.incomingFantraxId,
+      mlbamId:row.incomingMlbamId,
+      action:"Skipped",
+      reason:row.reason||"Ambiguous normalized name",
+      suggestedResolution:reasonSuggestion(row.reason||"Ambiguous normalized name")
+    })),
+    ...unmatchedRows.map(row=>exceptionDetail({
+      rowNumber:row.sourceRowNumber,
+      name:row.name,
+      fantraxId:row.fantrax_id,
+      mlbamId:row.mlbam_id,
+      action:"Skipped",
+      reason:row.reason||"No matching player",
+      suggestedResolution:reasonSuggestion(row.reason||"No matching player")
+    }))
+  ];
   return {
     ...prepared,
     updates:collapsed.updates,
@@ -427,6 +634,7 @@ function classifyFantraxRows(playerRows,resolver){
     matchedByMlbam,
     matchedByFallback,
     duplicateResolvedUpdatesCollapsed:collapsed.duplicateResolvedUpdatesCollapsed,
+    exceptionDetails,
     updateResolutionDiagnostics:collapsed.updateResolutionDiagnostics,
     updateDecisionDiagnostics,
     resolverEdgeCaseDiagnostics
@@ -441,6 +649,9 @@ export function buildFantraxPreviewSummary({leagueId,file,rows,head,maps}){
   if(ix.name<0)blocking.push("Fantrax import needs a Player or Name column.");
   if(ix.owner<0&&ix.status<0)warnings.push("No Status/owner column detected; rows will be treated as free agents.");
   if(ix.fantrax>=0)warnings.push("Fantrax ID column detected and will be stored as fantrax_id. It has been manually verified as stable across multiple Fantrax exports.");
+  const fantasyTeamsDetected=detectedFantasyTeamTokens(rows,ix);
+  const nonTeamStatusTokensDetected=nonTeamStatusTokens(rows,ix);
+  const rosterSlotDiagnostics=fantraxRosterSlotDiagnostics(rows,ix);
   const playerRows=ix.name<0?[]:buildFantraxPlayerRows(rows,ix,leagueId,maps,2);
   const resolver=new PlayerIdentityResolver({repository:new InMemoryPlayerIdentityRepository(maps?.players||[])});
   const classified=classifyFantraxRows(playerRows,resolver);
@@ -474,6 +685,20 @@ export function buildFantraxPreviewSummary({leagueId,file,rows,head,maps}){
     matchedByFantrax:classified.matchedByFantrax||0,
     matchedByMlbam:classified.matchedByMlbam||0,
     matchedByFallback:classified.matchedByFallback||0,
+    rowsWithFantraxIds:playerRows.filter(row=>row.fantrax_id).length,
+    rowsWithMlbamIds:playerRows.filter(row=>row.mlbam_id).length,
+    nameOnlyRows:playerRows.filter(row=>!row.fantrax_id&&!row.mlbam_id).length,
+    ownershipColumnDetected:headerName(head,ix.owner),
+    rosterSlotColumnDetected:headerName(head,ix.rosterSlot),
+    fantasyTeamsDetected,
+    nonTeamStatusTokensDetected,
+    distinctRawRosterTokens:rosterSlotDiagnostics.rawTokens,
+    normalizedRosterStatusCounts:rosterSlotDiagnostics.mappingCounts,
+    unknownRosterTokens:rosterSlotDiagnostics.unknownTokens,
+    first25UnclassifiedExamples:rosterSlotDiagnostics.unclassifiedExamples,
+    freeAgentsDetected:playerRows.filter(row=>row.is_free_agent).length,
+    rosteredPlayersDetected:playerRows.filter(row=>row.owner_team_id).length,
+    first50AmbiguousOrMalformed:[...(classified.identityConflicts||[]),...(classified.unmatchedRows||[])].slice(0,50),
     duplicateFantraxIds:classified.duplicateFantraxIds||0,
     duplicateMlbamIds:classified.duplicateMlbamIds||0,
     duplicateFallbackKeys:classified.duplicateFallbackKeys||0,
@@ -492,10 +717,11 @@ async function importFantrax({leagueId,file,onProgress,cancelled}){
     const ix=fantraxPlayerIndexes(head);
     if(ix.fantrax>=0)console.info("[Cloud Import] Fantrax ID column detected and stored as fantrax_id. The Fantrax ID has been manually verified as stable across exports.");
     if(ix.name<0)throw new Error("Fantrax import needs a player/name column.");
-    const maps=await cloudMaps(leagueId),owners=rows.map(r=>cleanOwner(cell(r,ix.owner)||cell(r,ix.status)));
+    const maps=await cloudMaps(leagueId),owners=detectedFantasyTeamTokens(rows,ix);
     await ensureTeams(leagueId,owners,maps);
     let resolver=new PlayerIdentityResolver({repository:new InMemoryPlayerIdentityRepository(maps.players)});
     let processed=0,matched=0,unmatched=0,inserted=0,updated=0,duplicateFantraxIds=0,duplicateMlbamIds=0,duplicateFallbackKeys=0,matchedByFantrax=0,matchedByMlbam=0,matchedByFallback=0,identityConflicts=0,skippedInvalidRows=0,duplicateResolvedUpdatesCollapsed=0;
+    const exceptionDetails=[];
     for(const batch of chunk(rows)){
       ensureNotCancelled(ctx);
       const playerRows=buildFantraxPlayerRows(batch,ix,leagueId,maps,processed+2);
@@ -515,14 +741,15 @@ async function importFantrax({leagueId,file,onProgress,cancelled}){
       identityConflicts+=(classified.identityConflicts||[]).length;
       skippedInvalidRows+=(classified.skippedInvalidRows||[]).length;
       duplicateResolvedUpdatesCollapsed+=classified.duplicateResolvedUpdatesCollapsed||0;
+      (classified.exceptionDetails||[]).forEach(detail=>pushException(exceptionDetails,detail));
       unmatched+=(classified.unmatchedRows||[]).length+(classified.identityConflicts||[]).length+(classified.skippedInvalidRows||[]).length;
       processed+=batch.length;matched+=saved.length;
       await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});
-      progress(ctx,"Fantrax player/roster import",{processed,total:rows.length,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows,sourceRows:classified.sourceRows,rowsAfterDeduplication:classified.rowsAfterDeduplication,batch:Math.ceil(processed/BATCH_SIZE),message:`Fantrax players ${processed} / ${rows.length}`});
+      progress(ctx,"Fantrax player/roster import",{processed,total:rows.length,matched,inserted,updated,skipped:unmatched,warnings:exceptionDetails.length,errors:0,exceptionDetails,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows,sourceRows:classified.sourceRows,rowsAfterDeduplication:classified.rowsAfterDeduplication,batch:Math.ceil(processed/BATCH_SIZE),message:`Fantrax players ${processed} / ${rows.length}`});
       await sleep();
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    return{processed,matched,inserted,updated,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows};
+    return{processed,matched,inserted,updated,skipped:unmatched,warnings:exceptionDetails.length,errors:0,exceptionDetails,matchedByFantrax,matchedByMlbam,matchedByFallback,duplicateFantraxIds,duplicateMlbamIds,duplicateFallbackKeys,duplicateResolvedUpdatesCollapsed,unmatched,identityConflicts,skippedInvalidRows};
   }catch(e){
     await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});
     throw e;
@@ -535,12 +762,18 @@ async function importHkb({leagueId,file,onProgress,cancelled}){
     const rows=await parseCsv(file),head=rows.shift()||[],map=headerMap(head),maps=await cloudMaps(leagueId);
     const ix={name:map.find(["name","player","player name"]),fantrax:map.find(["fantrax id","fantrax player id"]),mlbam:exactHeaderIndex(head,["MLBAM ID","MLB ID","MLB Player ID"]),value:map.find(["hkb value","value","dynasty value"]),overall:map.find(["overall rank","rank","overall"]),posRank:map.find(["position rank","pos rank"])};
     let processed=0,matched=0,unmatched=0,updated=0;
+    const exceptionDetails=[];
     for(const batch of chunk(rows)){
       ensureNotCancelled(ctx);
       const updates=[];
-      batch.forEach(row=>{
-        const name=cell(row,ix.name),fantraxId=textCell(row,ix.fantrax),mlbam=num(cell(row,ix.mlbam)),existing=playerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:mlbam,normalized_name:norm(name),name});
-        if(!existing){unmatched++;return}
+      batch.forEach((row,index)=>{
+        const rowNumber=processed+index+2;
+        const name=cell(row,ix.name),fantraxId=textCell(row,ix.fantrax),mlbam=serializeMlbamId(cell(row,ix.mlbam)),existing=supplementalPlayerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:mlbam,normalized_name:norm(name),name});
+        if(!existing){
+          unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber,row,ix,name,fantraxId,mlbamId:mlbam,action:"Update player HKB values",reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
+          return;
+        }
         matched++;updated++;
         updates.push(cleanObject({id:existing.id,league_id:leagueId,name:existing.name,normalized_name:existing.normalized_name,hkb_value:num(cell(row,ix.value)),overall_rank:num(cell(row,ix.overall)),position_rank:num(cell(row,ix.posRank))}));
       });
@@ -549,11 +782,11 @@ async function importHkb({leagueId,file,onProgress,cancelled}){
       }
       processed+=batch.length;
       await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});
-      progress(ctx,"HarryKnowsBall values import",{processed,total:rows.length,updated,unmatched,message:`HKB values ${processed} / ${rows.length}`});
+      progress(ctx,"HarryKnowsBall values import",{processed,total:rows.length,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,message:`HKB values ${processed} / ${rows.length}`});
       await sleep();
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    return{processed,matched,updated,unmatched};
+    return{processed,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched};
   }catch(e){await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});throw e}
 }
 const hitterMetrics=["xba","xslg","xwoba","xobp","xiso","exit_velocity_avg","launch_angle_avg","sweet_spot_percent","barrel_batted_rate","hard_hit_percent","whiff_percent","k_percent","bb_percent","avg_swing_speed","fast_swing_rate","attack_angle","attack_direction","ideal_angle_rate","vertical_swing_path"];
@@ -572,29 +805,70 @@ async function importStatcast({leagueId,file,type,onProgress,cancelled}){
   const job=await createJob(leagueId,`Statcast ${type}`,file);
   try{
     const rows=await parseCsv(file),head=rows.shift()||[],map=headerMap(head),maps=await cloudMaps(leagueId);
-    const playerIx=map.find(["player_id","mlbam","mlbam id"]),seasonIx=map.find(["year","season"]);
+    const playerIx=map.find(["player_id","mlbam","mlbam id"]),fantraxIx=map.find(["fantrax id","fantrax player id"]),seasonIx=map.find(["year","season"]);
     const metricKeys=type==="pitcher"?pitcherMetrics:hitterMetrics;
-    let processed=0,matched=0,unmatched=0,updated=0;
+    let processed=0,matched=0,unmatched=0,updated=0,matchedByMlbam=0,matchedByFantrax=0,matchedByUnambiguousName=0,mlbamBackfilled=0,mlbamAlreadyPresent=0,mlbamConflicts=0,ambiguous=0;
+    const exceptionDetails=[];
     for(const batch of chunk(rows)){
       ensureNotCancelled(ctx);
       const metricRows=[];
-      batch.forEach(row=>{
-        const playerId=num(cell(row,playerIx)),name=statcastName(row,map),existing=playerMatch(maps,{league_id:leagueId,mlbam_id:playerId,normalized_name:norm(name),name});
-        if(!existing){unmatched++;return}
+      const mlbamBackfillRows=new Map();
+      batch.forEach((row,index)=>{
+        const rowNumber=processed+index+2;
+        const playerId=serializeMlbamId(cell(row,playerIx)),name=statcastName(row,map),fantraxId=textCell(row,fantraxIx);
+        const resolved=resolveStatcastPlayer(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:playerId,normalized_name:norm(name),name});
+        if(resolved.status==="ambiguous"){
+          ambiguous++;unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber,name,fantraxId,mlbamId:playerId,action:`Upsert Statcast ${type} metrics`,reason:"Ambiguous normalized name",suggestedResolution:reasonSuggestion("Ambiguous normalized name")}));
+          return;
+        }
+        if(resolved.status==="conflict"){
+          mlbamConflicts++;unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber,name,fantraxId,mlbamId:playerId,action:`Backfill Statcast MLBAM and upsert ${type} metrics`,reason:"MLBAM conflict",suggestedResolution:"Keep the existing cloud MLBAM ID unless the player identity is manually verified and corrected."}));
+          return;
+        }
+        if(resolved.status!=="matched"||!resolved.player?.id){
+          unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber,name,mlbamId:playerId,action:`Upsert Statcast ${type} metrics`,reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
+          return;
+        }
+        const existing=resolved.player;
+        if(resolved.matchSource==="mlbam_id")matchedByMlbam++;
+        else if(resolved.matchSource==="fantrax_id")matchedByFantrax++;
+        else matchedByUnambiguousName++;
+        if(playerId&&cleanMlbamId(existing.mlbam_id)){
+          if(cleanMlbamId(existing.mlbam_id)===String(playerId))mlbamAlreadyPresent++;
+          else{
+            mlbamConflicts++;unmatched++;
+            pushException(exceptionDetails,exceptionDetail({rowNumber,name,fantraxId,mlbamId:playerId,action:`Backfill Statcast MLBAM and upsert ${type} metrics`,reason:"MLBAM conflict",suggestedResolution:"Keep the existing cloud MLBAM ID unless the player identity is manually verified and corrected."}));
+            return;
+          }
+        }else if(playerId){
+          mlbamBackfillRows.set(existing.id,{id:existing.id,league_id:leagueId,mlbam_id:playerId});
+        }
         const metrics={};
         metricKeys.forEach(key=>{const ix=map.find(key);if(ix>=0&&cell(row,ix)!=="")metrics[key]=num(cell(row,ix))??cell(row,ix)});
-        if(!Object.keys(metrics).length){unmatched++;return}
+        if(!Object.keys(metrics).length){
+          unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber,name,mlbamId:playerId,action:`Upsert Statcast ${type} metrics`,reason:"Malformed CSV: no supported metric values",suggestedResolution:reasonSuggestion("Malformed CSV")}));
+          return;
+        }
         matched++;updated++;
         metricRows.push({league_id:leagueId,player_id:existing.id,source:"Statcast",season:num(cell(row,seasonIx))||new Date().getFullYear(),metric_type:type==="pitcher"?"statcast_pitching":"statcast_hitting",metrics,imported_at:now()});
       });
+      if(mlbamBackfillRows.size){
+        const savedBackfills=await cloudStore.syncResolvedPlayers({updates:[...mlbamBackfillRows.values()],inserts:[]},{label:`Statcast ${type} MLBAM backfill`});
+        mlbamBackfilled+=savedBackfills.meta.updated||0;
+        savedBackfills.data.forEach(player=>rememberPlayer(maps,player));
+      }
       await cloudStore.upsertRows("player_metrics",metricRows,"player_id,source,season,metric_type");
       processed+=batch.length;
       await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});
-      progress(ctx,`Statcast ${type} import`,{processed,total:rows.length,updated,unmatched,message:`Statcast ${type} ${processed} / ${rows.length}`});
+      progress(ctx,`Statcast ${type} import`,{processed,total:rows.length,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,matchedByMlbam,matchedByFantrax,matchedByUnambiguousName,mlbamBackfilled,mlbamAlreadyPresent,mlbamConflicts,ambiguous,message:`Statcast ${type} ${processed} / ${rows.length}`});
       await sleep();
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    return{processed,matched,updated,unmatched};
+    return{processed,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,matchedByMlbam,matchedByFantrax,matchedByUnambiguousName,mlbamBackfilled,mlbamAlreadyPresent,mlbamConflicts,ambiguous};
   }catch(e){await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});throw e}
 }
 function splitPlayers(value){return clean(value).split(/\s*(?:;|\n|\+|,|\band\b)\s*/i).map(x=>x.replace(/\s*\([^)]*\)\s*/g," ").trim()).filter(Boolean)}
@@ -608,37 +882,42 @@ async function importTrades({leagueId,file,onProgress,cancelled}){
     const rows=await parseCsv(file),head=rows.shift()||[],map=headerMap(head),maps=await cloudMaps(leagueId);
     const ix={date:map.find(["date","transaction date","processed","timestamp"]),type:map.find(["transaction type","type","action","transaction"]),to:map.find(["to","to team","receiving team","team/manager receiving players","new team","team"]),from:map.find(["from","from team","sending team","team/manager sending players","old team"]),player:map.find(["player","players","player name","asset","name"]),notes:map.find(["notes","details","description","transaction details"]),id:map.find(["transaction id","transaction #","id","trade id"])};
     const grouped=new Map();
-    rows.forEach(row=>{
+    rows.forEach((row,index)=>{
       const to=cleanOwner(cell(row,ix.to)),from=cleanOwner(cell(row,ix.from)),date=cell(row,ix.date).slice(0,10),players=splitPlayers(cell(row,ix.player)||cell(row,ix.notes)),external=cell(row,ix.id);
       const key=external||tradeFingerprint({date,to,from,players});
-      const current=grouped.get(key)||{date,type:cell(row,ix.type)||"Trade",to,from,notes:cell(row,ix.notes),players:[],external_transaction_id:key};
+      const current=grouped.get(key)||{date,type:cell(row,ix.type)||"Trade",to,from,notes:cell(row,ix.notes),players:[],external_transaction_id:key,sourceRowNumber:index+2};
       current.players.push(...players);
       grouped.set(key,current);
     });
     const groups=[...grouped.values()];
     let processed=0,matched=0,unmatched=0,inserted=0;
+    const exceptionDetails=[];
     for(const group of groups){
       ensureNotCancelled(ctx);
       await ensureTeams(leagueId,[group.to,group.from],maps);
       const trade=(await cloudStore.upsertRows("trades",[cleanObject({league_id:leagueId,transaction_date:group.date,team_a_id:maps.teams.get(norm(group.to))?.id,team_b_id:maps.teams.get(norm(group.from))?.id,trade_type:group.type,notes:group.notes,source:"Fantrax CSV",external_transaction_id:group.external_transaction_id})],"league_id,external_transaction_id"))[0];
       for(const playerName of [...new Set(group.players)]){
         const player=maps.playersByName.get(norm(playerName));
-        if(player)matched++;else unmatched++;
+        if(player)matched++;
+        else{
+          unmatched++;
+          pushException(exceptionDetails,exceptionDetail({rowNumber:group.sourceRowNumber,name:playerName,team:[group.from,group.to].filter(Boolean).join(" -> "),action:"Insert trade asset",reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
+        }
         await cloudStore.insertRows("trade_assets",[cleanObject({league_id:leagueId,trade_id:trade.id,player_id:player?.id,player_name:playerName,from_team_id:maps.teams.get(norm(group.from))?.id,to_team_id:maps.teams.get(norm(group.to))?.id,asset_type:"player"})]);
       }
       processed++;inserted++;
-      if(processed%BATCH_SIZE===0){await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});progress(ctx,"Fantrax trade-history import",{processed,total:groups.length,inserted,unmatched,message:`Trades ${processed} / ${groups.length}`});await sleep()}
+      if(processed%BATCH_SIZE===0){await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});progress(ctx,"Fantrax trade-history import",{processed,total:groups.length,matched,inserted,updated:0,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,message:`Trades ${processed} / ${groups.length}`});await sleep()}
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    progress(ctx,"Fantrax trade-history import",{processed,total:groups.length,inserted,unmatched,message:`Trades ${processed} / ${groups.length}`});
-    return{processed,matched,inserted,unmatched};
+    progress(ctx,"Fantrax trade-history import",{processed,total:groups.length,matched,inserted,updated:0,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,message:`Trades ${processed} / ${groups.length}`});
+    return{processed,matched,inserted,updated:0,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched};
   }catch(e){await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});throw e}
 }
 async function migrateCustom({leagueId,onProgress,cancelled}){
   const ctx={leagueId,onProgress,cancelled,startedAt:Date.now()};
-  const job=await createJob(leagueId,"Local custom data",null);
+  const job=await createJob(leagueId,"Manager Intelligence",null);
   try{
-    progress(ctx,"Local custom-data migration",{message:"Migrating manager profiles, preferences, notes, settings, and manual trade notes"});
+    progress(ctx,"Manager Intelligence import",{message:"Importing manager profiles, preferences, notes, settings, and manual trade notes"});
     const db=window.db||{};
     const managers=db.managers||[];
     const managerRows=managers.map(manager=>cleanObject({
@@ -682,13 +961,13 @@ async function migrateCustom({leagueId,onProgress,cancelled}){
       notes++;
     }
     for(const trade of (db.trades||[]).filter(t=>t.source==="Manual"||t.notes)){
-      const row=cleanObject({league_id:leagueId,transaction_date:String(trade.date||now()).slice(0,10),trade_type:trade.type||"Trade",notes:trade.notes,source:trade.source||"Local custom note",external_transaction_id:trade.id});
+      const row=cleanObject({league_id:leagueId,transaction_date:String(trade.date||now()).slice(0,10),trade_type:trade.type||"Trade",notes:trade.notes,source:trade.source||"Manager Intelligence",external_transaction_id:trade.id});
       await cloudStore.insertRows("trades",[row]);
       manualTrades++;
     }
-    await updateJob(job,{status:"completed",rows_processed:managers.length+(db.players||[]).length+(db.trades||[]).length,rows_matched:savedManagers.length+preferences+notes+manualTrades,rows_unmatched:0,error_message:"Local custom data migrated without copying incomplete player caches.",completed_at:now()});
+    await updateJob(job,{status:"completed",rows_processed:managers.length+(db.players||[]).length+(db.trades||[]).length,rows_matched:savedManagers.length+preferences+notes+manualTrades,rows_unmatched:0,error_message:"Manager Intelligence imported; player caches were not included.",completed_at:now()});
     const result={processed:managers.length,matched:savedManagers.length,inserted:savedManagers.length+preferences+manualTrades,updated:notes,unmatched:0};
-    progress(ctx,"Local custom-data migration",{...result,message:"Local custom data migrated"});
+    progress(ctx,"Manager Intelligence import",{...result,message:"Manager Intelligence imported"});
     return result;
   }catch(e){
     await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});
@@ -788,14 +1067,14 @@ async function previewHkb(leagueId,file,rows,head){
     if(!name)return;
     validRows++;
     const fantraxId=textCell(row,ix.fantrax);
-    if(playerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:num(cell(row,ix.mlbam)),normalized_name:norm(name),name}))matched++;else unmatched++;
+    if(supplementalPlayerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:serializeMlbamId(cell(row,ix.mlbam)),normalized_name:norm(name),name}))matched++;else unmatched++;
   });
   if(!matched)warnings.push("No HKB rows matched current cloud players. Run Fantrax first or review names.");
   return previewBase(file,head,rows,"HarryKnowsBall values",validRows,rows.length-validRows,duplicateKeys(rows,row=>textCell(row,ix.fantrax)||cell(row,ix.mlbam)||norm(cell(row,ix.name))),matched,unmatched,blocking,warnings);
 }
 async function previewStatcast(leagueId,file,rows,head,expectedType){
   const map=headerMap(head),maps=await cloudMaps(leagueId);
-  const playerIx=map.find(["player_id","mlbam","mlbam id"]);
+  const playerIx=map.find(["player_id","mlbam","mlbam id"]),fantraxIx=map.find(["fantrax id","fantrax player id"]);
   const keys=expectedType==="pitcher"?pitcherMetrics:hitterMetrics;
   const detectedPitcher=head.some(h=>pitcherMetrics.includes(keyify(h)))&&map.find("p_era")>=0;
   const detectedType=detectedPitcher?"pitcher":"hitter";
@@ -803,15 +1082,29 @@ async function previewStatcast(leagueId,file,rows,head,expectedType){
   if(playerIx<0)warnings.push("No player_id column detected; import will rely on normalized names.");
   if(detectedType!==expectedType)warnings.push(`This looks like a Statcast ${detectedType} export, but this stage is ${expectedType}.`);
   if(!keys.some(key=>map.find(key)>=0))blocking.push("No supported Statcast metric columns were detected.");
-  let matched=0,unmatched=0,validRows=0;
+  let matched=0,unmatched=0,validRows=0,matchedByMlbam=0,matchedByFantrax=0,matchedByUnambiguousName=0,mlbamBackfillable=0,mlbamAlreadyPresent=0,mlbamConflicts=0,ambiguous=0,invalidPlayerIds=0;
   rows.forEach(row=>{
     const name=statcastName(row,map);
     const hasMetric=keys.some(key=>map.find(key)>=0&&cell(row,map.find(key))!=="");
     if(!hasMetric)return;
     validRows++;
-    if(playerMatch(maps,{league_id:leagueId,mlbam_id:num(cell(row,playerIx)),normalized_name:norm(name),name}))matched++;else unmatched++;
+    const playerId=serializeMlbamId(cell(row,playerIx));
+    if(playerIx>=0&&cell(row,playerIx)&&!playerId)invalidPlayerIds++;
+    const resolved=resolveStatcastPlayer(maps,{league_id:leagueId,fantrax_id:textCell(row,fantraxIx),mlbam_id:playerId,normalized_name:norm(name),name});
+    if(resolved.status==="ambiguous"){ambiguous++;unmatched++;return}
+    if(resolved.status==="conflict"){mlbamConflicts++;unmatched++;return}
+    if(resolved.status!=="matched"||!resolved.player?.id){unmatched++;return}
+    matched++;
+    if(resolved.matchSource==="mlbam_id")matchedByMlbam++;
+    else if(resolved.matchSource==="fantrax_id")matchedByFantrax++;
+    else matchedByUnambiguousName++;
+    if(playerId&&cleanMlbamId(resolved.player.mlbam_id))mlbamAlreadyPresent++;
+    else if(playerId)mlbamBackfillable++;
   });
-  return previewBase(file,head,rows,`Statcast ${expectedType}`,validRows,rows.length-validRows,duplicateKeys(rows,row=>cell(row,playerIx)||norm(statcastName(row,map))),matched,unmatched,blocking,warnings);
+  return {
+    ...previewBase(file,head,rows,`Statcast ${expectedType}`,validRows,rows.length-validRows,duplicateKeys(rows,row=>cell(row,playerIx)||norm(statcastName(row,map))),matched,unmatched,blocking,warnings),
+    statcastIdentitySummary:{matchedByMlbam,matchedByFantrax,matchedByUnambiguousName,mlbamBackfillable,mlbamAlreadyPresent,mlbamConflicts,ambiguous,unmatched,invalidPlayerIds}
+  };
 }
 async function previewTrades(leagueId,file,rows,head){
   const map=headerMap(head),maps=await cloudMaps(leagueId);
@@ -831,12 +1124,12 @@ async function previewTrades(leagueId,file,rows,head){
 async function previewCustomJson(file){
   const blocking=[],warnings=[];
   let payload=null;
-  try{payload=JSON.parse(await file.text())}catch(e){blocking.push("Custom Intelligence file is not valid JSON.")}
-  if(payload?.exportType!=="dynasty-custom-intelligence")blocking.push("Custom Intelligence JSON must have exportType dynasty-custom-intelligence.");
+  try{payload=JSON.parse(await file.text())}catch(e){blocking.push("Manager Intelligence file is not valid JSON.")}
+  if(payload?.exportType!=="dynasty-custom-intelligence")blocking.push("Manager Intelligence JSON must have exportType dynasty-custom-intelligence.");
   if(payload?.schemaVersion&&!String(payload.schemaVersion).startsWith("1."))warnings.push(`Schema version ${payload.schemaVersion} may need review.`);
   const categories=["managerProfiles","managerPreferences","customPlayerNotes","manualScouting","tradeNotes","favorites","watchlists","pinnedItems","manualOverrides","workflowNotes"];
   const total=categories.reduce((sum,key)=>sum+(Array.isArray(payload?.[key])?payload[key].length:0),0);
-  return {...previewBase(file,[],[], "Custom Intelligence JSON",total,0,new Set(),0,total,blocking,warnings),schemaVersion:payload?.schemaVersion||"",categories:Object.fromEntries(categories.map(key=>[key,Array.isArray(payload?.[key])?payload[key].length:0]))};
+  return {...previewBase(file,[],[], "Manager Intelligence",total,0,new Set(),0,total,blocking,warnings),schemaVersion:payload?.schemaVersion||"",categories:Object.fromEntries(categories.map(key=>[key,Array.isArray(payload?.[key])?payload[key].length:0]))};
 }
 export async function previewStep({step,leagueId,file}){
   if(step==="custom")return previewCustomJson(file);
@@ -852,12 +1145,12 @@ export async function previewStep({step,leagueId,file}){
 }
 async function importCustomJson({leagueId,file,onProgress,cancelled}){
   const ctx={leagueId,onProgress,cancelled,startedAt:Date.now()};
-  const job=await createJob(leagueId,"Custom Intelligence JSON",file);
+  const job=await createJob(leagueId,"Manager Intelligence",file);
   try{
     ensureNotCancelled(ctx);
-    progress(ctx,"Custom Intelligence JSON import",{message:"Parsing Custom Intelligence JSON"});
+    progress(ctx,"Manager Intelligence import",{message:"Parsing Manager Intelligence JSON"});
     const payload=JSON.parse(await file.text());
-    if(payload?.exportType!=="dynasty-custom-intelligence")throw new Error("Custom Intelligence JSON must have exportType dynasty-custom-intelligence.");
+    if(payload?.exportType!=="dynasty-custom-intelligence")throw new Error("Manager Intelligence JSON must have exportType dynasty-custom-intelligence.");
     const managerProfiles=Array.isArray(payload.managerProfiles)?payload.managerProfiles:[];
     const managerRows=managerProfiles.map(manager=>cleanObject({
       league_id:leagueId,
@@ -878,29 +1171,36 @@ async function importCustomJson({leagueId,file,onProgress,cancelled}){
     const savedManagers=await cloudStore.upsertRows("managers",managerRows,"league_id,team_name");
     const managerMap=new Map(savedManagers.map(m=>[norm(m.team_name),m]));
     const players=await cloudStore.getPlayers(leagueId),playerMap=new Map(players.map(p=>[norm(p.normalized_name||p.name),p]));
-    const preferenceRows=(payload.managerPreferences||[]).map(pref=>{
+    const exceptionDetails=[];
+    const preferenceRows=(payload.managerPreferences||[]).map((pref,index)=>{
       const manager=managerMap.get(norm(pref.managerTeamName));
-      return cleanObject({league_id:leagueId,manager_id:manager?.id,player_id:playerMap.get(norm(pref.playerName))?.id,player_name:pref.playerName,preference_type:pref.preferenceType,strength:pref.strength,notes:pref.notes});
+      if(!manager)pushException(exceptionDetails,exceptionDetail({rowNumber:`managerPreferences[${index}]`,name:pref.playerName,team:pref.managerTeamName,action:"Insert manager preference",reason:"Unknown manager",suggestedResolution:reasonSuggestion("Unknown manager")}));
+      const player=playerMap.get(norm(pref.playerName));
+      if(manager&&!player&&pref.playerName)pushException(exceptionDetails,exceptionDetail({rowNumber:`managerPreferences[${index}]`,name:pref.playerName,team:pref.managerTeamName,action:"Insert manager preference",reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
+      return cleanObject({league_id:leagueId,manager_id:manager?.id,player_id:player?.id,player_name:pref.playerName,preference_type:pref.preferenceType,strength:pref.strength,notes:pref.notes});
     }).filter(row=>row.manager_id);
     const savedPrefs=await cloudStore.insertRows("manager_preferences",preferenceRows);
     let noteUpdates=0;
-    for(const note of [...(payload.customPlayerNotes||[]),...(payload.manualScouting||[])]){
+    for(const [index,note] of [...(payload.customPlayerNotes||[]),...(payload.manualScouting||[])].entries()){
       ensureNotCancelled(ctx);
       const player=playerMap.get(norm(note.normalizedName||note.playerName));
-      if(!player)continue;
+      if(!player){
+        pushException(exceptionDetails,exceptionDetail({rowNumber:`playerNotes[${index}]`,name:note.playerName||note.normalizedName,action:"Update player notes",reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
+        continue;
+      }
       await cloudStore.updateRow("players",player.id,cleanObject({notes:note.notes}));
       noteUpdates++;
     }
     let tradeNotes=0;
-    const tradeRows=(payload.tradeNotes||[]).map(trade=>cleanObject({league_id:leagueId,transaction_date:String(trade.date||now()).slice(0,10),trade_type:trade.type||"Manual note",notes:trade.notes,source:trade.source||"Custom Intelligence JSON",external_transaction_id:trade.id}));
+    const tradeRows=(payload.tradeNotes||[]).map(trade=>cleanObject({league_id:leagueId,transaction_date:String(trade.date||now()).slice(0,10),trade_type:trade.type||"Manual note",notes:trade.notes,source:trade.source||"Manager Intelligence",external_transaction_id:trade.id}));
     if(tradeRows.length)tradeNotes=(await cloudStore.insertRows("trades",tradeRows)).length;
     const settingPatch={custom_intelligence:{favorites:payload.favorites||[],watchlists:payload.watchlists||[],pinnedItems:payload.pinnedItems||[],manualOverrides:payload.manualOverrides||[],userPreferences:payload.userPreferences||{},league:payload.league||{},manualScouting:payload.manualScouting||[],customPlayerNotes:payload.customPlayerNotes||[],workflowNotes:payload.workflowNotes||[],importedAt:now()}};
     await cloudStore.updateLeagueSettings(leagueId,settingPatch).catch(e=>console.warn("[Cloud Import] league preference import skipped",e?.message||"unknown"));
     const processed=managerProfiles.length+(payload.managerPreferences||[]).length+(payload.customPlayerNotes||[]).length+(payload.manualScouting||[]).length+(payload.tradeNotes||[]).length;
     const matched=savedManagers.length+savedPrefs.length+noteUpdates+tradeNotes;
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:Math.max(0,processed-matched),completed_at:now()});
-    progress(ctx,"Custom Intelligence JSON import",{processed,total:processed,inserted:savedManagers.length+savedPrefs.length+tradeNotes,updated:noteUpdates,unmatched:Math.max(0,processed-matched),message:"Custom Intelligence imported"});
-    return{processed,matched,inserted:savedManagers.length+savedPrefs.length+tradeNotes,updated:noteUpdates,unmatched:Math.max(0,processed-matched)};
+    progress(ctx,"Manager Intelligence import",{processed,total:processed,matched,inserted:savedManagers.length+savedPrefs.length+tradeNotes,updated:noteUpdates,skipped:Math.max(0,processed-matched),warnings:exceptionDetails.length,errors:0,exceptionDetails,unmatched:Math.max(0,processed-matched),message:"Manager Intelligence imported"});
+    return{processed,matched,inserted:savedManagers.length+savedPrefs.length+tradeNotes,updated:noteUpdates,skipped:Math.max(0,processed-matched),warnings:exceptionDetails.length,errors:0,exceptionDetails,unmatched:Math.max(0,processed-matched)};
   }catch(e){await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});throw e}
 }
 function stringArray(value){
@@ -936,28 +1236,38 @@ async function verify({leagueId,onProgress}){
   const pitching=metrics.filter(m=>m.metric_type==="statcast_pitching");
   const ownedInvalid=players.filter(p=>p.owner_team_id&&!teamIds.has(p.owner_team_id));
   const freeAgentInvalid=players.filter(p=>p.is_free_agent&&p.owner_team_id);
+  const ownedMarkedFree=players.filter(p=>p.owner_team_id&&p.is_free_agent);
+  const statusTeams=teams.filter(team=>isNonTeamStatusToken(team.name));
+  const rosteredFreeAgents=players.filter(p=>p.owner_team_id&&p.is_free_agent||p.owner_team_id&&normalizedStatusToken(p.roster_status)==="free agent");
+  const nameOnlyDuplicateCopies=players.filter(player=>!player.fantrax_id&&!player.mlbam_id&&nameDupes.has(norm(player.normalized_name||player.name))).length;
+  const duplicateNameAffected=players.filter(player=>nameDupes.has(norm(player.normalized_name||player.name))).length;
   const checks=[
     {name:"Cloud league exists",status:league?"PASS":"FAIL",detail:league?.name||"No league found"},
     {name:"Owner membership exists",status:memberships.some(m=>m.user_id===user?.id)?"PASS":"FAIL",detail:`${memberships.length} memberships`},
     {name:"Fantasy teams exist",status:teams.length>0?"PASS":"FAIL",detail:`${teams.length} teams`},
     {name:"Player count is plausible",status:players.length>=500?"PASS":players.length>0?"WARNING":"FAIL",detail:`${players.length} players`},
     {name:"Every owned player references a valid team",status:ownedInvalid.length?"FAIL":"PASS",detail:`${ownedInvalid.length} invalid owned players`},
-    {name:"Free agents intentionally have no owner_team_id",status:freeAgentInvalid.length?"FAIL":"PASS",detail:`${freeAgentInvalid.length} free agents with owners`},
+    {name:"Every owned player is not marked free agent",status:ownedMarkedFree.length?"FAIL":"PASS",detail:`${ownedMarkedFree.length} owned players marked free agent`},
+    {name:"Free agents intentionally have no owner_team_id",status:freeAgentInvalid.length?"FAIL":"PASS",detail:`${freeAgentInvalid.length} free agents with owners`,diagnosticKey:"freeAgentOwnership",diagnosticCount:freeAgentInvalid.length},
+    {name:"Rostered players incorrectly classified as free agents",status:rosteredFreeAgents.length?"FAIL":"PASS",detail:`${rosteredFreeAgents.length} rostered/free-agent conflicts`,diagnosticKey:"freeAgentOwnership",diagnosticCount:rosteredFreeAgents.length},
+    {name:"No waiver/status token exists as a fantasy team",status:statusTeams.length?"FAIL":"PASS",detail:`${statusTeams.length} status-token teams`},
     {name:"HKB metrics matched to players",status:players.some(p=>p.hkb_value!==null&&p.hkb_value!==undefined)?"PASS":"WARNING",detail:"At least one player has HKB value"},
     {name:"Statcast hitter metrics reference valid players",status:hitting.every(m=>playerIds.has(m.player_id))?"PASS":"FAIL",detail:`${hitting.length} hitter metrics`},
     {name:"Statcast pitcher metrics reference valid players",status:pitching.every(m=>playerIds.has(m.player_id))?"PASS":"FAIL",detail:`${pitching.length} pitcher metrics`},
     {name:"Trade assets reference valid trades",status:assets.every(a=>tradeIds.has(a.trade_id))?"PASS":"FAIL",detail:`${assets.length} assets`},
     {name:"Duplicate Fantrax IDs",status:fantraxDupes.size?"FAIL":"PASS",detail:`${fantraxDupes.size} duplicates`},
     {name:"Duplicate MLBAM IDs",status:mlbamDupes.size?"FAIL":"PASS",detail:`${mlbamDupes.size} duplicates`},
-    {name:"Duplicate normalized player names",status:nameDupes.size?"WARNING":"PASS",detail:`${nameDupes.size} duplicates`},
+    {name:"Duplicate normalized player names",status:nameDupes.size?"WARNING":"PASS",detail:`${nameDupes.size} duplicate names affecting ${duplicateNameAffected} player records`,diagnosticKey:"duplicateNormalizedNames",diagnosticCount:nameDupes.size},
+    {name:"Name-only duplicate copies are not created",status:nameOnlyDuplicateCopies?"WARNING":"PASS",detail:`${nameOnlyDuplicateCopies} name-only duplicate records`},
     {name:"Orphaned metrics",status:metrics.every(m=>playerIds.has(m.player_id))?"PASS":"FAIL",detail:`${metrics.filter(m=>!playerIds.has(m.player_id)).length} orphaned metrics`},
     {name:"Invalid numeric values",status:invalidNumbers.length?"WARNING":"PASS",detail:`${invalidNumbers.length} player rows`},
     {name:"Custom manager profiles imported",status:managers.length?"PASS":"WARNING",detail:`${managers.length} managers`},
     {name:"RLS access works for the signed-in user",status:user&&league?"PASS":"FAIL",detail:user?"Authenticated requests succeeded":"No signed-in user"}
   ];
   const passed=checks.every(c=>c.status!=="FAIL");
-  onProgress?.({stage:"Verification",checks,counts,passed,message:passed?"Verification passed":"Verification needs review"});
-  return{checks,counts,passed};
+  const diagnosticsSummary={freeAgentOwnership:{totalConflicts:freeAgentInvalid.length},duplicateNormalizedNames:{totalDuplicateNames:nameDupes.size,totalAffectedPlayerRecords:duplicateNameAffected}};
+  onProgress?.({stage:"Verification",checks,counts,passed,diagnosticsSummary,message:passed?"Verification passed":"Verification needs review"});
+  return{checks,counts,passed,diagnosticsSummary};
 }
 export const cloudImportStages={order:STEP_ORDER,labels:STEP_LABELS,batchSize:BATCH_SIZE,checkpointKey:CHECKPOINT_KEY};
 export async function runStep({step,leagueId,file,onProgress,cancelled=()=>false}){

@@ -2,6 +2,7 @@ import * as cloudStore from "./cloudStore.js";
 
 const BATCH_SIZE=150;
 const SCORE_FIELDS=["gmScore","breakoutScore","championshipImpactScore","positionalScarcityScore","tradeLiquidityScore","marketAppreciationScore","dynastyRiskScore","dynastyAssetScore","rosterPressureScore"];
+const ACTIVE_LEAGUE_KEY="dynasty_active_league_id";
 
 function sleep(){return new Promise(resolve=>setTimeout(resolve,0))}
 function now(){return new Date().toISOString()}
@@ -25,8 +26,9 @@ function chunk(rows,size=BATCH_SIZE){
 function localStore(){return window.DynastyDataStore}
 function localSettings(){return localStore()?.getSettings?.()||window.db?.settings||{}}
 function saveLocalSettings(settings){
-  if(window.db){window.db.settings={...(window.db.settings||{}),...settings};window.saveDB?.(false)}
-  else localStore()?.saveSettings?.({...localSettings(),...settings});
+  const merged={...localSettings(),...settings};
+  if(window.db)window.db.settings={...(window.db.settings||{}),...merged};
+  localStore()?.saveSettings?.(merged);
 }
 function localPlayers(){return window.db?.players||localStore()?.getPlayers?.()||[]}
 function localManagers(){return window.db?.managers||localStore()?.getManagers?.()||[]}
@@ -34,11 +36,20 @@ function localTrades(){return window.db?.trades||localStore()?.getTrades?.()||[]
 function localSnapshots(){return window.db?.snapshots||localStore()?.getSnapshots?.()||[]}
 
 export function getSelectedLeagueId(){
-  return localSettings().cloudLeagueId||"";
+  try{
+    const active=localStorage.getItem(ACTIVE_LEAGUE_KEY);
+    if(active)return active;
+  }catch{}
+  const settings=localSettings();
+  return settings.selectedCloudLeagueId||settings.cloudLeagueId||"";
 }
 
 export function setSelectedLeagueId(leagueId){
-  saveLocalSettings({cloudLeagueId:leagueId,lastCloudLeagueSelectedAt:now()});
+  try{
+    if(leagueId)localStorage.setItem(ACTIVE_LEAGUE_KEY,leagueId);
+    else localStorage.removeItem(ACTIVE_LEAGUE_KEY);
+  }catch{}
+  saveLocalSettings({lastCloudLeagueSelectedAt:now()});
 }
 
 export function buildLocalDataset(){
