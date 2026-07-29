@@ -41,7 +41,8 @@ assert.match(state,/const ACTIVE_LEAGUE_KEY="dynasty_active_league_id"/);
 assert.doesNotMatch(state,/dynasty_players|dynasty_managers|dynasty_trades/);
 
 assert.match(main,/loadLeagueOverview/);
-assert.match(main,/listPlayerIntelligence\(appState\.activeLeague\.id,appState\.playerQuery\)/);
+assert.match(main,/listPlayerIntelligence\(appState\.activeLeague\.id,query\)/);
+assert.match(main,/if\(requestId!==playerRequestId\)return null/);
 assert.match(main,/pageSize:50/);
 assert.match(main,/playerIntelligenceByIds/);
 assert.match(main,/selectedRosterTeamId/);

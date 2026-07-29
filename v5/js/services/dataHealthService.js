@@ -4,7 +4,7 @@ import * as teams from "../repositories/teamRepository.js";
 import * as managers from "../repositories/managerRepository.js";
 import * as metrics from "../repositories/metricRepository.js";
 import * as scores from "../repositories/scoreRepository.js";
-import { normalizeRosterStatus } from "../domain/rosterStatus.js";
+import { NORMALIZED_ROSTER_STATUSES, normalizeRosterStatus } from "../domain/rosterStatus.js";
 import { validFantasyTeamsForPlayers } from "../domain/teamRules.js";
 import { ENGINE_VERSION } from "../engine/dynastyEngine.js";
 import { DECISION_RULE_VERSION, getRosterRecommendations, getWaiverRecommendations } from "./decisionIntelligenceService.js";
@@ -108,7 +108,13 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {groupType:"confidence",groups:scoreDiagnostics.confidenceAverages}
   ];
   const rosterDiagnostics=rosterStatusDiagnostics(playerRows);
+  const ownedPlayers=playerRows.filter(player=>player.owner_team_id);
   const unclassifiedPlayers=playerRows.filter(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="UNCLASSIFIED");
+  const normalizedRosterCounts=NORMALIZED_ROSTER_STATUSES.map(status=>({
+    status,
+    count:playerRows.filter(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})===status).length
+  }));
+  const storedRosterStatusInsufficient=Boolean(ownedPlayers.length&&ownedPlayers.every(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="UNCLASSIFIED"));
   const ownedFreeAgent=playerRows.filter(player=>player.owner_team_id&&normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="FREE_AGENT");
   const freeAgentWithOwner=playerRows.filter(player=>player.is_free_agent&&player.owner_team_id);
   const teamsWithoutManagers=teamRows.filter(team=>!team.manager_id||!managerIds.has(team.manager_id));
@@ -160,6 +166,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Excluded invalid team rows",status:invalidTeamRows.length?"WARNING":"PASS",details:detail("Excluded invalid team rows",invalidTeamRows)},
     {name:"Actual manager count",status:"INFO",details:detail("Managers",managerRows)},
     {name:"Teams without managers",status:teamsWithoutManagers.length?"WARNING":"PASS",details:detail("Teams without managers",teamsWithoutManagers)},
+    {name:"Manager assignment coverage",status:managerRows.length&&teamsWithoutManagers.length===0?"PASS":"WARNING",details:detail("Manager assignment coverage",[{managerRows:managerRows.length,assignedTeams:teamRows.length-teamsWithoutManagers.length,unassignedTeams:teamsWithoutManagers.length,guidance:managerRows.length?"Assign existing manager UUIDs to unassigned teams in Teams & Managers.":"Import reviewed Manager Intelligence JSON before assigning teams."}])},
     {name:"Players with Fantrax ID",status:"INFO",details:detail("Players with Fantrax ID",playerRows.filter(player=>!externalIdMissing(player.fantrax_id)))},
     {name:"Players with MLBAM ID",status:"INFO",details:detail("Players with MLBAM ID",playerRows.filter(player=>!externalIdMissing(player.mlbam_id)))},
     {name:"Players with both external IDs",status:"INFO",details:detail("Players with both external IDs",bothPresent)},
@@ -167,6 +174,8 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Players missing MLBAM ID",status:mlbamMissing.length?"WARNING":"PASS",details:detail("Players missing MLBAM ID",mlbamMissing),playerQuery:{dataAvailability:"missingMlbam",sort:"name",ascending:true}},
     {name:"Players missing both external IDs",status:bothMissing.length?"WARNING":"PASS",details:detail("Players missing both external IDs",bothMissing)},
     {name:"Roster Status Diagnostics",status:"INFO",details:detail("Roster Status Diagnostics",rosterDiagnostics)},
+    {name:"Normalized roster status counts",status:"INFO",details:detail("Normalized roster status counts",normalizedRosterCounts)},
+    {name:"Stored roster-slot detail available",status:storedRosterStatusInsufficient?"WARNING":"PASS",details:detail("Stored roster-slot detail",[{ownedPlayers:ownedPlayers.length,unclassifiedOwnedPlayers:unclassifiedPlayers.filter(player=>player.owner_team_id).length,classification:storedRosterStatusInsufficient?"STORED_CLOUD_DATA_INSUFFICIENT":"NORMALIZED_GROUPS_AVAILABLE",guidance:storedRosterStatusInsufficient?"Cloud rows do not contain enough roster-slot detail to distinguish ACTIVE, RESERVE, IL, or MINORS. Re-preview a Fantrax export that contains a roster-slot column; do not rewrite cloud rows by assumption.":"Stored values support normalized roster groups.",automaticMutationPerformed:false}])},
     {name:"Unknown roster status values",status:unclassifiedPlayers.length?"WARNING":"PASS",details:detail("Players in UNCLASSIFIED roster group",unclassifiedPlayers),playerQuery:{rosterStatus:"UNCLASSIFIED",sort:"name",ascending:true}},
     {name:"Owned players mapped to FREE_AGENT",status:ownedFreeAgent.length?"FAIL":"PASS",details:detail("Owned players mapped to FREE_AGENT",ownedFreeAgent)},
     {name:"Free agents with owner_team_id",status:freeAgentWithOwner.length?"FAIL":"PASS",details:detail("Free agents with owner_team_id",freeAgentWithOwner)},

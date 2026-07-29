@@ -19,6 +19,7 @@ export const appState={
   statusMessage:"",
   view:"dashboard",
   playerQuery:{page:1,pageSize:50,search:"",ownerTeamId:"",position:"",mlbTeam:"",rosterStatus:"",playerStage:"",context:"",dataAvailability:"",sort:"dynasty_asset_score",ascending:false,scoreVersion:"",preset:""},
+  playerSearchDraft:"",
   selectedPlayerId:"",
   selectedPlayer:null,
   comparisonPlayerIds:[],

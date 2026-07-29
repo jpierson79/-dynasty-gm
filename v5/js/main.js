@@ -16,7 +16,7 @@ import { addTradeAssetSelection, removeTradeAssetSelection } from "./services/tr
 import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-user-team-final";
 import { memberships } from "./repositories/leagueRepository.js";
 import { renderDashboard } from "./views/dashboardView.js";
-import { renderPlayers } from "./views/playersView.js";
+import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
 import { renderWaiverOpportunities } from "./views/waiverOpportunitiesView.js";
 import { renderTradeCenter } from "./views/tradeCenterView.js";
@@ -90,18 +90,22 @@ async function refreshLeagueData(){
     setState({loading:false});
   }
 }
-async function loadPlayerPage(){
+function renderPlayerResultsRegion(){
+  if(appState.view==="players")setHtml($("#playerResults"),renderPlayerResults(appState,appState.playerPage||playerPage));
+}
+async function loadPlayerPage(query=appState.playerQuery){
   const requestId=++playerRequestId;
-  setState({playersLoading:true,playersError:""});
+  setStateSilently({playersLoading:true,playersError:""});
+  renderPlayerResultsRegion();
   try{
-    const page=await listPlayerIntelligence(appState.activeLeague.id,appState.playerQuery);
-    if(requestId!==playerRequestId)return appState.playerPage||playerPage;
+    const page=await listPlayerIntelligence(appState.activeLeague.id,query);
+    if(requestId!==playerRequestId)return null;
     return page;
   }catch(error){
-    if(requestId===playerRequestId)setState({playersError:String(error?.message||error)});
+    if(requestId===playerRequestId)setStateSilently({playersError:String(error?.message||error)});
     throw error;
   }finally{
-    if(requestId===playerRequestId)setState({playersLoading:false});
+    if(requestId===playerRequestId)setStateSilently({playersLoading:false});
   }
 }
 async function loadWaiverPage(){
@@ -222,7 +226,7 @@ function playerQueryFromControls(){
   const context=$("#contextFilter")?.value||"";
   return {
     ...appState.playerQuery,
-    search:$("#playerSearch")?.value.trim()||"",
+    search:String(appState.playerSearchDraft||$("#playerSearch")?.value||"").trim(),
     ownerTeamId:$("#ownerFilter")?.value||"",
     position:$("#positionFilter")?.value||"",
     mlbTeam:$("#mlbTeamFilter")?.value||"",
@@ -251,10 +255,12 @@ function defaultPlayerQuery(){
   return {page:1,pageSize:50,search:"",ownerTeamId:"",position:"",mlbTeam:"",rosterStatus:"",playerStage:"",context:"",dataAvailability:"",sort:"dynasty_asset_score",ascending:false,scoreVersion:"",preset:""};
 }
 async function updatePlayerPage(query){
-  setState({playerQuery:query});
-  playerPage=await loadPlayerPage().catch(error=>{setError(error);return playerPage});
-  setState({playerPage});
-  render();
+  setStateSilently({playerQuery:query,playerSearchDraft:query.search||""});
+  const nextPage=await loadPlayerPage(query).catch(error=>{setError(error);return null});
+  if(nextPage){
+    playerPage=nextPage;
+    setState({playerPage});
+  }else renderPlayerResultsRegion();
 }
 async function loadComparison(){
   const ids=appState.comparisonPlayerIds||[];
@@ -289,13 +295,12 @@ function bindViewEvents(){
   $("#playerSearchButton")?.addEventListener("click",async()=>{
     await updatePlayerPage(playerQueryFromControls());
   });
-  $("#playerSearch")?.addEventListener("input",debounce(async()=>{
-    await updatePlayerPage(playerQueryFromControls());
-  },300));
-  $("#clearPlayerFilters")?.addEventListener("click",async()=>{await updatePlayerPage(defaultPlayerQuery())});
+  $("#playerSearch")?.addEventListener("input",event=>setStateSilently({playerSearchDraft:event.target.value}));
+  $("#playerSearch")?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();updatePlayerPage(playerQueryFromControls())}});
+  $("#clearPlayerFilters")?.addEventListener("click",async()=>{setStateSilently({playerSearchDraft:""});await updatePlayerPage(defaultPlayerQuery())});
   $all("[data-player-preset]").forEach(button=>button.addEventListener("click",async()=>{
     const preset=presetQuery(button.dataset.playerPreset);
-    if(preset)await updatePlayerPage({...defaultPlayerQuery(),...preset});
+    if(preset){setStateSilently({playerSearchDraft:preset.search||""});await updatePlayerPage({...defaultPlayerQuery(),...preset})}
   }));
   $all("[data-player-detail]").forEach(button=>button.addEventListener("click",()=>{
     const row=(appState.playerPage?.rows||[]).find(item=>item.id===button.dataset.playerDetail);
@@ -419,6 +424,7 @@ function bindViewEvents(){
   $("#linkManagerButton")?.addEventListener("click",async()=>{
     const team=appState.teams.find(item=>item.id===$("#linkTeam")?.value);
     const manager=appState.managers.find(item=>item.id===$("#linkManager")?.value);
+    if(!team||!manager){setError("Select an unassigned team and an existing manager.");return}
     try{await linkManagerToTeam(appState.activeLeague.id,team,manager);await refreshLeagueData()}catch(error){setError(error)}
   });
   $all("[data-health-detail]").forEach(button=>button.addEventListener("click",()=>{
@@ -461,6 +467,15 @@ function bindViewEvents(){
   $all("[data-import-file]").forEach(input=>input.addEventListener("change",event=>{
     const step=event.target.dataset.importFile;
     importUiState.files[step]=event.target.files?.[0]||null;
+    delete importUiState.previews[step];
+    delete importUiState.reviewed[step];
+    importUiState.preview=null;
+    importUiState.result=null;
+    render();
+  }));
+  $all("[data-clear-import-file]").forEach(button=>button.addEventListener("click",()=>{
+    const step=button.dataset.clearImportFile;
+    importUiState.files[step]=null;
     delete importUiState.previews[step];
     delete importUiState.reviewed[step];
     importUiState.preview=null;

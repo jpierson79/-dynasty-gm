@@ -39,7 +39,7 @@ function presetButtons(query){
 function filters(state,query){
   const teams=state.teams||[],positions=state.positionOptions||[],mlbTeams=state.mlbTeamOptions||[];
   return `<div class="explorer-filters">
-    <label>Search<input id="playerSearch" value="${escapeHtml(query.search||"")}" placeholder="Player name"></label>
+    <label>Search<input id="playerSearch" value="${escapeHtml(state.playerSearchDraft??query.search??"")}" placeholder="Player name"></label>
     <label>Position<select id="positionFilter"><option value="">All positions</option>${positions.map(pos=>optionHtml(pos,pos,query.position)).join("")}</select></label>
     <label>MLB org<select id="mlbTeamFilter"><option value="">All orgs</option>${mlbTeams.map(team=>optionHtml(team,team,query.mlbTeam)).join("")}</select></label>
     <label>Fantasy owner<select id="ownerFilter"><option value="">All owners</option><option value="FREE_AGENT"${selected("FREE_AGENT",query.ownerTeamId)}>Free agents</option>${teams.map(team=>optionHtml(team.id,team.name,query.ownerTeamId)).join("")}</select></label>
@@ -60,8 +60,8 @@ function filters(state,query){
     <label>Page size<select id="pageSize"><option${query.pageSize===25?" selected":""}>25</option><option${query.pageSize===50?" selected":""}>50</option><option${query.pageSize===100?" selected":""}>100</option></select></label>
     <label class="checkline"><input id="freeAgentsOnly" type="checkbox"${checked(query.freeAgentsOnly)}> Free agents only</label>
     <label class="checkline"><input id="rosteredOnly" type="checkbox"${checked(query.rosteredOnly)}> Rostered only</label>
-    <button id="playerSearchButton" class="primary">Apply</button>
-    <button id="clearPlayerFilters" class="secondary">Clear Filters</button>
+    <button type="button" id="playerSearchButton" class="primary">Apply</button>
+    <button type="button" id="clearPlayerFilters" class="secondary">Clear Filters</button>
   </div>`;
 }
 function playerTable(rows,state,comparisonIds=[]){
@@ -119,5 +119,10 @@ export function renderPlayers(state,page){
   const rows=page?.rows||[];
   const selected=state.selectedPlayerId?(rows.find(row=>row.id===state.selectedPlayerId)||state.selectedPlayer||null):null;
   const comparisonRows=state.comparisonPlayers||[];
-  return `<section class="view-panel player-explorer"><h2>Player Intelligence Explorer</h2><p class="note">Stored V5.1.1 intelligence from calculated_player_scores. Missing values display as unavailable.</p>${presetButtons(query)}${filters(state,query)}<p class="note">${state.playersLoading?"Loading players...":state.playersError?`Player query failed: ${escapeHtml(state.playersError)}`:`Showing ${rows.length} of ${page?.count||0} matching players. Page ${query.page}. Score version ${escapeHtml(page?.scoreVersion||query.scoreVersion||"latest")}.`}</p>${playerTable(rows,state,state.comparisonPlayerIds||[])}<div class="toolbar"><button id="prevPlayers" class="secondary"${query.page<=1?" disabled":""}>Previous</button><button id="nextPlayers" class="secondary"${query.page*query.pageSize>=(page?.count||0)?" disabled":""}>Next</button></div>${comparison(comparisonRows)}${drawer(selected)}</section>`;
+  return `<section class="view-panel player-explorer"><h2>Player Intelligence Explorer</h2><p class="note">Stored V5.1.1 intelligence from calculated_player_scores. Missing values display as unavailable.</p>${presetButtons(query)}${filters(state,query)}<div id="playerResults">${renderPlayerResults(state,page)}</div>${comparison(comparisonRows)}${drawer(selected)}</section>`;
+}
+
+export function renderPlayerResults(state,page){
+  const query=state.playerQuery,rows=page?.rows||[];
+  return `<p class="note" aria-live="polite">${state.playersLoading?"Loading players...":state.playersError?`Player query failed: ${escapeHtml(state.playersError)}`:`Showing ${rows.length} of ${page?.count||0} matching players. Page ${query.page}. Score version ${escapeHtml(page?.scoreVersion||query.scoreVersion||"latest")}.`}</p>${playerTable(rows,state,state.comparisonPlayerIds||[])}<div class="toolbar"><button type="button" id="prevPlayers" class="secondary"${query.page<=1?" disabled":""}>Previous</button><button type="button" id="nextPlayers" class="secondary"${query.page*query.pageSize>=(page?.count||0)?" disabled":""}>Next</button></div>`;
 }
