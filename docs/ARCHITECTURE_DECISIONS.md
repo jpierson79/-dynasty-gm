@@ -107,3 +107,51 @@ Decision: Duplicate or conflicting identities are reported; no player rows are d
 Consequences: Duplicate repair is a manual or explicitly requested process.
 
 Evidence paths: user-supplied facts, `supabase/migrations/006_player_external_identity.sql`, `docs/cloud-player-identity.md`, `tests/PlayerIdentityResolver.test.mjs`.
+
+## ADR-010: Distinguish Fantrax CSV And API Player-ID Representations
+
+Status: accepted.
+
+Context: `getTeamRosters.rosterItems[].id` initially appeared not to match `players.fantrax_id`. Read-only diagnostics proved that every stored CSV ID has one leading and trailing ASCII asterisk, while Fantrax API endpoints use the unwrapped inner value. All 566 current roster IDs joined after this strict transformation.
+
+Decision: Preserve `players.fantrax_id` exactly as the trimmed CSV identity. A future `players.fantrax_api_player_id` may store the validated unwrapped identity. Unwrapping must require exactly one leading and trailing `*`, preserve the inner value, and validate it through `getPlayerIds`.
+
+Consequences: Do not strip arbitrary punctuation. Do not use name matching, fuzzy matching, or MLBAM fallback for the Fantrax API join. `rosterItems[].id` is a player identity, so no separate roster-item ID column is needed. The 36 stored IDs absent from the current global catalog remain an explicit unresolved diagnostic.
+
+Evidence paths: verified V5.4.3A read-only identity diagnostics, `docs/PROJECT_MEMORY.md`.
+
+## ADR-011: Keep Ownership And Roster Status Independent
+
+Status: accepted.
+
+Context: Fantrax CSV ownership is authoritative but does not distinguish active, reserve, injured-reserve, and minors placement. The roster API provides explicit status values independently from application ownership.
+
+Decision: Normalize only exact observed values: `ACTIVE`, `RESERVE`, `INJURED_RESERVE` to `IL`, and `MINORS`; every other value becomes `UNCLASSIFIED`.
+
+Consequences: Missing or unknown API status never makes a player a free agent. Roster-status synchronization must preserve `owner_team_id` and `is_free_agent`. Status must not be inferred from position, age, injury metadata, or prospect classification.
+
+Evidence paths: verified V5.4.3 read-only endpoint diagnostics, `v5/js/domain/rosterStatus.js`.
+
+## ADR-012: Store Fantrax Team And League Identity Explicitly Before Sync
+
+Status: proposed for V5.4.3B; migration not yet approved or created.
+
+Context: Fantrax team IDs matched across all tested league endpoints and periods, but the current `teams` table has no Fantrax team-ID field. The current `leagues` schema also has no structured Fantrax league integration. Cross-season team-ID stability is not proven.
+
+Decision: The proposed foundation adds nullable `teams.fantrax_team_id`, nullable `players.fantrax_api_player_id`, and structured league-integration metadata containing provider, external league ID, external league-history ID, season year, and timestamps.
+
+Consequences: Team assignments require a reviewed one-to-one preview. Name-only automatic team matching is prohibited. Fantrax team IDs are treated as authoritative within a configured league/season, not silently assumed stable across seasons. No `userSecretId` is stored.
+
+Evidence paths: verified V5.4.3A team/league diagnostics, `supabase/migrations/001_initial_schema.sql`.
+
+## ADR-013: Require Read-Only Preview Before Fantrax Roster Writes
+
+Status: accepted as the next-phase boundary; implementation pending.
+
+Context: Player identity is now provable for the current roster, but required player API-ID, team-ID, and league-integration fields do not yet exist.
+
+Decision: V5.4.3B is limited to a reviewed schema migration, strict ID normalization and validation, external-identity backfill preview, league configuration, reviewed team assignment, read-only roster-status preview, Data Health diagnostics, and synthetic tests.
+
+Consequences: V5.4.3B must not write roster statuses or ownership, rewrite free agents, create players or teams, use automatic name matching, run production imports, or apply a remote migration without explicit approval. Production roster synchronization remains unsafe until the identity foundation and reviewed assignments are complete.
+
+Evidence paths: verified V5.4.3A diagnostics and user-approved phase definition.

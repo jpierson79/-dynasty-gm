@@ -42,8 +42,60 @@ Evidence: user-supplied authoritative facts, `js/app.js`, `js/services/cloudCsvI
 - Fallback identity matching is permitted only when both stable IDs are absent.
 - Fallback requires normalized name, team or organization, and overlapping position.
 - Ambiguous matches are not guessed.
+- Fantrax CSV `ID` values currently stored in `players.fantrax_id` use the verified wrapper format `*API_ID*`.
+- The Fantrax API player identity is derived only by requiring exactly one leading ASCII `*` and exactly one trailing ASCII `*`, then preserving the inner value unchanged.
+- The CSV/API join must validate the unwrapped value through Fantrax `getPlayerIds`. It must not strip arbitrary punctuation or use name, fuzzy, or MLBAM fallback.
+- Fantrax `getTeamRosters.rosterItems[].id` is the Fantrax API player ID, not a separate roster-item identity. No `fantrax_roster_item_id` is needed.
 
-Evidence: user-supplied authoritative facts, `docs/cloud-player-identity.md`, `supabase/migrations/006_player_external_identity.sql`, `js/services/PlayerIdentityResolver.js`, `tests/PlayerIdentityResolver.test.mjs`, `tests/cloudStoreSerialization.test.mjs`.
+Evidence: user-supplied authoritative facts, `docs/cloud-player-identity.md`, `supabase/migrations/006_player_external_identity.sql`, `js/services/PlayerIdentityResolver.js`, `tests/PlayerIdentityResolver.test.mjs`, `tests/cloudStoreSerialization.test.mjs`, verified V5.4.3A read-only Fantrax diagnostics.
+
+## Fantrax Roster API Facts
+
+- `GET https://www.fantrax.com/fxea/general/getTeamRosters` is reachable with `leagueId` and an optional `period`; no authentication was observed.
+- Browser CORS succeeds when credentials are omitted.
+- Successful responses may use `text/plain` even though the body is valid JSON.
+- Invalid league IDs may return HTTP 200 with `INVALID_LEAGUE_ID`, so callers must inspect the parsed body rather than relying on HTTP status alone.
+- The verified response contains a returned period, dynamic Fantrax team-ID keys, team names, and roster items with Fantrax API player ID, position, and raw status.
+- Verified raw status mapping is exact: `ACTIVE` to `ACTIVE`, `RESERVE` to `RESERVE`, `INJURED_RESERVE` to `IL`, `MINORS` to `MINORS`, and every other value to `UNCLASSIFIED`.
+- Ownership, roster status, player identity, and team identity are separate concepts. Unknown or missing roster status never implies free agency, and an owned player with an unknown status remains owned.
+- In the verified current snapshot, all 566 roster API player IDs matched normalized stored Fantrax IDs, all 566 cloud-owned players appeared in the snapshot, and there were no duplicate normalized IDs.
+- Of 10,170 stored Fantrax IDs, 10,134 normalized IDs appeared in the global `getPlayerIds` catalog. The remaining 36 historical/catalog misses did not affect the current 566-player roster snapshot.
+- Fantrax team IDs were authoritative within the tested league: 10 distinct 16-character alphanumeric IDs matched across `getLeagueInfo`, `getTeamRosters`, `getDraftResults`, `getStandings`, and `getMatchupScores`, including tested current and historical periods.
+- Cross-season Fantrax team-ID stability is not proven.
+- The current production schema has neither an authoritative Fantrax team-ID field nor structured Fantrax league-integration storage.
+- Production roster synchronization has not been implemented and is not safe until required external-identity fields and reviewed one-to-one team assignments exist.
+
+Evidence: Fantrax v1.3 beta developer documentation, verified V5.4.3/V5.4.3A read-only endpoint and cloud-join diagnostics, `supabase/migrations/001_initial_schema.sql`.
+
+## Fantrax Identity Graph
+
+```text
+public.players.id (application UUID)
+  -> players.fantrax_id (preserved CSV identity: *API_ID*)
+     -> strict wrapper removal
+        -> proposed players.fantrax_api_player_id
+           -> getPlayerIds key/fantraxId
+           -> getLeagueInfo.playerInfo key
+           -> getTeamRosters.rosterItems[].id
+           -> getDraftResults.playerId
+
+public.players.mlbam_id
+  -> independent MLB identity; not a fallback for the Fantrax API join
+
+public.leagues.id (application UUID)
+  -> proposed league integration row
+     -> Fantrax external league ID
+     -> Fantrax leagueHistoryId and seasonYear
+
+public.teams.id (application UUID)
+  -> proposed teams.fantrax_team_id
+     -> getLeagueInfo/getTeamRosters/getDraftResults/getStandings/getMatchupScores team ID
+
+public.managers.id
+  -> current application team assignment only; not a Fantrax identity
+```
+
+The graph does not make ownership equivalent to roster status: `owner_team_id` identifies the application owner team, while Fantrax raw status identifies placement within that roster.
 
 ## Import Invariants
 
@@ -67,6 +119,8 @@ Evidence: user-supplied authoritative facts, `js/services/cloudCsvImportService.
 - Existing UUIDs and related records are preserved during synchronization.
 - Local browser data is not deleted by cloud authentication or migration workflows.
 - Custom intelligence export excludes recreatable player pools, raw Statcast data, import progress, credentials, sessions, and raw caches.
+- Fantrax roster-status work must not alter ownership, player UUIDs, external IDs, scoring, metrics, or free-agent state.
+- Unknown Fantrax roster statuses remain visible and normalize to `UNCLASSIFIED`; they are never guessed from position, age, injury, prospect status, or profile data.
 
 Evidence: user-supplied authoritative facts, `supabase/migrations/006_player_external_identity.sql`, `docs/cloud-player-identity.md`, `js/services/customIntelligenceExport.js`, `js/services/authUi.js`.
 
