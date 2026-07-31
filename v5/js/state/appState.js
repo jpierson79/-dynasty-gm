@@ -32,6 +32,7 @@ export const appState={
   waiversError:"",
   waiverUpgrade:null,
   tradeCenter:{userTeamId:"",userTeamName:"",partnerTeamId:"",myTeamSearchDraft:"",partnerTeamSearchDraft:"",outgoingSearch:"",incomingSearch:"",outgoingPlayerIds:[],incomingPlayerIds:[],outgoingPlayers:[],incomingPlayers:[],outgoingCandidates:[],incomingCandidates:[],analysis:null,consolidationTargets:null,tradeFits:null,drafts:[],outgoingLoading:false,incomingLoading:false,outgoingError:"",incomingError:"",loading:false,error:""},
+  rosterStatusManager:{rows:[],filters:{search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false},page:1,pageSize:100,pendingChanges:{},selectedIds:[],lastSelectedId:"",confirmSave:false,saving:false,error:"",lastSavedAt:""},
   userTeamResolution:null,
   rosterRecommendations:null,
   rosterRecommendationsLoading:false,

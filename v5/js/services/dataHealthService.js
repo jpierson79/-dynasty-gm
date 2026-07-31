@@ -42,7 +42,7 @@ function rosterStatusDiagnostics(playerRows){
   });
   return [...groups.values()].sort((a,b)=>a.mappedRosterStatus.localeCompare(b.mappedRosterStatus)||a.rawRosterStatus.localeCompare(b.rawRosterStatus));
 }
-export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={}}={}){
+export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null}={}){
   const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows]=await Promise.all([
     leagues.memberships(leagueId),
     players.allPlayers(leagueId),
@@ -115,6 +115,15 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     count:playerRows.filter(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})===status).length
   }));
   const storedRosterStatusInsufficient=Boolean(ownedPlayers.length&&ownedPlayers.every(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="UNCLASSIFIED"));
+  const pendingStatusChanges=Object.values(rosterStatusManager?.pendingChanges||{});
+  const latestRosterStatusUpdate=playerRows.filter(player=>player.roster_status&&player.updated_at).slice().sort((a,b)=>String(b.updated_at||"").localeCompare(String(a.updated_at||"")))[0]||null;
+  const manualOverrideGuidance={
+    supported:false,
+    pendingChanges:pendingStatusChanges.length,
+    futureRequirement:"Future Fantrax synchronization must preserve reviewed manual roster-status overrides.",
+    currentSchema:"No reviewed manual override marker was found in the current players schema.",
+    safeBehavior:"Roster Status Manager writes only players.roster_status and players.updated_at. It does not alter ownership, free-agent state, UUIDs, Fantrax IDs, or MLBAM IDs."
+  };
   const ownedFreeAgent=playerRows.filter(player=>player.owner_team_id&&normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="FREE_AGENT");
   const freeAgentWithOwner=playerRows.filter(player=>player.is_free_agent&&player.owner_team_id);
   const teamsWithoutManagers=teamRows.filter(team=>!team.manager_id||!managerIds.has(team.manager_id));
@@ -175,6 +184,10 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Players missing both external IDs",status:bothMissing.length?"WARNING":"PASS",details:detail("Players missing both external IDs",bothMissing)},
     {name:"Roster Status Diagnostics",status:"INFO",details:detail("Roster Status Diagnostics",rosterDiagnostics)},
     {name:"Normalized roster status counts",status:"INFO",details:detail("Normalized roster status counts",normalizedRosterCounts)},
+    {name:"Manual Status Overrides",status:"WARNING",details:detail("Manual Status Overrides",[manualOverrideGuidance])},
+    {name:"Pending Status Changes",status:pendingStatusChanges.length?"WARNING":"PASS",details:detail("Pending Status Changes",pendingStatusChanges)},
+    {name:"Unclassified Count",status:unclassifiedPlayers.length?"WARNING":"PASS",details:detail("Unclassified Count",[{count:unclassifiedPlayers.length}])},
+    {name:"Last Manual Update",status:latestRosterStatusUpdate?"INFO":"WARNING",details:detail("Last Manual Update",latestRosterStatusUpdate?[{playerId:latestRosterStatusUpdate.id,playerName:latestRosterStatusUpdate.name,rosterStatus:latestRosterStatusUpdate.roster_status,updatedAt:latestRosterStatusUpdate.updated_at,note:"No manual override marker exists, so this is the latest roster_status row timestamp, not a proven manual-only audit."}]:[manualOverrideGuidance])},
     {name:"Stored roster-slot detail available",status:storedRosterStatusInsufficient?"WARNING":"PASS",details:detail("Stored roster-slot detail",[{ownedPlayers:ownedPlayers.length,unclassifiedOwnedPlayers:unclassifiedPlayers.filter(player=>player.owner_team_id).length,classification:storedRosterStatusInsufficient?"STORED_CLOUD_DATA_INSUFFICIENT":"NORMALIZED_GROUPS_AVAILABLE",guidance:storedRosterStatusInsufficient?"Cloud rows do not contain enough roster-slot detail to distinguish ACTIVE, RESERVE, IL, or MINORS. Re-preview a Fantrax export that contains a roster-slot column; do not rewrite cloud rows by assumption.":"Stored values support normalized roster groups.",automaticMutationPerformed:false}])},
     {name:"Unknown roster status values",status:unclassifiedPlayers.length?"WARNING":"PASS",details:detail("Players in UNCLASSIFIED roster group",unclassifiedPlayers),playerQuery:{rosterStatus:"UNCLASSIFIED",sort:"name",ascending:true}},
     {name:"Owned players mapped to FREE_AGENT",status:ownedFreeAgent.length?"FAIL":"PASS",details:detail("Owned players mapped to FREE_AGENT",ownedFreeAgent)},

@@ -1,4 +1,4 @@
-import { countLeagueRows, pagedLeagueRows, selectAllLeagueRows, selectLeagueRows } from "./baseRepository.js";
+import { client, countLeagueRows, pagedLeagueRows, request, selectAllLeagueRows, selectLeagueRows } from "./baseRepository.js";
 
 export async function listPlayers(leagueId,query={}){
   const filters=[];
@@ -29,4 +29,20 @@ export async function rosterSummaryRows(leagueId){
 export async function positionOptions(leagueId){
   const rows=await selectAllLeagueRows("players",leagueId,{columns:"positions",order:"name",ascending:true});
   return [...new Set(rows.flatMap(player=>Array.isArray(player.positions)?player.positions:String(player.positions||"").split(/[\/,\s]+/)).filter(Boolean))].sort();
+}
+export async function updateRosterStatuses(leagueId,updates,{updatedBy=""}={}){
+  if(!leagueId)throw new Error("Active league is required.");
+  if(!Array.isArray(updates)||!updates.length)return [];
+  const supabase=await client();
+  const updated_at=new Date().toISOString();
+  const rows=[];
+  for(const update of updates){
+    const row={roster_status:update.roster_status,updated_at};
+    const result=await request(
+      supabase.from("players").update(row).eq("league_id",leagueId).eq("id",update.id).select("id,name,owner_team_id,roster_status,is_free_agent,fantrax_id,mlbam_id,updated_at").single(),
+      "players roster_status update"
+    );
+    rows.push({...result.data,updated_by:updatedBy||""});
+  }
+  return rows;
 }

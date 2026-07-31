@@ -104,11 +104,30 @@ dd{margin:0}
 .trade-chip span{color:var(--muted);font-size:12px}
 .trade-candidates .table-wrap{max-height:360px}
 .trade-analysis .metric b{font-size:18px}
+.status-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:10px 0 14px}
+.status-card{display:grid;gap:5px;text-align:left;border-radius:8px;background:var(--panel-2);min-height:72px}
+.status-card b{font-size:24px}
+.status-card.good,.status-badge.good{border-color:var(--good)}
+.status-card.reserve,.status-badge.reserve{border-color:var(--accent-2)}
+.status-card.bad,.status-badge.bad{border-color:var(--bad)}
+.status-card.minors,.status-badge.minors{border-color:#a78bfa}
+.status-card.warn,.status-badge.warn{border-color:var(--warn)}
+.status-card.active{box-shadow:0 0 0 2px rgba(45,212,191,.35)}
+.status-badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;background:#0b1220}
+.roster-status-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:12px;align-items:start}
+.roster-status-table table{min-width:1220px}
+.pending-row td{background:#172554}
+.review-panel{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px;position:sticky;top:82px;max-height:72vh;overflow:auto}
+.review-panel ul{display:grid;gap:6px;padding-left:18px;margin:8px 0}
+.review-panel li span{display:block;color:var(--muted);font-size:12px}
+.sticky-action-bar{position:sticky;top:74px;z-index:4;background:#0d1422;border:1px solid var(--line);border-radius:8px;padding:8px}
 @media(max-width:900px){
   .app-shell{grid-template-columns:1fr}
   .sidebar{position:static}
   .two{grid-template-columns:1fr}
   .trade-layout{grid-template-columns:1fr}
+  .roster-status-layout{grid-template-columns:1fr}
+  .review-panel{position:static;max-height:none}
   .trade-chip{grid-template-columns:minmax(0,1fr) auto}
   .trade-chip button{grid-column:1 / -1}
   th{position:sticky;top:0}

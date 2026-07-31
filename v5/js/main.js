@@ -4,7 +4,7 @@ import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut
 import { loadLeagueOverview } from "./services/cloudDataService.js";
 import { runDataHealth } from "./services/dataHealthService.js?v5-4-1-user-team";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";
-import { positionOptions, rosterByTeam } from "./repositories/playerRepository.js";
+import { allPlayers, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js";
 import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/playerIntelligenceRepository.js";
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
@@ -14,10 +14,12 @@ import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecomme
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
 import { addTradeAssetSelection, removeTradeAssetSelection } from "./services/tradeInteractionService.js";
 import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-user-team-final";
+import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js";
 import { memberships } from "./repositories/leagueRepository.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
+import { renderRosterStatusManager } from "./views/rosterStatusManagerView.js?v5-4-4-acceptance";
 import { renderWaiverOpportunities } from "./views/waiverOpportunitiesView.js";
 import { renderTradeCenter } from "./views/tradeCenterView.js";
 import { renderTeamsManagers } from "./views/teamsManagersView.js";
@@ -141,6 +143,73 @@ function tradeSelectedPlayers(rows,ids){
   const byId=new Map([...(appState.tradeCenter?.outgoingPlayers||[]),...(appState.tradeCenter?.incomingPlayers||[]),...(appState.tradeCenter?.outgoingCandidates||[]),...(appState.tradeCenter?.incomingCandidates||[]),...(rows||[])].map(player=>[player.id,player]));
   return ids.map(id=>byId.get(id)).filter(Boolean);
 }
+function rosterStatusState(patch={}){
+  return {...appState.rosterStatusManager,...patch};
+}
+async function loadRosterStatusManager(){
+  if(!appState.activeLeague)return;
+  try{
+    const rows=rosterStatusManagerRows(await allPlayers(appState.activeLeague.id),appState.teams||[]);
+    setState({rosterStatusManager:rosterStatusState({rows,error:""})});
+  }catch(error){
+    setState({rosterStatusManager:rosterStatusState({error:String(error?.message||error)})});
+    setError(error);
+  }
+}
+function rosterStatusFiltersFromControls(){
+  return {
+    search:$("#rsmSearch")?.value.trim()||"",
+    currentStatus:$("#rsmCurrentStatus")?.value||"",
+    teamId:$("#rsmTeam")?.value||"",
+    position:$("#rsmPosition")?.value||"",
+    mlbTeam:$("#rsmMlbTeam")?.value||"",
+    ownerId:$("#rsmOwner")?.value||"",
+    freeAgent:$("#rsmFreeAgent")?.value||"",
+    changedOnly:$("#rsmChangedOnly")?.checked||false
+  };
+}
+function rosterStatusVisibleRows(){
+  const manager=appState.rosterStatusManager;
+  return filterRosterStatusRows(manager.rows||[],manager.filters||{},manager.pendingChanges||{});
+}
+function rosterStatusPageRows(){
+  const manager=appState.rosterStatusManager;
+  const page=manager.page||1,pageSize=manager.pageSize||100;
+  return rosterStatusVisibleRows().slice((page-1)*pageSize,page*pageSize);
+}
+function setRosterStatusFilters(filters){
+  setState({rosterStatusManager:rosterStatusState({filters,page:1,selectedIds:[],lastSelectedId:""})});
+}
+async function saveRosterStatusChanges(){
+  const manager=appState.rosterStatusManager;
+  const validation=validateRosterStatusSave(manager.rows||[],manager.pendingChanges||{});
+  if(!validation.valid){
+    setState({rosterStatusManager:rosterStatusState({error:`${validation.invalid.length} invalid roster status updates.`})});
+    return;
+  }
+  const payload=savePayload(manager.pendingChanges||{});
+  if(!payload.length)return;
+  try{
+    setState({rosterStatusManager:rosterStatusState({saving:true,error:""})});
+    await updateRosterStatuses(appState.activeLeague.id,payload,{updatedBy:appState.authUser?.id||""});
+    const rows=rosterStatusManagerRows(await allPlayers(appState.activeLeague.id),appState.teams||[]);
+    setState({rosterStatusManager:rosterStatusState({rows,pendingChanges:{},selectedIds:[],lastSelectedId:"",saving:false,lastSavedAt:new Date().toLocaleString(),error:""})});
+    await refreshLeagueData();
+  }catch(error){
+    setState({rosterStatusManager:rosterStatusState({saving:false,error:String(error?.message||error)})});
+    setError(error);
+  }
+}
+function requestRosterStatusSaveConfirmation(){
+  const manager=appState.rosterStatusManager;
+  const validation=validateRosterStatusSave(manager.rows||[],manager.pendingChanges||{});
+  if(!validation.valid){
+    setState({rosterStatusManager:rosterStatusState({confirmSave:false,error:`${validation.invalid.length} invalid roster status updates.`})});
+    return;
+  }
+  if(!savePayload(manager.pendingChanges||{}).length)return;
+  setState({rosterStatusManager:rosterStatusState({confirmSave:true,error:""})});
+}
 function tradeDraftKey(side){return side==="outgoing"?"myTeamSearchDraft":"partnerTeamSearchDraft"}
 function tradeLoadingKey(side){return side==="outgoing"?"outgoingLoading":"incomingLoading"}
 function tradeErrorKey(side){return side==="outgoing"?"outgoingError":"incomingError"}
@@ -205,6 +274,7 @@ async function renderView(){
   if(appState.view==="waivers")setHtml(root,renderWaiverOpportunities(appState,appState.waiverPage||waiverPage));
   if(appState.view==="tradeCenter")setHtml(root,renderTradeCenter({...appState,tradeCenter:tradeState()}));
   if(appState.view==="myRoster")setHtml(root,renderMyRoster(appState));
+  if(appState.view==="rosterStatusManager")setHtml(root,renderRosterStatusManager(appState));
   if(appState.view==="teamsManagers")setHtml(root,renderTeamsManagers(appState));
   if(appState.view==="imports")setHtml(root,renderImports(appState,importUiState));
   if(appState.view==="settings")setHtml(root,renderSettingsDataHealth(appState));
@@ -347,6 +417,42 @@ function bindViewEvents(){
       setState({rosterRecommendations,rosterRecommendationsLoading:false});
     }catch(error){setState({rosterRecommendationsLoading:false,rosterRecommendationsError:String(error?.message||error)});setError(error)}
   });
+  $("#rsmApplyFilters")?.addEventListener("click",()=>setRosterStatusFilters(rosterStatusFiltersFromControls()));
+  $("#rsmClearFilters")?.addEventListener("click",()=>setRosterStatusFilters({search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false}));
+  $all("[data-rsm-filter-status]").forEach(button=>button.addEventListener("click",()=>setRosterStatusFilters({...appState.rosterStatusManager.filters,currentStatus:button.dataset.rsmFilterStatus})));
+  $("#rsmSelectPage")?.addEventListener("change",event=>{
+    const rows=rosterStatusPageRows();
+    const selectedIds=event.target.checked?selectPageRows(appState.rosterStatusManager.selectedIds||[],rows):clearSelection();
+    setState({rosterStatusManager:rosterStatusState({selectedIds,lastSelectedId:""})});
+  });
+  $all("[data-rsm-select]").forEach(input=>input.addEventListener("click",event=>{
+    const selectedIds=toggleSelection(appState.rosterStatusManager.selectedIds||[],input.dataset.rsmSelect,{checked:event.target.checked,visibleRows:rosterStatusPageRows(),lastSelectedId:appState.rosterStatusManager.lastSelectedId,shiftKey:event.shiftKey});
+    setState({rosterStatusManager:rosterStatusState({selectedIds,lastSelectedId:input.dataset.rsmSelect})});
+  }));
+  $("#rsmSelectAllFiltered")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({selectedIds:selectAllFilteredRows(rosterStatusVisibleRows()),lastSelectedId:""})}));
+  $("#rsmClearSelection")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({selectedIds:clearSelection(),lastSelectedId:""})}));
+  $("#rsmPrevPage")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({page:Math.max(1,(appState.rosterStatusManager.page||1)-1),lastSelectedId:""})}));
+  $("#rsmNextPage")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({page:(appState.rosterStatusManager.page||1)+1,lastSelectedId:""})}));
+  $("#rsmPageSize")?.addEventListener("change",event=>setState({rosterStatusManager:rosterStatusState({page:1,pageSize:Number(event.target.value)||100,lastSelectedId:""})}));
+  $all("[data-rsm-status]").forEach(select=>select.addEventListener("change",event=>{
+    const rows=appState.rosterStatusManager.rows||[];
+    const row=rows.find(item=>item.id===select.dataset.rsmStatus);
+    if(!row)return;
+    const pendingChanges=setPendingStatus(appState.rosterStatusManager.pendingChanges||{},row,event.target.value);
+    setState({rosterStatusManager:rosterStatusState({pendingChanges,error:""})});
+  }));
+  $all("[data-rsm-bulk-status]").forEach(button=>button.addEventListener("click",()=>{
+    const pendingChanges=bulkSetPendingStatus(appState.rosterStatusManager.pendingChanges||{},appState.rosterStatusManager.rows||[],appState.rosterStatusManager.selectedIds||[],button.dataset.rsmBulkStatus);
+    setState({rosterStatusManager:rosterStatusState({pendingChanges,error:""})});
+  }));
+  $("#rsmClearPendingSelected")?.addEventListener("click",()=>{
+    const pendingChanges=clearPendingStatusChanges(appState.rosterStatusManager.pendingChanges||{},appState.rosterStatusManager.selectedIds||[]);
+    setState({rosterStatusManager:rosterStatusState({pendingChanges,error:""})});
+  });
+  $("#rsmSaveChanges")?.addEventListener("click",requestRosterStatusSaveConfirmation);
+  $("#rsmConfirmSave")?.addEventListener("click",saveRosterStatusChanges);
+  $("#rsmDismissConfirm")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({confirmSave:false})}));
+  $("#rsmCancelChanges")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({pendingChanges:clearAllPendingStatusChanges(),selectedIds:[],lastSelectedId:"",confirmSave:false,error:""})}));
   $("#applyWaiverFilters")?.addEventListener("click",async()=>{await updateWaiverPage(waiverQueryFromControls())});
   $("#clearWaiverFilters")?.addEventListener("click",async()=>{await updateWaiverPage(defaultWaiverQuery())});
   $("#prevWaivers")?.addEventListener("click",async()=>{await updateWaiverPage({...appState.waiverQuery,page:Math.max(1,(appState.waiverQuery.page||1)-1)})});
@@ -520,6 +626,7 @@ function bindShellEvents(){
         setState({tradeCenter:tradeState({outgoingCandidates:appState.tradeCenter.outgoingCandidates?.length?appState.tradeCenter.outgoingCandidates:appState.tradeCenter.outgoingCandidates})});
         loadTradeCandidates("outgoing").then(()=>render()).catch(setError);
       }
+      if(nav.dataset.view==="rosterStatusManager"&&!(appState.rosterStatusManager.rows||[]).length)loadRosterStatusManager();
     }
   });
   document.body.addEventListener("submit",async event=>{
@@ -536,7 +643,7 @@ function bindShellEvents(){
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
-    try{setState({health:await runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter}),healthDetails:null})}catch(error){setError(error)}
+    try{setState({health:await runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager}),healthDetails:null})}catch(error){setError(error)}
     }
   });
   document.body.addEventListener("change",async event=>{
@@ -554,6 +661,7 @@ async function bootstrap(){
     await initializeAuth((_,message)=>setHtml($("#messagePanel"),message||"Loading"));
     if(appState.authUser)await refreshAccessibleLeagues(appState.authUser.id);
     if(appState.activeLeague)await refreshLeagueData();
+    if(appState.activeLeague&&appState.view==="rosterStatusManager")await loadRosterStatusManager();
   }catch(error){
     setError(error);
   }finally{

@@ -29,7 +29,7 @@ const repositories=await readdir(new URL("js/repositories/",root));
 
 ["css/styles.css","js/main.js"].forEach(path=>assert.match(html,new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))));
 assert.match(html,/Version 5 is under construction\. The existing application remains available separately\./);
-["Dashboard","Players","Waiver Opportunities","Trade Center","My Roster","Teams & Managers","Cloud Imports","Settings & Data Health"].forEach(label=>assert.match(html,new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))));
+["Dashboard","Players","Waiver Opportunities","Trade Center","My Roster","Roster Status Manager","Teams & Managers","Cloud Imports","Settings & Data Health"].forEach(label=>assert.match(html,new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))));
 ["Waiver Finder","Waiver Hunter","Market Edges","Decision Engine","Package Builder","Portfolio","Trends","Scout"].forEach(label=>assert.doesNotMatch(html,new RegExp(label)));
 
 ["playerRepository.js","teamRepository.js","managerRepository.js","metricRepository.js","scoreRepository.js","tradeRepository.js","importJobRepository.js"].forEach(file=>assert.ok(repositories.includes(file),`${file} must exist`));
