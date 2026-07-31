@@ -1,4 +1,5 @@
 export const PLAYER_STAGE_OPTIONS=[
+  "PROSPECT",
   "MLB_ESTABLISHED","MLB_EMERGING","MLB_ROLE_PLAYER","PROSPECT_NEAR_MLB","PROSPECT_DEVELOPMENTAL","RELIEVER","UNKNOWN"
 ];
 
@@ -24,7 +25,7 @@ export const SCORE_SORTS=[
 export const PLAYER_INTELLIGENCE_PRESETS={
   topDynasty:{label:"Top Dynasty Assets",query:{sort:"dynasty_asset_score",ascending:false,minDynastyAssetScore:65}},
   winNow:{label:"Win-Now Impact",query:{sort:"championship_impact",ascending:false,minChampionshipImpact:60}},
-  upside:{label:"High-Upside Prospects",query:{sort:"ceiling_score",ascending:false,playerStage:"PROSPECT_NEAR_MLB",minCeiling:60}},
+  upside:{label:"High-Upside Prospects",query:{sort:"ceiling_score",ascending:false,playerStage:"PROSPECT",minCeiling:60}},
   buyLow:{label:"Buy-Low Candidates",query:{sort:"buy_low_score",ascending:false,minBuyLowScore:55,minConfidence:50}},
   sellHigh:{label:"Sell-High Candidates",query:{sort:"sell_high_score",ascending:false,minConfidence:50}},
   freeAgents:{label:"Best Free Agents",query:{sort:"dynasty_asset_score",ascending:false,ownerTeamId:"FREE_AGENT",minAcquisitionOpportunity:55}},

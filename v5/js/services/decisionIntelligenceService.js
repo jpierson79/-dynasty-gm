@@ -1,6 +1,6 @@
 import { listPlayerIntelligence, playerIntelligenceByIds, scoreValue } from "../repositories/playerIntelligenceRepository.js";
 
-export const DECISION_RULE_VERSION="5.3.0";
+export const DECISION_RULE_VERSION="5.4.5";
 export const REASON_CODES=Object.freeze({
   HIGH_DYNASTY_VALUE:"HIGH_DYNASTY_VALUE",
   HIGH_CHAMPIONSHIP_IMPACT:"HIGH_CHAMPIONSHIP_IMPACT",
@@ -14,6 +14,7 @@ export const REASON_CODES=Object.freeze({
   ROSTER_CRUNCH:"ROSTER_CRUNCH",
   FREE_AGENT_UPGRADE:"FREE_AGENT_UPGRADE",
   CONSOLIDATION_ASSET:"CONSOLIDATION_ASSET",
+  CORE_ASSET_PROTECTION:"CORE_ASSET_PROTECTION",
   UNCLASSIFIED_ROSTER_STATUS:"UNCLASSIFIED_ROSTER_STATUS",
   INSUFFICIENT_DATA:"INSUFFICIENT_DATA"
 });
@@ -137,8 +138,11 @@ export function recommendRosterPlayer(player,context={}){
   const reasons=[];
   const dynasty=score(player,"dynasty_asset_score",0),impact=score(player,"championship_impact",0),ceiling=score(player,"ceiling_score",0),floor=score(player,"floor_score",0),risk=score(player,"risk_score",100),confidence=score(player,"confidence_score",0);
   const prospect=String(player.playerStage||"").includes("PROSPECT");
+  const hkb=Number(player.hkb_value||0);
+  const coreAsset=dynasty>=64||impact>=62||hkb>=1800||(dynasty>=60&&ceiling>=68)||(prospect&&dynasty>=58&&ceiling>=72);
   addReason(reasons,REASON_CODES.HIGH_DYNASTY_VALUE,dynasty>=68);
   addReason(reasons,REASON_CODES.HIGH_CHAMPIONSHIP_IMPACT,impact>=65);
+  addReason(reasons,REASON_CODES.CORE_ASSET_PROTECTION,coreAsset);
   addReason(reasons,REASON_CODES.POSITIONAL_SURPLUS,Boolean(teamSurplusFor(player,context)));
   addReason(reasons,REASON_CODES.LOW_CONFIDENCE,confidence<55);
   addReason(reasons,REASON_CODES.HIGH_RISK,risk>=70);
@@ -146,7 +150,7 @@ export function recommendRosterPlayer(player,context={}){
   addReason(reasons,REASON_CODES.UNCLASSIFIED_ROSTER_STATUS,String(player.roster_status||"").toUpperCase()==="UNCLASSIFIED");
   addReason(reasons,REASON_CODES.ROSTER_CRUNCH,context.rosterPressure?.activeOverTarget||context.rosterPressure?.reserveOverTarget||context.rosterPressure?.minorsOverTarget);
   let type="HOLD";
-  if(dynasty>=68||impact>=65)type="HOLD";
+  if(coreAsset)type="HOLD";
   else if(teamSurplusFor(player,context)&&dynasty>=55)type="CONSOLIDATE";
   else if(risk>=75&&dynasty>=55)type="SHOP";
   else if(dynasty<44&&floor<42&&!prospect&&confidence>=55)type="DROP_CANDIDATE";

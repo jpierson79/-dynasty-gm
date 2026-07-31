@@ -81,11 +81,12 @@ function applyScoreFilters(query,filters={}){
   if(filters.minDynastyAssetScore)query=query.gte("dynasty_asset_score",Number(filters.minDynastyAssetScore));
   if(filters.minChampionshipImpact)query=query.gte("championship_impact",Number(filters.minChampionshipImpact));
   if(filters.maxRisk)query=query.lte("risk_score",Number(filters.maxRisk));
+  if(filters.playerStage==="PROSPECT")query=query.in("explanation->metadata->>player_stage",["PROSPECT_NEAR_MLB","PROSPECT_DEVELOPMENTAL"]);
+  else if(filters.playerStage)query=query.eq("explanation->metadata->>player_stage",filters.playerStage);
   return query;
 }
 function localFilterRows(rows,filters={}){
   return rows.filter(row=>{
-    if(filters.playerStage&&row.playerStage!==filters.playerStage)return false;
     if(filters.dataAvailability==="highConfidence"&&scoreValue(row,"confidence_score")<70)return false;
     if(filters.dataAvailability==="lowConfidence"&&scoreValue(row,"confidence_score")>=55)return false;
     if(filters.dataAvailability==="hasStatcast"&&!row.hasStatcast)return false;

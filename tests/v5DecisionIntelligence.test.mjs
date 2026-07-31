@@ -38,14 +38,14 @@ const freeCatcher=player({id:"fa-c",name:"Free C",positions:["C"],dynasty:64,imp
 const lowInfo=player({id:"fa-low",name:"Low Info",positions:["RP"],dynasty:54,impact:45,ceiling:58,confidence:40,hkb_value:0,metricCount:0});
 const context=buildTeamContext(roster,[freeCatcher,lowInfo]);
 
-assert.equal(DECISION_RULE_VERSION,"5.3.0");
+assert.equal(DECISION_RULE_VERSION,"5.4.5");
 assert.ok(Object.values(REASON_CODES).includes("POSITIONAL_NEED"));
 assert.ok(context.positionWeakness.includes("C"),"thin catcher depth should register as a positional weakness");
 assert.ok(context.positionSurplus.includes("OF"),"outfield depth should register as positional surplus");
 
 const freeRec=recommendFreeAgent(freeCatcher,context);
 assert.equal(freeRec.playerId,"fa-c");
-assert.equal(freeRec.decisionRuleVersion,"5.3.0");
+assert.equal(freeRec.decisionRuleVersion,"5.4.5");
 assert.ok(freeRec.reasonCodes.includes("POSITIONAL_NEED"));
 assert.ok(["ADD","STASH","WATCH"].includes(freeRec.recommendation));
 
@@ -57,6 +57,14 @@ const surplusRec=recommendRosterPlayer(surplusOf,context);
 assert.ok(surplusRec.reasonCodes.includes("POSITIONAL_SURPLUS"));
 assert.equal(surplusRec.recommendation,"CONSOLIDATE","a good player can be a consolidation asset");
 
+const obviousCore=player({id:"r-core",name:"Obvious Core",positions:["OF"],owner_team_id:"team-1",roster_status:"ACTIVE",dynasty:61,impact:57,ceiling:72,hkb_value:2600});
+const coreRec=recommendRosterPlayer(obviousCore,context);
+assert.equal(coreRec.recommendation,"HOLD","premium market-value core players must not be labeled consolidation assets");
+assert.ok(coreRec.reasonCodes.includes("CORE_ASSET_PROTECTION"));
+
+const eliteProspect=player({id:"r-elite-pro",name:"Elite Prospect",positions:["SS"],owner_team_id:"team-1",roster_status:"MINORS",stage:"PROSPECT_DEVELOPMENTAL",dynasty:59,impact:38,ceiling:78,hkb_value:1200});
+assert.equal(recommendRosterPlayer(eliteProspect,context).recommendation,"HOLD","premium prospects must be protected from positional-surplus consolidation");
+
 const prospectRec=recommendRosterPlayer(prospect,context);
 assert.notEqual(prospectRec.recommendation,"DROP_CANDIDATE","high-ceiling prospects should not be simple drop candidates");
 
@@ -64,7 +72,7 @@ const unclassifiedRec=recommendRosterPlayer(unclassified,context);
 assert.ok(unclassifiedRec.reasonCodes.includes("UNCLASSIFIED_ROSTER_STATUS"));
 assert.ok(unclassifiedRec.confidence<70,"unclassified roster status should lower recommendation confidence");
 
-const renderedWaivers=renderWaiverOpportunities({positionOptions:["C"],mlbTeamOptions:["NYM"],waiverQuery:{page:1,pageSize:50}}, {recommendations:[freeRec,lowInfoRec],count:2,page:1,pageSize:50,decisionRuleVersion:"5.3.0"});
+const renderedWaivers=renderWaiverOpportunities({positionOptions:["C"],mlbTeamOptions:["NYM"],waiverQuery:{page:1,pageSize:50}}, {recommendations:[freeRec,lowInfoRec],count:2,page:1,pageSize:50,decisionRuleVersion:"5.4.5"});
 assert.match(renderedWaivers,/Waiver Opportunities/);
 assert.match(renderedWaivers,/data-waiver-detail="fa-c"/);
 assert.match(renderedWaivers,/data-waiver-upgrade="fa-c"/);
@@ -72,7 +80,7 @@ assert.match(renderedWaivers,/data-watch-player="fa-c"/);
 assert.match(renderedWaivers,/in-session only/);
 assert.match(renderedWaivers,/Immediate Adds|Watch List|Dynasty Stashes/);
 
-const rosterHtml=renderMyRoster({teams:[{id:"team-1",name:"Aces"}],userTeamResolution:{teamId:"team-1"},rosterPlayers:roster,rosterRecommendations:{decisionRuleVersion:"5.3.0",recommendations:[surplusRec,prospectRec,unclassifiedRec]}});
+const rosterHtml=renderMyRoster({teams:[{id:"team-1",name:"Aces"}],userTeamResolution:{teamId:"team-1"},rosterPlayers:roster,rosterRecommendations:{decisionRuleVersion:"5.4.5",recommendations:[surplusRec,prospectRec,unclassifiedRec]}});
 assert.match(rosterHtml,/Refresh Recommendations/);
 assert.match(rosterHtml,/Consolidation Assets/);
 assert.match(rosterHtml,/Decision diagnostics/);

@@ -39,7 +39,7 @@ export function renderWaiverOpportunities(state,page){
   const watched=recs.filter(rec=>watchIds.includes(rec.playerId));
   return `<section class="view-panel"><h2>Waiver Opportunities</h2><p class="note">Free-agent recommendations from stored V5.1.1 scores and roster context. No transactions are automatic.</p>${filters(state,query)}
   <section class="panel"><h3>Session Watch List</h3><p class="note">Watch list is in-session only in this pass because no existing cloud persistence table supports it without a migration.</p>${watched.length?watched.map(item=>`<span class="pill">${escapeHtml(item.player?.name||item.playerId)}</span>`).join(" "):"<p class='note'>No watched free agents yet.</p>"}</section>
-  <p class="note">${state.waiversLoading?"Loading waiver opportunities...":state.waiversError?`Waiver query failed: ${escapeHtml(state.waiversError)}`:`Showing ${recs.length} of ${page?.count||0} free agents. Page ${query.page||1}. Rule ${escapeHtml(page?.decisionRuleVersion||"5.3.0")}.`}</p>
+  <p class="note">${state.waiversLoading?"Loading waiver opportunities...":state.waiversError?`Waiver query failed: ${escapeHtml(state.waiversError)}`:`Showing ${recs.length} of ${page?.count||0} free agents. Page ${query.page||1}. Rule ${escapeHtml(page?.decisionRuleVersion||"5.4.5")}.`}</p>
   ${table([
     {label:"Player",html:true,value:row=>`<button class="link-button" data-waiver-detail="${escapeHtml(row.playerId)}">${escapeHtml(row.player?.name||row.playerId)}</button>`},
     {label:"Position",value:row=>Array.isArray(row.player?.positions)?row.player.positions.join("/"):"Unavailable"},

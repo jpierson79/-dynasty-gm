@@ -48,10 +48,12 @@ assert.match(repo,/minChampionshipImpact/);
 assert.match(repo,/maxRisk/);
 assert.match(repo,/localFilterRows/,"explanation-only score filters are applied only to bounded page rows");
 assert.match(repo,/playerIntelligenceByIds/);
+assert.match(repo,/explanation->metadata->>player_stage/,"player-stage filters must run before pagination");
+assert.match(repo,/PROSPECT_NEAR_MLB","PROSPECT_DEVELOPMENTAL/,"aggregate prospect filtering must include both prospect stages");
 
 assert.ok(SCORE_SORTS.some(sort=>sort.value==="buy_low_score"));
 assert.equal(PLAYER_INTELLIGENCE_PRESETS.freeAgents.query.ownerTeamId,"FREE_AGENT");
-assert.equal(PLAYER_INTELLIGENCE_PRESETS.upside.query.playerStage,"PROSPECT_NEAR_MLB");
+assert.equal(PLAYER_INTELLIGENCE_PRESETS.upside.query.playerStage,"PROSPECT");
 assert.equal(PLAYER_INTELLIGENCE_PRESETS.buyLow.query.minConfidence,50);
 
 const html=renderPlayers({

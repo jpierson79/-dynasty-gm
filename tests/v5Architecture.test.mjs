@@ -86,7 +86,7 @@ assert.match(dynastyEngine,/elapsedMs/);
 assert.match(dynastyEngine,/updated:upserted/);
 ["ageCurve","scarcity","championshipImpact","marketAppreciation","tradeLiquidity","risk","ceiling","floor","breakout","portfolioFit","leagueFit","overallScore","playerStage","confidence"].forEach(name=>assert.match(dynastyEngine,new RegExp(name)));
 assert.match(dynastyEngine,/metadata:\{/);
-assert.match(decisionService,/DECISION_RULE_VERSION="5\.3\.0"/);
+assert.match(decisionService,/DECISION_RULE_VERSION="5\.4\.5"/);
 assert.match(decisionService,/listPlayerIntelligence/);
 assert.doesNotMatch(decisionService,/calculatePlayerScores|calculateLeagueScores/);
 assert.match(tradeService,/TRADE_ANALYSIS_VERSION="5\.4\.0"/);
