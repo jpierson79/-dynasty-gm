@@ -27,6 +27,18 @@ The July 16 operational snapshot that described branch `fix/reliable-repeat-impo
 - V5.4.3/V5.4.3A completed read-only Fantrax endpoint and identity discovery; no roster synchronization, preview implementation, or schema change was produced.
 - The repository was clean before this documentation-only task.
 
+## V5.4.5 Fantrax Public Preview Foundation
+
+- A preview-only V5 workflow now requests six documented public Fantrax operations through an allowlisted Supabase Edge Function: league info, team rosters, matchup scores, current standings, draft picks, and draft results.
+- The preview normalizes league, player, team, roster, scoring-period, matchup, standing, and draft data without database writes.
+- Player identity uses only an exact populated `fantrax_api_player_id` or the strict `*API_ID*` transformation. Name and MLBAM fallback remain prohibited.
+- Team-name equality is suggestion-only because the current schema has no `teams.fantrax_team_id`; suggestions are never authoritative or persisted.
+- Roster status mapping remains exact for the four observed values, with unknown values shown as `UNCLASSIFIED`.
+- Matchup scores are labeled team scores. Standings are labeled `CURRENT_ONLY`. No player-level fantasy scoring or Dynasty Intelligence integration exists.
+- Data Health reports preview availability and identity diagnostics without claiming synchronization.
+- Chrome validation on 2026-08-02 verified 10 teams, 10,161 exact player identity matches, 567 exact roster-player matches, 24 scoring periods, 15 current and period-1 matchup rows, 10 current-only standings rows, 6 draft picks, and 50 draft results. All 10 teams remain intentionally blocked because authoritative Fantrax team IDs are not persisted.
+- The `fantrax-public-league-preview` Edge Function was deployed with explicit authorization for preview validation. It performs public HTTP reads only and has no database client or write path.
+
 ## Verified HKB Matching Repair
 
 - HKB uses a dedicated canonical name normalizer for fallback matching; Fantrax and MLBAM identity precedence is unchanged.

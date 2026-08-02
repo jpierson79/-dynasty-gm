@@ -155,3 +155,15 @@ Decision: V5.4.3B is limited to a reviewed schema migration, strict ID normaliza
 Consequences: V5.4.3B must not write roster statuses or ownership, rewrite free agents, create players or teams, use automatic name matching, run production imports, or apply a remote migration without explicit approval. Production roster synchronization remains unsafe until the identity foundation and reviewed assignments are complete.
 
 Evidence paths: verified V5.4.3A diagnostics and user-approved phase definition.
+
+## ADR-014: Use Public REST Through An Edge Function
+
+Status: accepted.
+
+Context: The unofficial Python FantraxAPI wrapper exposed additional scoring objects but required authenticated browser cookies for the configured league. The documented REST endpoints supplied the required league, roster, matchup, standings, and draft preview data without credentials.
+
+Decision: Production-shaped preview reads use the allowlisted `fantrax-public-league-preview` Supabase Edge Function and documented `/fxea/general/` endpoints. Python, FantraxAPI, `/fxpa/req`, Selenium, credentials, and cookies are excluded.
+
+Consequences: The Edge Function enforces operation, timeout, size, HTTP, and JSON checks and returns normalized preview models. Standings are labeled `CURRENT_ONLY`; team matchup scores remain separate from player and Dynasty Intelligence scores. Preview performs no database writes.
+
+Evidence paths: `supabase/functions/fantrax-public-league-preview/index.ts`, `supabase/functions/_shared/fantraxPreviewCore.js`, `tests/v5FantraxPublicPreview.test.mjs`.

@@ -67,6 +67,17 @@ Evidence: user-supplied authoritative facts, `docs/cloud-player-identity.md`, `s
 
 Evidence: Fantrax v1.3 beta developer documentation, verified V5.4.3/V5.4.3A read-only endpoint and cloud-join diagnostics, `supabase/migrations/001_initial_schema.sql`.
 
+## Fantrax Public Preview Architecture
+
+- The unofficial FantraxAPI Python wrapper is not a production dependency. Its richer `/fxpa/req` scoring methods required an authenticated browser session for the configured league, while the documented REST endpoints remained credential-free.
+- Production Fantrax reads use JavaScript/TypeScript through the `fantrax-public-league-preview` Supabase Edge Function. Python, Selenium, Fantrax credentials, browser cookies, arbitrary Fantrax URLs, and `/fxpa/req` are prohibited.
+- The approved public operations are league info, team rosters, matchup scores, current standings, draft picks, and draft results.
+- `getMatchupScores` is period-specific and represents team matchup scores. Player-level Fantrax fantasy points remain unresolved and must not populate Dynasty Intelligence scores.
+- `getStandings` is treated only as `CURRENT_ONLY`; its historical-period semantics remain unverified.
+- League scoring snapshots and Dynasty Intelligence scores are separate domains.
+
+Evidence: verified V5.4.5 investigation and `supabase/functions/fantrax-public-league-preview/index.ts`.
+
 ## Fantrax Identity Graph
 
 ```text

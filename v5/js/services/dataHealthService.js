@@ -42,7 +42,25 @@ function rosterStatusDiagnostics(playerRows){
   });
   return [...groups.values()].sort((a,b)=>a.mappedRosterStatus.localeCompare(b.mappedRosterStatus)||a.rawRosterStatus.localeCompare(b.rawRosterStatus));
 }
-export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null}={}){
+export function fantraxPreviewHealthChecks(preview=null){
+  const data=preview?.data||null,health=data?.endpointHealth||[],ok=name=>health.find(row=>row.endpoint===name)?.success===true;
+  const playerTotal=data?.playerRows?.length||0,playerMatches=data?.playerRows?.filter(row=>row.identityResult==="MATCHED").length||0;
+  const teamTotal=data?.teamRows?.length||0,teamMatches=data?.teamRows?.filter(row=>row.identityResult==="MATCHED").length||0;
+  const item=(name,status,rows)=>({name,status,details:detail(name,rows)});
+  return [
+    item("Fantrax Public API Reachable",health.some(row=>row.success)?"PASS":"WARNING",health),
+    item("Fantrax League Metadata Available",ok("league-info")?"PASS":"WARNING",[{available:ok("league-info"),previewOnly:true}]),
+    item("Fantrax Player Identity Match Rate",playerTotal&&playerMatches===playerTotal?"PASS":playerTotal?"WARNING":"INFO",[{matched:playerMatches,total:playerTotal,previewOnly:true}]),
+    item("Fantrax Team Identity Match Rate",teamTotal&&teamMatches===teamTotal?"PASS":teamTotal?"WARNING":"INFO",[{matched:teamMatches,total:teamTotal,persistable:Boolean(teamMatches),previewOnly:true}]),
+    item("Fantrax Roster Preview Available",ok("team-rosters")?"PASS":"WARNING",[{rows:data?.rosterItems?.length||0,cloudWrites:0}]),
+    item("Unknown Fantrax Roster Statuses",data?.diagnostics?.unknownStatuses?.length?"WARNING":"PASS",(data?.diagnostics?.unknownStatuses||[]).map(status=>({status}))),
+    item("Fantrax Matchup Period Available",ok("matchup-scores")?"PASS":"WARNING",[{rows:data?.matchups?.length||0}]),
+    item("Fantrax Standings Snapshot Available",ok("standings")?"PASS":"WARNING",[{rows:data?.standings?.length||0,snapshotScope:"CURRENT_ONLY"}]),
+    item("Fantrax Draft Data Available",ok("draft-picks")||ok("draft-results")?"PASS":"WARNING",[{draftPickEndpoint:ok("draft-picks"),draftResultEndpoint:ok("draft-results")}]),
+    item("Last Fantrax Preview Fetch",data?.fetchedAt?"INFO":"WARNING",[{fetchedAt:data?.fetchedAt||"Never",previewOnly:true,cloudWrites:0}])
+  ];
+}
+export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null}={}){
   const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows]=await Promise.all([
     leagues.memberships(leagueId),
     players.allPlayers(leagueId),
@@ -248,5 +266,6 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Team-manager links",status:teamRows.some(team=>team.manager_id&&!managerRows.some(manager=>manager.id===team.manager_id))?"WARNING":"PASS",details:detail("Team-manager link issues",teamRows.filter(team=>team.manager_id&&!managerRows.some(manager=>manager.id===team.manager_id)))},
     {name:"RLS access",status:"PASS",details:detail("RLS access",[{leagueId,readSucceeded:true}])}
   ];
+  checks.push(...fantraxPreviewHealthChecks(fantraxPreview));
   return {checks,failed:checks.filter(check=>check.status==="FAIL").length,warnings:checks.filter(check=>check.status==="WARNING").length};
 }

@@ -49,6 +49,9 @@
 9. Unknown status maps to `UNCLASSIFIED` and never changes ownership or free-agent state.
 10. Do not store raw private roster payloads or add live API calls to routine Data Health rendering.
 11. Remove temporary diagnostic files before completing an investigation unless the user explicitly requests otherwise.
+12. Route production public-league preview reads through the allowlisted Supabase Edge Function; do not call Fantrax directly from the production browser workflow.
+13. Treat `getMatchupScores` as period-specific team scoring only and `getStandings` as a current snapshot until Fantrax proves historical semantics.
+14. Keep player fantasy-point ingestion out of scope until a credential-free documented endpoint is independently verified.
 
 ## Validation Rules
 

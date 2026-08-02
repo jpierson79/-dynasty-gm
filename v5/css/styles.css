@@ -122,6 +122,12 @@ dd{margin:0}
 .review-panel ul{display:grid;gap:6px;padding-left:18px;margin:8px 0}
 .review-panel li span{display:block;color:var(--muted);font-size:12px}
 .sticky-action-bar{position:sticky;top:74px;z-index:4;background:#0d1422;border:1px solid var(--line);border-radius:8px;padding:8px}
+.preview-tabs{display:flex;gap:8px;overflow:auto;margin:14px 0;padding-bottom:4px}
+.preview-tabs button{white-space:nowrap;text-transform:capitalize}
+.preview-tabs button.active{border-color:var(--accent);background:#0f3b3a}
+.fantrax-preview>.toolbar input{min-width:245px}
+.fantrax-roster-table table{min-width:1500px}
+.warning-note{border:1px solid var(--warn);background:#3a2910;color:#fde68a;border-radius:7px;padding:10px;font-size:13px;line-height:1.45;margin:10px 0}
 @media(max-width:1280px){
   .app-shell{grid-template-columns:220px minmax(0,1fr);gap:12px;padding:12px}
   .trade-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
