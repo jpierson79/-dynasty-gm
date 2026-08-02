@@ -101,7 +101,7 @@ assert.doesNotMatch(edge,/cookie|userSecretId|service_role|\.from\(/i);
 assert.doesNotMatch(service,/\.update\(|\.upsert\(|\.insert\(|calculateLeagueScores/);
 assert.doesNotMatch(`${edge}\n${service}`,/fxpa\/req|selenium|\bpython\b|from ["']fantraxapi["']/i);
 assert.match(html,/data-view="fantraxPreview"/);
-assert.match(html,/v5-4-5-fantrax-preview-3/);
+assert.match(html,/v5-4-6a-team-identity/);
 assert.match(main,/dataHealthService\.js\?v5-4-5-fantrax-preview/);
 assert.match(main,/fetchFantraxPublicPreview/);
 assert.match(view,/Fantrax standings period semantics have not been verified/);

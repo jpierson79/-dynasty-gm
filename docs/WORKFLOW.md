@@ -52,6 +52,9 @@
 12. Route production public-league preview reads through the allowlisted Supabase Edge Function; do not call Fantrax directly from the production browser workflow.
 13. Treat `getMatchupScores` as period-specific team scoring only and `getStandings` as a current snapshot until Fantrax proves historical semantics.
 14. Keep player fantasy-point ingestion out of scope until a credential-free documented endpoint is independently verified.
+15. Persist Fantrax team identity only after an explicit review and confirmation. Enforce one-to-one assignments within the active league and never auto-save a name-based suggestion.
+16. Before any future roster synchronization, require a reviewed manual-override model containing an explicit source and timestamp, a clear-override workflow, and preview diagnostics for conflicts.
+17. A local team-identity checkpoint does not imply deployment: record migration application, persisted mappings, protected-field verification, and Chrome acceptance separately. After a local checkpoint, resume with deployment and live validation rather than reimplementing the feature.
 
 ## Validation Rules
 

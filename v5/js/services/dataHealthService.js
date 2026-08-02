@@ -46,12 +46,23 @@ export function fantraxPreviewHealthChecks(preview=null){
   const data=preview?.data||null,health=data?.endpointHealth||[],ok=name=>health.find(row=>row.endpoint===name)?.success===true;
   const playerTotal=data?.playerRows?.length||0,playerMatches=data?.playerRows?.filter(row=>row.identityResult==="MATCHED").length||0;
   const teamTotal=data?.teamRows?.length||0,teamMatches=data?.teamRows?.filter(row=>row.identityResult==="MATCHED").length||0;
+  const persistedIds=(data?.teamRows||[]).filter(row=>row.identityResult==="MATCHED").map(row=>row.fantraxTeamId),duplicateTeamIds=persistedIds.filter((id,index)=>persistedIds.indexOf(id)!==index);
+  const rosterRows=data?.rosterItems||[],validTeamRosterRows=rosterRows.filter(row=>row.teamIdentityResult==="MATCHED");
   const item=(name,status,rows)=>({name,status,details:detail(name,rows)});
   return [
     item("Fantrax Public API Reachable",health.some(row=>row.success)?"PASS":"WARNING",health),
     item("Fantrax League Metadata Available",ok("league-info")?"PASS":"WARNING",[{available:ok("league-info"),previewOnly:true}]),
     item("Fantrax Player Identity Match Rate",playerTotal&&playerMatches===playerTotal?"PASS":playerTotal?"WARNING":"INFO",[{matched:playerMatches,total:playerTotal,previewOnly:true}]),
     item("Fantrax Team Identity Match Rate",teamTotal&&teamMatches===teamTotal?"PASS":teamTotal?"WARNING":"INFO",[{matched:teamMatches,total:teamTotal,persistable:Boolean(teamMatches),previewOnly:true}]),
+    item("Fantrax Teams Found",teamTotal?"PASS":"WARNING",[{found:teamTotal}]),
+    item("Fantrax Team IDs Persisted",teamTotal&&teamMatches===teamTotal?"PASS":"WARNING",[{persisted:teamMatches,total:teamTotal}]),
+    item("Duplicate Fantrax Team IDs",duplicateTeamIds.length?"FAIL":"PASS",duplicateTeamIds.map(fantraxTeamId=>({fantraxTeamId}))),
+    item("Unmapped Fantrax Teams",teamTotal===teamMatches?"PASS":"WARNING",(data?.teamRows||[]).filter(row=>row.identityResult!=="MATCHED")),
+    item("Cloud Teams Without Fantrax IDs",teamTotal===teamMatches?"PASS":"WARNING",[{withoutIdentity:Math.max(0,teamTotal-teamMatches),total:teamTotal}]),
+    item("Roster Entries With Valid Team Identity",rosterRows.length&&validTeamRosterRows.length===rosterRows.length?"PASS":rosterRows.length?"WARNING":"INFO",[{valid:validTeamRosterRows.length,total:rosterRows.length}]),
+    item("Ownership Differences Detected",rosterRows.some(row=>row.ownershipDifference)?"WARNING":"PASS",rosterRows.filter(row=>row.ownershipDifference)),
+    item("Status Differences Detected",rosterRows.some(row=>row.rosterStatusDifference)?"WARNING":"PASS",rosterRows.filter(row=>row.rosterStatusDifference)),
+    item("Manual Override Protection Available","WARNING",[{available:false,blocker:"players has no reviewed status source, manual-override flag, override timestamp, updated_by audit field, or synchronization timestamp."}]),
     item("Fantrax Roster Preview Available",ok("team-rosters")?"PASS":"WARNING",[{rows:data?.rosterItems?.length||0,cloudWrites:0}]),
     item("Unknown Fantrax Roster Statuses",data?.diagnostics?.unknownStatuses?.length?"WARNING":"PASS",(data?.diagnostics?.unknownStatuses||[]).map(status=>({status}))),
     item("Fantrax Matchup Period Available",ok("matchup-scores")?"PASS":"WARNING",[{rows:data?.matchups?.length||0}]),

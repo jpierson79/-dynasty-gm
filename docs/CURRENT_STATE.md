@@ -39,6 +39,19 @@ The July 16 operational snapshot that described branch `fix/reliable-repeat-impo
 - Chrome validation on 2026-08-02 verified 10 teams, 10,161 exact player identity matches, 567 exact roster-player matches, 24 scoring periods, 15 current and period-1 matchup rows, 10 current-only standings rows, 6 draft picks, and 50 draft results. All 10 teams remain intentionally blocked because authoritative Fantrax team IDs are not persisted.
 - The `fantrax-public-league-preview` Edge Function was deployed with explicit authorization for preview validation. It performs public HTTP reads only and has no database client or write path.
 
+## V5.4.6A Fantrax Team Identity Foundation
+
+- Local implementation is complete and checkpointed for Git validation. Migration 007 exists locally but has not been applied.
+- A narrowly scoped migration adds nullable `teams.fantrax_team_id`, validates its normalized 16-character format, and enforces uniqueness within each league without backfilling rows.
+- The Fantrax Preview Identity tab includes a responsive Team Identity Manager with roster, matchup, and draft-presence context; cloud team, manager relationship, UUID, owned-player count, existing identity; pending review; cancellation; replacement confirmation; and an exact team-identity-only confirmation dialog.
+- One-to-one and cross-league rules are validated before persistence. Name equality is displayed only as a non-authoritative suggestion.
+- Saving is constrained to the active league/team UUID and writes only `teams.fantrax_team_id`; post-save preview recomputation reports ownership and roster-status differences without an Apply Sync action.
+- Data Health now reports Fantrax team counts, persisted identities, duplicates, unmapped teams, valid roster-team joins, ownership/status differences, and an honest manual-override warning.
+- The current roster-status manager writes only `players.roster_status` and `updated_at`. No reviewed manual override/source/timestamp/sync audit mechanism exists, so production roster synchronization remains blocked.
+- Fantrax team mappings have not been persisted. Live protected-field before/after verification and Chrome acceptance validation remain pending because browser control was unavailable.
+- No player ownership, roster status, player identity, manager assignment, score, HKB value, or Statcast value changed during this local phase.
+- V5.4.6B roster synchronization remains blocked. The next task is to deploy migration 007 through the approved workflow, snapshot protected fields, persist reviewed mappings, and complete live Chrome validation—not to reimplement the foundation.
+
 ## Verified HKB Matching Repair
 
 - HKB uses a dedicated canonical name normalizer for fallback matching; Fantrax and MLBAM identity precedence is unchanged.
