@@ -12,6 +12,6 @@ export const importTypes=[
 export async function previewImport({step,leagueId,file}){
   return cloudCsvImport.previewStep({step,leagueId,file});
 }
-export async function runImport({step,leagueId,file,onProgress,cancelled}){
-  return cloudCsvImport.runStep({step,leagueId,file,onProgress,cancelled});
+export async function runImport({step,leagueId,file,onProgress,cancelled,reviewedPreview}){
+  return cloudCsvImport.runStep({step,leagueId,file,onProgress,cancelled,reviewedPreview});
 }

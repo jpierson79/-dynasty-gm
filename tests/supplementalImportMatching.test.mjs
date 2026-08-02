@@ -125,7 +125,9 @@ function mapsFor(players){
 
 const importService=await readFile(new URL("../js/services/cloudCsvImportService.js",import.meta.url),"utf8");
 assert.match(importService,/import \{ buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, normalizeIdentityName, resolvePlayerIdentity \} from "\.\/playerIdentity\.js";/);
-assert.match(importService,/const name=cell\(row,ix\.name\),fantraxId=textCell\(row,ix\.fantrax\),mlbam=serializeMlbamId\(cell\(row,ix\.mlbam\)\),existing=supplementalPlayerMatch\(maps/);
+assert.match(importService,/createHkbPlayerMatcher/);
+assert.match(importService,/classifyHkbRows/);
+assert.match(importService,/reviewedPreview\.hkbDecisions/);
 assert.match(importService,/const playerId=serializeMlbamId\(cell\(row,playerIx\)\),name=statcastName\(row,map\),fantraxId=textCell\(row,fantraxIx\)/);
 assert.match(importService,/const resolved=resolveStatcastPlayer\(maps,\{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:playerId/);
 assert.match(importService,/cloudStore\.syncResolvedPlayers\(\{updates:\[\.\.\.mlbamBackfillRows\.values\(\)\],inserts:\[\]\}/);

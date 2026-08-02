@@ -2,6 +2,7 @@ import * as cloudStore from "./cloudStore.js";
 import { PlayerIdentityResolver } from "./PlayerIdentityResolver.js";
 import { InMemoryPlayerIdentityRepository } from "./identity/InMemoryPlayerIdentityRepository.js";
 import { buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, normalizeIdentityName, resolvePlayerIdentity } from "./playerIdentity.js";
+import { createHkbPlayerMatcher, HKB_DIAGNOSTIC, normalizeHkbPlayerName, summarizeHkbClassifications } from "./hkbPlayerMatcher.js";
 import { SUPABASE_URL } from "../config/supabase.js";
 
 const BATCH_SIZE=150;
@@ -755,38 +756,91 @@ async function importFantrax({leagueId,file,onProgress,cancelled}){
     throw e;
   }
 }
-async function importHkb({leagueId,file,onProgress,cancelled}){
+function hkbIndexes(head){
+  const map=headerMap(head);
+  return {
+    name:map.find(["name","player","player name"]),
+    fantrax:map.find(["fantrax id","fantrax player id"]),
+    mlbam:exactHeaderIndex(head,["MLBAM ID","MLB ID","MLB Player ID"]),
+    value:map.find(["hkb value","value","dynasty value"]),
+    overall:map.find(["overall rank","rank","overall"]),
+    posRank:map.find(["position rank","pos rank"]),
+    team:map.find(["team","mlb team","org","organization"]),
+    positions:map.find(["positions","position","pos"]),
+    level:map.find(["level"]),
+    age:map.find(["age"])
+  };
+}
+function hkbCandidateText(candidates=[]){
+  return candidates.map(candidate=>`${candidate.name||"Unknown"} [UUID ${candidate.id||"missing"}; team ${candidate.mlbTeam||"unknown"}; positions ${(candidate.positions||[]).join("/")||"unknown"}; owner ${candidate.ownerTeamId||"unowned"}; roster ${candidate.rosterStatus||"unknown"}]`).join(" | ");
+}
+function hkbExceptionDetail(item){
+  return {
+    csvRow:item.csvRow,
+    playerName:item.sourceName,
+    fantraxId:"",
+    mlbamId:"",
+    team:item.sourceTeamRaw||item.sourceTeam||"",
+    sourcePosition:(item.sourcePositions||[]).join("/"),
+    sourceLevel:item.sourceLevel||"",
+    candidateCount:item.candidateCount||0,
+    candidateDetails:hkbCandidateText(item.candidates),
+    diagnosticCategory:item.category,
+    actionAttempted:item.category===HKB_DIAGNOSTIC.NON_PLAYER_ASSET?"Preserve non-player valuation asset":"Update existing player HKB values",
+    failureReason:item.category===HKB_DIAGNOSTIC.NON_PLAYER_ASSET?"Draft-pick asset, not a player":item.category,
+    suggestedResolution:item.suggestedResolution
+  };
+}
+export function classifyHkbRows({rows,head,players,leagueId=""}){
+  const ix=hkbIndexes(head),match=createHkbPlayerMatcher(players),classifications=[];
+  rows.forEach((row,index)=>{
+    const sourceName=cell(row,ix.name);
+    const result=match({
+      name:sourceName,
+      team:cell(row,ix.team),
+      positions:splitPositions(cell(row,ix.positions)),
+      level:cell(row,ix.level),
+      age:num(cell(row,ix.age))
+    });
+    classifications.push({
+      ...result,
+      csvRow:index+2,
+      leagueId,
+      sourceTeamRaw:cell(row,ix.team),
+      sourceValue:num(cell(row,ix.value)),
+      sourceOverallRank:num(cell(row,ix.overall)),
+      sourcePositionRank:num(cell(row,ix.posRank)),
+      matchedPlayerId:result.player?.id||""
+    });
+  });
+  return {ix,classifications,summary:summarizeHkbClassifications(classifications)};
+}
+function hkbPreviewFingerprint(leagueId,file){
+  return `${leagueId}|${file?.name||""}|${file?.size??""}|${file?.lastModified??""}`;
+}
+async function importHkb({leagueId,file,onProgress,cancelled,reviewedPreview}){
   const ctx={leagueId,onProgress,cancelled,startedAt:Date.now()};
+  if(reviewedPreview?.previewSchema!=="hkb-matching-v1"||reviewedPreview.previewFingerprint!==hkbPreviewFingerprint(leagueId,file))throw new Error("HKB upload requires the exact reviewed preview for the currently selected file.");
   const job=await createJob(leagueId,"HarryKnowsBall values",file);
   try{
-    const rows=await parseCsv(file),head=rows.shift()||[],map=headerMap(head),maps=await cloudMaps(leagueId);
-    const ix={name:map.find(["name","player","player name"]),fantrax:map.find(["fantrax id","fantrax player id"]),mlbam:exactHeaderIndex(head,["MLBAM ID","MLB ID","MLB Player ID"]),value:map.find(["hkb value","value","dynasty value"]),overall:map.find(["overall rank","rank","overall"]),posRank:map.find(["position rank","pos rank"])};
+    const decisions=Array.isArray(reviewedPreview.hkbDecisions)?reviewedPreview.hkbDecisions:[];
     let processed=0,matched=0,unmatched=0,updated=0;
-    const exceptionDetails=[];
-    for(const batch of chunk(rows)){
+    const exceptionDetails=[...(reviewedPreview.exceptionDetails||[])];
+    for(const batch of chunk(decisions)){
       ensureNotCancelled(ctx);
-      const updates=[];
-      batch.forEach((row,index)=>{
-        const rowNumber=processed+index+2;
-        const name=cell(row,ix.name),fantraxId=textCell(row,ix.fantrax),mlbam=serializeMlbamId(cell(row,ix.mlbam)),existing=supplementalPlayerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:mlbam,normalized_name:norm(name),name});
-        if(!existing){
-          unmatched++;
-          pushException(exceptionDetails,exceptionDetail({rowNumber,row,ix,name,fantraxId,mlbamId:mlbam,action:"Update player HKB values",reason:"No matching player",suggestedResolution:reasonSuggestion("No matching player")}));
-          return;
-        }
-        matched++;updated++;
-        updates.push(cleanObject({id:existing.id,league_id:leagueId,name:existing.name,normalized_name:existing.normalized_name,hkb_value:num(cell(row,ix.value)),overall_rank:num(cell(row,ix.overall)),position_rank:num(cell(row,ix.posRank))}));
-      });
-      for(const update of updates){
-        await cloudStore.updateRow("players",update.id,update);
-      }
+      const updates=batch.filter(decision=>decision.matchedPlayerId).map(decision=>cleanObject({id:decision.matchedPlayerId,league_id:leagueId,hkb_value:decision.sourceValue,overall_rank:decision.sourceOverallRank,position_rank:decision.sourcePositionRank}));
+      const uniqueUpdates=[...new Map(updates.map(update=>[update.id,update])).values()];
+      if(uniqueUpdates.length)await cloudStore.syncResolvedPlayers({updates:uniqueUpdates,inserts:[]},{label:"HarryKnowsBall value import"});
+      matched+=batch.filter(decision=>decision.matchedPlayerId).length;
+      updated+=uniqueUpdates.length;
+      unmatched+=batch.filter(decision=>!decision.matchedPlayerId&&decision.category!==HKB_DIAGNOSTIC.NON_PLAYER_ASSET).length;
       processed+=batch.length;
       await updateJob(job,{rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched});
-      progress(ctx,"HarryKnowsBall values import",{processed,total:rows.length,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched,message:`HKB values ${processed} / ${rows.length}`});
+      progress(ctx,"HarryKnowsBall values import",{processed,total:decisions.length,matched,inserted:0,updated,skipped:unmatched,warnings:exceptionDetails.length,errors:0,exceptionDetails,unmatched,message:`HKB values ${processed} / ${decisions.length}`});
       await sleep();
     }
     await updateJob(job,{status:"completed",rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,completed_at:now()});
-    return{processed,matched,inserted:0,updated,skipped:unmatched,warnings:unmatched,errors:0,exceptionDetails,unmatched};
+    return{processed,matched,inserted:0,updated,skipped:unmatched,warnings:exceptionDetails.length,errors:0,exceptionDetails,unmatched,hkbSummary:reviewedPreview.hkbSummary};
   }catch(e){await updateJob(job,{status:"failed",error_message:e.message,completed_at:now()});throw e}
 }
 const hitterMetrics=["xba","xslg","xwoba","xobp","xiso","exit_velocity_avg","launch_angle_avg","sweet_spot_percent","barrel_batted_rate","hard_hit_percent","whiff_percent","k_percent","bb_percent","avg_swing_speed","fast_swing_rate","attack_angle","attack_direction","ideal_angle_rate","vertical_swing_path"];
@@ -1056,21 +1110,31 @@ export async function dryRunFantraxIdBackfill({leagueId,file}){
   return report;
 }
 async function previewHkb(leagueId,file,rows,head){
-  const map=headerMap(head),maps=await cloudMaps(leagueId);
-  const ix={name:map.find(["name","player","player name"]),fantrax:map.find(["fantrax id","fantrax player id"]),mlbam:exactHeaderIndex(head,["MLBAM ID","MLB ID","MLB Player ID"]),value:map.find(["hkb value","value","dynasty value"])};
+  const maps=await cloudMaps(leagueId),ix=hkbIndexes(head);
   const blocking=[],warnings=[];
   if(ix.name<0)blocking.push("HarryKnowsBall import needs a player/name column.");
   if(ix.value<0)blocking.push("HarryKnowsBall import needs an HKB value column.");
-  let matched=0,unmatched=0,validRows=0;
+  const report=classifyHkbRows({rows,head,players:maps.players,leagueId});
+  let legacyMatched=0;
   rows.forEach(row=>{
     const name=cell(row,ix.name);
-    if(!name)return;
-    validRows++;
-    const fantraxId=textCell(row,ix.fantrax);
-    if(supplementalPlayerMatch(maps,{league_id:leagueId,fantrax_id:fantraxId,mlbam_id:serializeMlbamId(cell(row,ix.mlbam)),normalized_name:norm(name),name}))matched++;else unmatched++;
+    if(name&&supplementalPlayerMatch(maps,{league_id:leagueId,normalized_name:norm(name),name}))legacyMatched++;
   });
-  if(!matched)warnings.push("No HKB rows matched current cloud players. Run Fantrax first or review names.");
-  return previewBase(file,head,rows,"HarryKnowsBall values",validRows,rows.length-validRows,duplicateKeys(rows,row=>textCell(row,ix.fantrax)||cell(row,ix.mlbam)||norm(cell(row,ix.name))),matched,unmatched,blocking,warnings);
+  const matched=report.classifications.filter(item=>item.status==="matched").length;
+  const problemRows=report.classifications.filter(item=>item.status!=="matched");
+  const diagnosticRows=report.classifications.filter(item=>item.category!=="UNIQUE_NORMALIZED_NAME_MATCH");
+  if(!matched)warnings.push("No HKB rows matched current cloud players. Run Fantrax first or review names and player context.");
+  return {
+    ...previewBase(file,head,rows,"HarryKnowsBall values",report.summary.playerRows,report.summary.invalidRows,duplicateKeys(rows,row=>normalizeHkbPlayerName(cell(row,ix.name))),matched,report.summary.unmatchedRows,blocking,warnings),
+    previewSchema:"hkb-matching-v1",
+    previewFingerprint:hkbPreviewFingerprint(leagueId,file),
+    cloudPlayersLoaded:maps.players.length,
+    legacyMatchSummary:{matched:legacyMatched,unmatched:rows.length-legacyMatched},
+    hkbSummary:report.summary,
+    hkbDecisions:report.classifications.map(item=>({csvRow:item.csvRow,category:item.category,matchedPlayerId:item.matchedPlayerId,sourceValue:item.sourceValue,sourceOverallRank:item.sourceOverallRank,sourcePositionRank:item.sourcePositionRank})),
+    exceptionDetails:problemRows.map(hkbExceptionDetail),
+    hkbDiagnostics:diagnosticRows.map(hkbExceptionDetail)
+  };
 }
 async function previewStatcast(leagueId,file,rows,head,expectedType){
   const map=headerMap(head),maps=await cloudMaps(leagueId);
@@ -1270,9 +1334,9 @@ async function verify({leagueId,onProgress}){
   return{checks,counts,passed,diagnosticsSummary};
 }
 export const cloudImportStages={order:STEP_ORDER,labels:STEP_LABELS,batchSize:BATCH_SIZE,checkpointKey:CHECKPOINT_KEY};
-export async function runStep({step,leagueId,file,onProgress,cancelled=()=>false}){
+export async function runStep({step,leagueId,file,onProgress,cancelled=()=>false,reviewedPreview=null}){
   if(!leagueId&&step!=="verification")throw new Error("Select or create a cloud league first.");
-  const args={leagueId,file,onProgress,cancelled};
+  const args={leagueId,file,onProgress,cancelled,reviewedPreview};
   if(step==="fantrax")return importFantrax(args);
   if(step==="hkb")return importHkb(args);
   if(step==="statcastHitters")return importStatcast({...args,type:"hitter"});

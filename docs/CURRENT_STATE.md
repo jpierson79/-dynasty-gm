@@ -1,12 +1,12 @@
 # Current State
 
-Generated: 2026-07-30 America/Chicago.
+Generated: 2026-08-01 America/Chicago.
 
 ## Git State
 
 - Active branch: `feature/manager-intelligence`
-- Current HEAD: `c11c84a`
-- Current HEAD subject: `Stabilize V5 UI workflow and data health`
+- Current HEAD: `94e051a`
+- Current HEAD subject: `Fix prospect visibility and roster recommendations`
 - Initial working tree for this documentation reconciliation: clean.
 - Recent completed commits:
   - `c11c84a` Stabilize V5 UI workflow and data health
@@ -26,6 +26,16 @@ The July 16 operational snapshot that described branch `fix/reliable-repeat-impo
 - V5.4.2 UI stabilization covers Players search draft state, import filename controls, table containment, Teams & Managers empty-state guidance, and roster-status diagnostics.
 - V5.4.3/V5.4.3A completed read-only Fantrax endpoint and identity discovery; no roster synchronization, preview implementation, or schema change was produced.
 - The repository was clean before this documentation-only task.
+
+## Verified HKB Matching Repair
+
+- HKB uses a dedicated canonical name normalizer for fallback matching; Fantrax and MLBAM identity precedence is unchanged.
+- Diacritics, apostrophes, hyphens, periods in initials, and whitespace normalize consistently while suffix tokens remain meaningful.
+- Duplicate canonical names require a unique result from explicit MLB-team and position context. Unknown cloud team metadata does not override a unique position result; explicit conflicting team metadata remains unsafe.
+- Draft-pick assets matching the narrow year plus Early/Mid/Late plus round pattern are reported separately and never treated as players.
+- Preview and upload share the reviewed match decisions. HKB upload is limited to batched value/rank updates for existing player UUIDs and performs no player insert.
+- Read-only preview of `harryknowsball_players (12).csv` loaded 10,197 cloud players and improved matching from 1,652 to 1,693 rows. It classified 18 non-player assets, 1,652 unique name matches, 6 normalization repairs, 41 contextual matches, 35 players absent from cloud, and no ambiguous, conflicting, or invalid rows.
+- The live preview did not run an upload and produced no browser console errors.
 
 Evidence: recent Git history, `v5/`, `tests/v5*.test.mjs`, `tests/fantrax*.test.mjs`.
 

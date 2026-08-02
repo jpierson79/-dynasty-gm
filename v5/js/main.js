@@ -608,7 +608,7 @@ function bindViewEvents(){
     if(!importUiState.reviewed[step]){setError("Review and confirm the preview before uploading.");return}
     try{
       importUiState.running=true;
-      importUiState.result=await runImport({step,leagueId:appState.activeLeague.id,file,onProgress:progress=>{importUiState.result=progress;render()}});
+      importUiState.result=await runImport({step,leagueId:appState.activeLeague.id,file,reviewedPreview:importUiState.previews[step],onProgress:progress=>{importUiState.result=progress;render()}});
       importUiState.running=false;
       await refreshLeagueData();
     }catch(error){importUiState.running=false;setError(error)}
