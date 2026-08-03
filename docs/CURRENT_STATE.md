@@ -41,16 +41,17 @@ The July 16 operational snapshot that described branch `fix/reliable-repeat-impo
 
 ## V5.4.6A Fantrax Team Identity Foundation
 
-- Local implementation is complete and checkpointed for Git validation. Migration 007 exists locally but has not been applied.
+- V5.4.6A implementation and deployment acceptance are complete. Migration 007 was applied once and verified as nullable text with its format constraint and league-scoped partial unique index.
 - A narrowly scoped migration adds nullable `teams.fantrax_team_id`, validates its normalized 16-character format, and enforces uniqueness within each league without backfilling rows.
 - The Fantrax Preview Identity tab includes a responsive Team Identity Manager with roster, matchup, and draft-presence context; cloud team, manager relationship, UUID, owned-player count, existing identity; pending review; cancellation; replacement confirmation; and an exact team-identity-only confirmation dialog.
 - One-to-one and cross-league rules are validated before persistence. Name equality is displayed only as a non-authoritative suggestion.
 - Saving is constrained to the active league/team UUID and writes only `teams.fantrax_team_id`; post-save preview recomputation reports ownership and roster-status differences without an Apply Sync action.
 - Data Health now reports Fantrax team counts, persisted identities, duplicates, unmapped teams, valid roster-team joins, ownership/status differences, and an honest manual-override warning.
 - The current roster-status manager writes only `players.roster_status` and `updated_at`. No reviewed manual override/source/timestamp/sync audit mechanism exists, so production roster synchronization remains blocked.
-- Fantrax team mappings have not been persisted. Live protected-field before/after verification and Chrome acceptance validation remain pending because browser control was unavailable.
-- No player ownership, roster status, player identity, manager assignment, score, HKB value, or Statcast value changed during this local phase.
-- V5.4.6B roster synchronization remains blocked. The next task is to deploy migration 007 through the approved workflow, snapshot protected fields, persist reviewed mappings, and complete live Chrome validation—not to reimplement the foundation.
+- Ten reviewed one-to-one mappings were persisted across the ten valid fantasy teams; two excluded/stale raw team rows remain unmapped. Database verification found 10 populated IDs, 10 distinct IDs, and zero duplicate mapping groups.
+- Pre/post protected hashes matched exactly for teams, players, calculated scores, and player metrics. No player ownership, roster status, player identity, manager assignment, score, HKB value, or Statcast value changed.
+- Chrome acceptance passed after versioning the team-repository browser import to prevent a stale-module export error. Reload persistence, 10 mapped/0 unmapped teams, duplicate blocking, roster identity joins, read-only difference reporting, responsive controls, Data Health, absence of Apply Sync, and a clean console were confirmed.
+- Manual Override Protection Available remains `WARNING`; production roster synchronization and V5.4.6B readiness remain blocked until a reviewed override/source/timestamp policy exists.
 
 ## Verified HKB Matching Repair
 

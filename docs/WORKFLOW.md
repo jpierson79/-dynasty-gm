@@ -55,6 +55,7 @@
 15. Persist Fantrax team identity only after an explicit review and confirmation. Enforce one-to-one assignments within the active league and never auto-save a name-based suggestion.
 16. Before any future roster synchronization, require a reviewed manual-override model containing an explicit source and timestamp, a clear-override workflow, and preview diagnostics for conflicts.
 17. A local team-identity checkpoint does not imply deployment: record migration application, persisted mappings, protected-field verification, and Chrome acceptance separately. After a local checkpoint, resume with deployment and live validation rather than reimplementing the feature.
+18. The V5.4.6A deployment baseline is migration 007 applied, 10 distinct reviewed team IDs, zero duplicate groups, matching pre/post protected hashes, and completed Chrome/Data Health acceptance. Do not treat this as authorization or readiness for roster synchronization while manual override protection is absent.
 
 ## Validation Rules
 

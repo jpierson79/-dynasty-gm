@@ -80,14 +80,14 @@ Evidence: verified V5.4.5 investigation and `supabase/functions/fantrax-public-l
 
 ## Fantrax Team Identity Foundation
 
-- The locally completed V5.4.6A foundation proposes authoritative Fantrax team identity as nullable text in `teams.fantrax_team_id`; migration 007 exists but has not been applied to the cloud database.
+- V5.4.6A stores authoritative Fantrax team identity as nullable text in `teams.fantrax_team_id`; migration 007 was applied and schema-verified in production.
 - The identity is unique within a league through a partial unique index on `(league_id, fantrax_team_id)` and must be a trimmed 16-character alphanumeric value.
 - Existing team UUIDs, names, manager assignments, ownership, roster status, player identity, and scores are preserved. The migration performs no backfill.
 - Team names are suggestions only. A user must review and confirm every mapping, and one Fantrax team cannot map to multiple cloud teams or vice versa.
 - Mapping writes are constrained by active league UUID and team UUID and update only `teams.fantrax_team_id`.
-- Fantrax team mappings are not yet persisted. Live protected-field comparison and Chrome validation remain pending; no player ownership, roster status, identity, manager assignment, or score data changed during local implementation.
+- Ten reviewed one-to-one Fantrax team mappings are persisted, with zero duplicate mapping groups. Pre/post hashes proved team UUID, league UUID, team name, manager assignment, player ownership/status/identity, HKB values, calculated scores, and player metrics unchanged.
 - The current player schema has no reviewed manual roster-status override marker, source, override timestamp, synchronization timestamp, or durable `updated_by` audit field. Production roster synchronization remains blocked until an override policy is designed and implemented.
-- The next V5.4.6A task is deployment and live validation of this checkpoint, not reimplementation. V5.4.6B remains blocked until that work succeeds.
+- Chrome acceptance verified persisted 10-of-10 team identity, zero unmapped teams, duplicate blocking, resolved roster-team identity, read-only ownership/status differences, responsive controls, no Apply Sync action, no console errors, and accurate Data Health reporting. V5.4.6B remains blocked by absent reviewed manual roster-status override protection.
 
 Evidence: `supabase/migrations/007_fantrax_team_identity.sql`, `v5/js/services/fantraxTeamIdentityService.js`, `v5/js/repositories/teamRepository.js`.
 

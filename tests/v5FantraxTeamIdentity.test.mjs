@@ -50,6 +50,7 @@ const main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8");
 const view=fs.readFileSync(new URL("../v5/js/views/fantraxPreviewView.js",import.meta.url),"utf8");
 for(const text of ["Review Mappings","Save Team Mappings","Cancel Pending Mappings","Confirm Save","It will not change player ownership, roster status, scores, managers, or player identity."])assert.match(view,new RegExp(text));
 assert.match(main,/persistFantraxTeamMappings/);
+assert.match(main,/teamRepository\.js\?v5-4-6a-team-identity/,"browser must load the repository version that exports team mapping persistence");
 assert.doesNotMatch(view,/Apply Sync/);
 assert.doesNotMatch(main,/owner_team_id\s*:|roster_status\s*:/,"team mapping handler contains no player writes");
 

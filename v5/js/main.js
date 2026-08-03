@@ -17,7 +17,7 @@ import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-us
 import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js";
 import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js";
 import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings } from "./services/fantraxTeamIdentityService.js";
-import { saveFantraxTeamMappings } from "./repositories/teamRepository.js";
+import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
 import { memberships } from "./repositories/leagueRepository.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";

@@ -170,12 +170,12 @@ Evidence paths: `supabase/functions/fantrax-public-league-preview/index.ts`, `su
 
 ## ADR-015: Persist Confirmed Fantrax Team Identity On Teams
 
-Status: accepted and implemented locally for V5.4.6A; migration not yet applied.
+Status: accepted, deployed, and live-validated for V5.4.6A.
 
 Context: Application teams already have league-scoped permanent UUIDs and existing RLS. A separate external-team table would duplicate that ownership boundary for a single authoritative provider identity.
 
 Decision: Add nullable `teams.fantrax_team_id` with a league-scoped partial unique index and strict trimmed 16-character alphanumeric validation. Persist only explicit user-confirmed mappings. Team names, manager names, roster similarity, and ownership overlap remain non-authoritative suggestions.
 
-Consequences: The migration has no backfill and preserves every existing team row and relationship. The mapping repository updates only the identity column while constraining updates by active league and team UUID. Until migration 007 is deployed and reviewed mappings pass live protected-field and Chrome validation, no Fantrax team identity is considered persisted and V5.4.6B roster synchronization remains blocked. Rollback requires dropping the unique index before the column.
+Consequences: The migration has no backfill and preserves every existing team row and relationship. The mapping repository updates only the identity column while constraining updates by active league and team UUID. Ten mappings passed live protected-field and Chrome validation. This establishes team identity only; V5.4.6B roster synchronization remains blocked by absent manual-override protection. Rollback requires dropping the unique index before the column.
 
 Evidence paths: `supabase/migrations/007_fantrax_team_identity.sql`, `v5/js/services/fantraxTeamIdentityService.js`, `tests/v5FantraxTeamIdentity.test.mjs`.
