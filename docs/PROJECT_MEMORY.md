@@ -93,6 +93,15 @@ Evidence: `supabase/migrations/007_fantrax_team_identity.sql`, `v5/js/services/f
 
 ## Fantrax Identity Graph
 
+## Manual Roster-Status Override Foundation
+
+- V5.4.6B-1 models roster-status provenance on `players` with nullable `roster_status_source`, `roster_status_override_at`, and `roster_status_override_by` fields. Null legacy provenance is presented as `LEGACY`; it is never inferred from the status value.
+- A manual save sets source `MANUAL`; a database trigger stamps `auth.uid()` and the current time so browser input cannot spoof audit identity. Existing owner, identity, free-agent, scoring, HKB, and metric fields are outside the write payload.
+- Clearing an override preserves `roster_status`, sets source to `UNKNOWN`, and clears override metadata. It only makes the row eligible for a future reviewed sync.
+- Fantrax preview recommendations are read-only: `NO_CHANGE`, `APPLY_FANTRAX_STATUS`, `PRESERVE_MANUAL_OVERRIDE`, or `REVIEW_CONFLICT`. No production roster synchronization is implemented by V5.4.6B-1.
+- Migration 008 was applied once and schema-verified in production. It added no provenance backfill: all 10,197 existing players initially retained null source and override metadata.
+- Controlled Chrome acceptance on Yoshinobu Yamamoto proved authenticated database stamping, persistence after reload, restoration to the original `UNCLASSIFIED` status, and clear-to-`UNKNOWN` with null override metadata. Live Data Health rendering and a configured Fantrax conflict preview remain pending.
+
 ```text
 public.players.id (application UUID)
   -> players.fantrax_id (preserved CSV identity: *API_ID*)

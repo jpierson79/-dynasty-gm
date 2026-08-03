@@ -32,7 +32,7 @@ export const appState={
   waiversError:"",
   waiverUpgrade:null,
   tradeCenter:{userTeamId:"",userTeamName:"",partnerTeamId:"",myTeamSearchDraft:"",partnerTeamSearchDraft:"",outgoingSearch:"",incomingSearch:"",outgoingPlayerIds:[],incomingPlayerIds:[],outgoingPlayers:[],incomingPlayers:[],outgoingCandidates:[],incomingCandidates:[],analysis:null,consolidationTargets:null,tradeFits:null,drafts:[],outgoingLoading:false,incomingLoading:false,outgoingError:"",incomingError:"",loading:false,error:""},
-  rosterStatusManager:{rows:[],filters:{search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false},page:1,pageSize:100,pendingChanges:{},selectedIds:[],lastSelectedId:"",confirmSave:false,saving:false,error:"",lastSavedAt:""},
+  rosterStatusManager:{rows:[],filters:{search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false,manualOnly:false,source:"",conflictsOnly:false,missingMetadata:false,updatedBy:""},page:1,pageSize:100,pendingChanges:{},selectedIds:[],lastSelectedId:"",confirmSave:false,confirmClearOverrides:false,clearOverrideIds:[],saving:false,error:"",lastSavedAt:""},
   fantraxPreview:{data:null,externalLeagueId:"",period:"",loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false},pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,lastTeamMappingSave:""},
   userTeamResolution:null,
   rosterRecommendations:null,

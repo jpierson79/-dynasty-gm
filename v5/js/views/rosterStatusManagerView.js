@@ -1,4 +1,4 @@
-import { EDITABLE_ROSTER_STATUSES, filterRosterStatusRows, pendingStatusFor, reviewGroups, statusSummary } from "../services/rosterStatusManagerService.js";
+import { EDITABLE_ROSTER_STATUSES, ROSTER_STATUS_SOURCES, filterRosterStatusRows, pendingStatusFor, reviewGroups, statusSummary } from "../services/rosterStatusManagerService.js?v5-4-6b1-manual-overrides";
 import { escapeHtml, optionHtml } from "../utils/dom.js";
 
 const STATUS_LABELS={ACTIVE:"Active",RESERVE:"Reserve",IL:"IL",MINORS:"Minors",UNCLASSIFIED:"Unclassified"};
@@ -27,6 +27,11 @@ function filterControls(state,filters,rows){
     <label>Owner<select id="rsmOwner">${ownerOptions(teams,filters.ownerId||"")}</select></label>
     <label>Free Agent<select id="rsmFreeAgent"><option value="">Any</option><option value="yes"${selected("yes",filters.freeAgent)}>Free agents</option><option value="no"${selected("no",filters.freeAgent)}>Rostered only</option></select></label>
     <label class="checkline"><input id="rsmChangedOnly" type="checkbox"${checked(filters.changedOnly)}> Show only changed rows</label>
+    <label class="checkline"><input id="rsmManualOnly" type="checkbox"${checked(filters.manualOnly)}> Manual overrides only</label>
+    <label>Status source<select id="rsmSource"><option value="">All sources</option>${ROSTER_STATUS_SOURCES.map(source=>optionHtml(source,source,filters.source)).join("")}</select></label>
+    <label class="checkline"><input id="rsmConflictsOnly" type="checkbox"${checked(filters.conflictsOnly)}> Fantrax conflicts</label>
+    <label class="checkline"><input id="rsmMissingMetadata" type="checkbox"${checked(filters.missingMetadata)}> Missing override metadata</label>
+    <label>Updated by<input id="rsmUpdatedBy" value="${escapeHtml(filters.updatedBy||"")}" placeholder="User UUID"></label>
     <button type="button" id="rsmApplyFilters" class="primary">Apply</button>
     <button type="button" id="rsmClearFilters" class="secondary">Clear Filters</button>
   </div>`;
@@ -43,7 +48,7 @@ function playerTable(rows,state){
   const selected=new Set(selectedIds);
   return `<div class="table-wrap roster-status-table"><table><thead><tr>
     <th><input type="checkbox" id="rsmSelectPage" aria-label="Select page"${rows.length&&rows.every(row=>selected.has(row.id))?" checked":""}></th>
-    <th>Player Name</th><th>Owner</th><th>Position</th><th>MLB Team</th><th>Current Status</th><th>New Status</th><th>Source</th><th>Last Updated</th><th>Validation</th>
+    <th>Player Name</th><th>Owner</th><th>Position</th><th>MLB Team</th><th>Current Status</th><th>New Status</th><th>Status Source</th><th>Manual Override</th><th>Override Date</th><th>Updated By</th><th>Fantrax Status</th><th>Conflict</th><th>Validation</th>
   </tr></thead><tbody>${rows.length?rows.map(row=>{
     const changed=Boolean(pendingChanges[row.id]);
     return `<tr class="${changed?"pending-row":""}">
@@ -54,11 +59,12 @@ function playerTable(rows,state){
       <td>${escapeHtml(row.mlb_team||"Unavailable")}</td>
       <td>${statusBadge(row.currentStatus)}</td>
       <td>${statusSelect(row,pendingChanges)}</td>
-      <td>${escapeHtml(row.source||"Cloud")}</td>
-      <td>${escapeHtml(row.updated_at||"Unavailable")}</td>
+      <td><span class="pill">${escapeHtml(row.source)}</span></td>
+      <td>${row.manualOverride?"Yes":"No"}</td><td>${escapeHtml(row.roster_status_override_at||"—")}</td><td>${escapeHtml(row.roster_status_override_by||"—")}</td>
+      <td>${escapeHtml(row.fantraxStatus||"—")}</td><td>${row.fantraxConflict?"Conflict":"—"}</td>
       <td>${escapeHtml(changed?`${row.currentStatus} -> ${pendingChanges[row.id].newStatus}`:row.validation||"Valid")}</td>
     </tr>`;
-  }).join(""):`<tr><td colspan="10" class="note">No rows found.</td></tr>`}</tbody></table></div>`;
+  }).join(""):`<tr><td colspan="13" class="note">No rows found.</td></tr>`}</tbody></table></div>`;
 }
 function pageControls(manager,filteredCount,pageRows){
   const page=manager.page||1,pageSize=manager.pageSize||100;
@@ -68,7 +74,7 @@ function pageControls(manager,filteredCount,pageRows){
 }
 function bulkToolbar(selectedCount){
   if(!selectedCount)return "";
-  return `<div class="toolbar sticky-action-bar" aria-live="polite"><b>${selectedCount} players selected</b>${EDITABLE_ROSTER_STATUSES.map(status=>`<button type="button" class="secondary" data-rsm-bulk-status="${escapeHtml(status)}">Set ${escapeHtml(STATUS_LABELS[status])}</button>`).join("")}<button type="button" id="rsmClearPendingSelected" class="secondary">Clear Pending Changes</button></div>`;
+  return `<div class="toolbar sticky-action-bar" aria-live="polite"><b>${selectedCount} players selected</b>${EDITABLE_ROSTER_STATUSES.map(status=>`<button type="button" class="secondary" data-rsm-bulk-status="${escapeHtml(status)}">Set ${escapeHtml(STATUS_LABELS[status])}</button>`).join("")}<button type="button" id="rsmClearPendingSelected" class="secondary">Clear Pending Changes</button><button type="button" id="rsmClearOverridesSelected" class="secondary">Clear Manual Overrides</button></div>`;
 }
 function reviewPanel(pendingChanges){
   const groups=reviewGroups(pendingChanges);
@@ -80,6 +86,10 @@ function confirmationPanel(pendingChanges,visible){
   if(!visible||!total)return "";
   return `<section class="panel confirm-panel" role="dialog" aria-label="Confirm roster status updates"><h3>Apply ${total} roster status updates?</h3><p class="note">Statuses only will be changed.</p><p class="note">Ownership will not change. Fantrax identity will not change. Player UUIDs, MLBAM IDs, and free-agent state will not change.</p><div class="toolbar"><button type="button" id="rsmConfirmSave" class="primary">Proceed</button><button type="button" id="rsmDismissConfirm" class="secondary">Keep Editing</button></div></section>`;
 }
+function clearOverrideConfirmation(manager){
+  if(!manager.confirmClearOverrides)return "";
+  return `<section class="panel confirm-panel" role="dialog"><h3>Clear ${manager.clearOverrideIds?.length||0} manual overrides?</h3><p class="note">Clearing the override allows a future Fantrax sync to update this status. It does not immediately change the player’s current roster status.</p><div class="toolbar"><button id="rsmConfirmClearOverrides" class="primary">Clear Overrides</button><button id="rsmDismissClearOverrides" class="secondary">Cancel</button></div></section>`;
+}
 export function renderRosterStatusManager(state){
   const manager=state.rosterStatusManager||{};
   const rows=manager.rows||[];
@@ -90,5 +100,5 @@ export function renderRosterStatusManager(state){
   const pageRows=filtered.slice((page-1)*pageSize,page*pageSize);
   const selectedCount=(manager.selectedIds||[]).length;
   const changedCount=Object.keys(pendingChanges).length;
-  return `<section class="view-panel roster-status-manager"><h2>Roster Status Manager</h2><p class="note">Manual review for roster-status corrections. Pending edits stay in the browser until Save Changes is confirmed.</p>${summaryCards(rows,pendingChanges,filters.currentStatus)}${filterControls(state,filters,rows)}<div class="toolbar"><button type="button" id="rsmSelectAllFiltered" class="secondary">Select all filtered</button><button type="button" id="rsmClearSelection" class="secondary">Clear selection</button><span class="pill">${selectedCount} players selected</span><span class="pill warn">${changedCount} pending changes</span>${manager.saving?`<span class="pill">Saving...</span>`:""}${manager.error?`<span class="pill bad">${escapeHtml(manager.error)}</span>`:""}${manager.lastSavedAt?`<span class="pill good">Last saved ${escapeHtml(manager.lastSavedAt)}</span>`:""}</div>${confirmationPanel(pendingChanges,manager.confirmSave)}${bulkToolbar(selectedCount)}${pageControls(manager,filtered.length,pageRows)}<div class="roster-status-layout">${playerTable(pageRows,state)}${reviewPanel(pendingChanges)}</div></section>`;
+  return `<section class="view-panel roster-status-manager"><h2>Roster Status Manager</h2><p class="note">Manual review for roster-status corrections. Pending edits stay in the browser until Save Changes is confirmed.</p>${summaryCards(rows,pendingChanges,filters.currentStatus)}${filterControls(state,filters,rows)}<div class="toolbar"><button type="button" id="rsmSelectAllFiltered" class="secondary">Select all filtered</button><button type="button" id="rsmClearSelection" class="secondary">Clear selection</button><button type="button" id="rsmClearOverridesFiltered" class="secondary">Clear all filtered manual overrides</button><span class="pill">${selectedCount} players selected</span><span class="pill warn">${changedCount} pending changes</span>${manager.saving?`<span class="pill">Saving...</span>`:""}${manager.error?`<span class="pill bad">${escapeHtml(manager.error)}</span>`:""}${manager.lastSavedAt?`<span class="pill good">Last saved ${escapeHtml(manager.lastSavedAt)}</span>`:""}</div>${confirmationPanel(pendingChanges,manager.confirmSave)}${clearOverrideConfirmation(manager)}${bulkToolbar(selectedCount)}${pageControls(manager,filtered.length,pageRows)}<div class="roster-status-layout">${playerTable(pageRows,state)}${reviewPanel(pendingChanges)}</div></section>`;
 }

@@ -39,7 +39,7 @@ assert.throws(()=>normalizeFantraxResponse("draft-results",{}),/schema validatio
 assert.throws(()=>normalizeFantraxResponse("unknown",{}),/allowlisted/);
 
 const cloudPlayers=[
-  {id:"uuid-1",name:"Exact",fantrax_api_player_id:"P1",fantrax_id:"*OLD*",mlbam_id:1,owner_team_id:"team-uuid-1",roster_status:"RESERVE"},
+  {id:"uuid-1",name:"Exact",fantrax_api_player_id:"P1",fantrax_id:"*OLD*",mlbam_id:1,owner_team_id:"team-uuid-1",roster_status:"RESERVE",roster_status_source:"MANUAL",roster_status_override_at:fetchedAt,roster_status_override_by:"user-1"},
   {id:"uuid-2",name:"Wrapped",fantrax_id:"*P2*",mlbam_id:2,owner_team_id:"team-uuid-1",roster_status:"RESERVE"},
   {id:"uuid-3",name:"Bad wrapper",fantrax_id:"P3",mlbam_id:3},
   {id:"uuid-4",name:"No ID",fantrax_id:"",mlbam_id:4}
@@ -75,7 +75,10 @@ assert.equal(preview.rosterItems[0].playerIdentityResult,"MATCHED");
 assert.equal(preview.rosterItems[0].teamIdentityResult,"MATCHED");
 assert.equal(preview.rosterItems[0].ownershipDifference,false);
 assert.equal(preview.rosterItems[0].rosterStatusDifference,true);
+assert.equal(preview.rosterItems[0].futureSyncRecommendation,"PRESERVE_MANUAL_OVERRIDE");
+assert.equal(preview.rosterItems[0].activeManualOverride,true);
 assert.equal(preview.rosterItems[1].normalizedRosterStatus,"UNCLASSIFIED");
+assert.equal(preview.rosterItems[1].futureSyncRecommendation,"REVIEW_CONFLICT");
 assert.equal(preview.matchups[0].winner,"Tie");
 assert.equal(preview.matchups[0].scoreDifference,0);
 assert.equal(preview.standings[0].snapshotScope,"CURRENT_ONLY");
@@ -102,7 +105,7 @@ assert.doesNotMatch(service,/\.update\(|\.upsert\(|\.insert\(|calculateLeagueSco
 assert.doesNotMatch(`${edge}\n${service}`,/fxpa\/req|selenium|\bpython\b|from ["']fantraxapi["']/i);
 assert.match(html,/data-view="fantraxPreview"/);
 assert.match(html,/v5-4-6a-team-identity/);
-assert.match(main,/dataHealthService\.js\?v5-4-5-fantrax-preview/);
+assert.match(main,/dataHealthService\.js\?v5-4-6b1-manual-overrides/);
 assert.match(main,/fetchFantraxPublicPreview/);
 assert.match(view,/Fantrax standings period semantics have not been verified/);
 assert.match(view,/Team Matchup Scores/);

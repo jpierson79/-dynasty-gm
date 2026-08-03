@@ -2,9 +2,9 @@ import { $, $all, debounce, escapeHtml, optionHtml, setHtml } from "./utils/dom.
 import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js";
 import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js";
 import { loadLeagueOverview } from "./services/cloudDataService.js";
-import { runDataHealth } from "./services/dataHealthService.js?v5-4-5-fantrax-preview";
+import { runDataHealth } from "./services/dataHealthService.js?v5-4-6b1-manual-overrides";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";
-import { allPlayers, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js";
+import { allPlayers, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b1-manual-overrides";
 import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/playerIntelligenceRepository.js";
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
@@ -14,15 +14,15 @@ import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecomme
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
 import { addTradeAssetSelection, removeTradeAssetSelection } from "./services/tradeInteractionService.js";
 import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-user-team-final";
-import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js";
-import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js";
+import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, manualOverrideIds, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js?v5-4-6b1-manual-overrides";
+import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js?v5-4-6b1-manual-overrides";
 import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings } from "./services/fantraxTeamIdentityService.js";
 import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
 import { memberships } from "./repositories/leagueRepository.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
-import { renderRosterStatusManager } from "./views/rosterStatusManagerView.js?v5-4-4-acceptance";
+import { renderRosterStatusManager } from "./views/rosterStatusManagerView.js?v5-4-6b1-manual-overrides";
 import { renderWaiverOpportunities } from "./views/waiverOpportunitiesView.js";
 import { renderTradeCenter } from "./views/tradeCenterView.js";
 import { renderTeamsManagers } from "./views/teamsManagersView.js";
@@ -195,6 +195,7 @@ function rosterStatusFiltersFromControls(){
     ownerId:$("#rsmOwner")?.value||"",
     freeAgent:$("#rsmFreeAgent")?.value||"",
     changedOnly:$("#rsmChangedOnly")?.checked||false
+    ,manualOnly:$("#rsmManualOnly")?.checked||false,source:$("#rsmSource")?.value||"",conflictsOnly:$("#rsmConflictsOnly")?.checked||false,missingMetadata:$("#rsmMissingMetadata")?.checked||false,updatedBy:$("#rsmUpdatedBy")?.value.trim()||""
   };
 }
 function rosterStatusVisibleRows(){
@@ -220,7 +221,7 @@ async function saveRosterStatusChanges(){
   if(!payload.length)return;
   try{
     setState({rosterStatusManager:rosterStatusState({saving:true,error:""})});
-    await updateRosterStatuses(appState.activeLeague.id,payload,{updatedBy:appState.authUser?.id||""});
+    await updateRosterStatuses(appState.activeLeague.id,payload);
     const rows=rosterStatusManagerRows(await allPlayers(appState.activeLeague.id),appState.teams||[]);
     setState({rosterStatusManager:rosterStatusState({rows,pendingChanges:{},selectedIds:[],lastSelectedId:"",saving:false,lastSavedAt:new Date().toLocaleString(),error:""})});
     await refreshLeagueData();
@@ -228,6 +229,19 @@ async function saveRosterStatusChanges(){
     setState({rosterStatusManager:rosterStatusState({saving:false,error:String(error?.message||error)})});
     setError(error);
   }
+}
+function requestClearOverrides(ids){
+  const allowed=new Set(manualOverrideIds(appState.rosterStatusManager.rows||[]));
+  const clearOverrideIds=[...new Set(ids)].filter(id=>allowed.has(id));
+  if(clearOverrideIds.length)setState({rosterStatusManager:rosterStatusState({confirmClearOverrides:true,clearOverrideIds,error:""})});
+}
+async function confirmClearOverrides(){
+  const ids=appState.rosterStatusManager.clearOverrideIds||[];
+  try{
+    await clearRosterStatusOverrides(appState.activeLeague.id,ids);
+    const rows=rosterStatusManagerRows(await allPlayers(appState.activeLeague.id),appState.teams||[]);
+    setState({rosterStatusManager:rosterStatusState({rows,confirmClearOverrides:false,clearOverrideIds:[],selectedIds:[],error:""})});
+  }catch(error){setState({rosterStatusManager:rosterStatusState({confirmClearOverrides:false,error:String(error?.message||error)})})}
 }
 function requestRosterStatusSaveConfirmation(){
   const manager=appState.rosterStatusManager;
@@ -464,7 +478,7 @@ function bindViewEvents(){
     }catch(error){setState({rosterRecommendationsLoading:false,rosterRecommendationsError:String(error?.message||error)});setError(error)}
   });
   $("#rsmApplyFilters")?.addEventListener("click",()=>setRosterStatusFilters(rosterStatusFiltersFromControls()));
-  $("#rsmClearFilters")?.addEventListener("click",()=>setRosterStatusFilters({search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false}));
+  $("#rsmClearFilters")?.addEventListener("click",()=>setRosterStatusFilters({search:"",currentStatus:"",teamId:"",position:"",mlbTeam:"",ownerId:"",freeAgent:"",changedOnly:false,manualOnly:false,source:"",conflictsOnly:false,missingMetadata:false,updatedBy:""}));
   $all("[data-rsm-filter-status]").forEach(button=>button.addEventListener("click",()=>setRosterStatusFilters({...appState.rosterStatusManager.filters,currentStatus:button.dataset.rsmFilterStatus})));
   $("#rsmSelectPage")?.addEventListener("change",event=>{
     const rows=rosterStatusPageRows();
@@ -495,6 +509,10 @@ function bindViewEvents(){
     const pendingChanges=clearPendingStatusChanges(appState.rosterStatusManager.pendingChanges||{},appState.rosterStatusManager.selectedIds||[]);
     setState({rosterStatusManager:rosterStatusState({pendingChanges,error:""})});
   });
+  $("#rsmClearOverridesSelected")?.addEventListener("click",()=>requestClearOverrides(appState.rosterStatusManager.selectedIds||[]));
+  $("#rsmClearOverridesFiltered")?.addEventListener("click",()=>requestClearOverrides(rosterStatusVisibleRows().map(row=>row.id)));
+  $("#rsmConfirmClearOverrides")?.addEventListener("click",confirmClearOverrides);
+  $("#rsmDismissClearOverrides")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({confirmClearOverrides:false,clearOverrideIds:[]})}));
   $("#rsmSaveChanges")?.addEventListener("click",requestRosterStatusSaveConfirmation);
   $("#rsmConfirmSave")?.addEventListener("click",saveRosterStatusChanges);
   $("#rsmDismissConfirm")?.addEventListener("click",()=>setState({rosterStatusManager:rosterStatusState({confirmSave:false})}));

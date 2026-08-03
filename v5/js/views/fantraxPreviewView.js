@@ -1,6 +1,6 @@
 import {table} from "../components/table.js";
 import {escapeHtml,optionHtml} from "../utils/dom.js";
-import {filterRosterPreview} from "../services/fantraxPublicPreviewService.js";
+import {filterRosterPreview} from "../services/fantraxPublicPreviewService.js?v5-4-6b1-manual-overrides";
 import {teamIdentitySuggestion,validatePendingTeamMappings} from "../services/fantraxTeamIdentityService.js";
 
 const metric=(label,value)=>`<div class="metric"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`;

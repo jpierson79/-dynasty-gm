@@ -6,6 +6,7 @@ import {
   clearPendingStatusChanges,
   EDITABLE_ROSTER_STATUSES,
   filterRosterStatusRows,
+  manualOverrideIds,
   reviewGroups,
   rosterStatusManagerRows,
   savePayload,
@@ -24,10 +25,11 @@ const main=await readFile(new URL("v5/js/main.js",root),"utf8");
 const state=await readFile(new URL("v5/js/state/appState.js",root),"utf8");
 const repo=await readFile(new URL("v5/js/repositories/playerRepository.js",root),"utf8");
 const dataHealth=await readFile(new URL("v5/js/services/dataHealthService.js",root),"utf8");
+const migration=await readFile(new URL("supabase/migrations/008_manual_roster_status_overrides.sql",root),"utf8");
 
 const teams=[{id:"team-1",name:"Rum Ham"},{id:"team-2",name:"DPC"}];
 const players=[
-  {id:"p1",league_id:"l1",name:"Alpha",positions:["OF"],mlb_team:"NYY",owner_team_id:"team-1",roster_status:"ACTIVE",is_free_agent:false,fantrax_id:"*F1*",mlbam_id:1,updated_at:"2026-07-01"},
+  {id:"p1",league_id:"l1",name:"Alpha",positions:["OF"],mlb_team:"NYY",owner_team_id:"team-1",roster_status:"ACTIVE",roster_status_source:"MANUAL",roster_status_override_at:"2026-07-01",roster_status_override_by:"user-1",is_free_agent:false,fantrax_id:"*F1*",mlbam_id:1,updated_at:"2026-07-01"},
   {id:"p2",league_id:"l1",name:"Bravo",positions:["SP"],mlb_team:"LAD",owner_team_id:"team-1",roster_status:"ROSTERED",is_free_agent:false,fantrax_id:"*F2*",mlbam_id:2,updated_at:"2026-07-02"},
   {id:"p3",league_id:"l1",name:"Charlie",positions:["SS"],mlb_team:"BOS",owner_team_id:"team-2",roster_status:"RESERVE",is_free_agent:false,fantrax_id:"*F3*",mlbam_id:3,updated_at:"2026-07-03"},
   {id:"p4",league_id:"l1",name:"Delta",positions:["RP"],mlb_team:"NYM",owner_team_id:null,roster_status:"FREE_AGENT",is_free_agent:true,fantrax_id:"*F4*",mlbam_id:4,updated_at:"2026-07-04"}
@@ -37,6 +39,9 @@ const rows=rosterStatusManagerRows(players,teams);
 assert.deepEqual(EDITABLE_ROSTER_STATUSES,["ACTIVE","RESERVE","IL","MINORS","UNCLASSIFIED"]);
 assert.equal(rows.find(row=>row.id==="p2").currentStatus,"UNCLASSIFIED");
 assert.equal(rows.find(row=>row.id==="p1").ownerName,"Rum Ham");
+assert.equal(rows.find(row=>row.id==="p2").source,"LEGACY");
+assert.deepEqual(manualOverrideIds(rows),["p1"]);
+assert.deepEqual(filterRosterStatusRows(rows,{manualOnly:true},{}).map(row=>row.id),["p1"]);
 
 let pending={};
 pending=setPendingStatus(pending,rows[0],"IL");
@@ -84,6 +89,12 @@ assert.match(rendered,/Statuses only will be changed/);
 assert.match(rendered,/id="rsmConfirmSave"/);
 assert.match(rendered,/Pending Changes/);
 assert.match(rendered,/Move to Minors/);
+assert.match(rendered,/Status Source/);
+assert.match(rendered,/Manual overrides only/);
+assert.match(rendered,/Clear Manual Overrides/);
+const clearRendered=renderRosterStatusManager({teams,rosterStatusManager:{rows,filters:{},pendingChanges:{},selectedIds:["p1"],confirmClearOverrides:true,clearOverrideIds:["p1"]}});
+assert.match(clearRendered,/Clearing the override allows a future Fantrax sync/);
+assert.match(clearRendered,/id="rsmConfirmClearOverrides"/);
 
 assert.match(html,/Roster Status Manager/);
 assert.match(state,/rosterStatusManager:\{/);
@@ -95,12 +106,18 @@ assert.match(main,/requestRosterStatusSaveConfirmation/);
 assert.match(main,/rsmConfirmSave/);
 assert.match(main,/updateRosterStatuses\(appState\.activeLeague\.id,payload/);
 assert.match(repo,/export async function updateRosterStatuses/);
-assert.match(repo,/row=\{roster_status:update\.roster_status,updated_at\}/);
+assert.match(repo,/roster_status_source:"MANUAL"/);
+assert.match(repo,/supabase\.auth\.getUser/);
+assert.match(repo,/export async function clearRosterStatusOverrides/);
 assert.doesNotMatch(repo,/owner_team_id\s*:|fantrax_id\s*:|fantrax_api_player_id\s*:|mlbam_id\s*:|is_free_agent\s*:/,"roster-status save must not write protected fields");
 assert.match(dataHealth,/Manual Status Overrides/);
 assert.match(dataHealth,/Pending Status Changes/);
 assert.match(dataHealth,/Unclassified Count/);
 assert.match(dataHealth,/Last Manual Update/);
-assert.match(dataHealth,/No reviewed manual override marker/);
+assert.match(dataHealth,/Roster Status Source Coverage/);
+assert.match(dataHealth,/Manual Overrides Missing User/);
+assert.match(migration,/roster_status_source in \('FANTRAX','MANUAL','CSV','LEGACY','UNKNOWN'\)/);
+assert.match(migration,/new\.roster_status_override_by := \(select auth\.uid\(\)\)/,"database prevents browser audit spoofing");
+assert.doesNotMatch(migration,/update public\.players|owner_team_id|fantrax_id|mlbam_id|calculated_player_scores/i,"migration has no backfill or protected-field writes");
 
 console.log("v5RosterStatusManager tests passed");

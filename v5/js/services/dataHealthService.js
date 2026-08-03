@@ -62,7 +62,10 @@ export function fantraxPreviewHealthChecks(preview=null){
     item("Roster Entries With Valid Team Identity",rosterRows.length&&validTeamRosterRows.length===rosterRows.length?"PASS":rosterRows.length?"WARNING":"INFO",[{valid:validTeamRosterRows.length,total:rosterRows.length}]),
     item("Ownership Differences Detected",rosterRows.some(row=>row.ownershipDifference)?"WARNING":"PASS",rosterRows.filter(row=>row.ownershipDifference)),
     item("Status Differences Detected",rosterRows.some(row=>row.rosterStatusDifference)?"WARNING":"PASS",rosterRows.filter(row=>row.rosterStatusDifference)),
-    item("Manual Override Protection Available","WARNING",[{available:false,blocker:"players has no reviewed status source, manual-override flag, override timestamp, updated_by audit field, or synchronization timestamp."}]),
+    item("Fantrax Status Conflicts",rosterRows.some(row=>row.fantraxConflict)?"WARNING":"PASS",rosterRows.filter(row=>row.fantraxConflict)),
+    item("Overrides Preserved From Fantrax","INFO",rosterRows.filter(row=>row.futureSyncRecommendation==="PRESERVE_MANUAL_OVERRIDE")),
+    item("Players Eligible for Fantrax Status Update","INFO",rosterRows.filter(row=>row.futureSyncRecommendation==="APPLY_FANTRAX_STATUS")),
+    item("Manual Override Protection Available","PASS",[{available:true,sourceRecorded:true,timestampRecorded:true,userRecorded:true,clearBehavior:true,previewProtection:true,productionSyncReady:false}]),
     item("Fantrax Roster Preview Available",ok("team-rosters")?"PASS":"WARNING",[{rows:data?.rosterItems?.length||0,cloudWrites:0}]),
     item("Unknown Fantrax Roster Statuses",data?.diagnostics?.unknownStatuses?.length?"WARNING":"PASS",(data?.diagnostics?.unknownStatuses||[]).map(status=>({status}))),
     item("Fantrax Matchup Period Available",ok("matchup-scores")?"PASS":"WARNING",[{rows:data?.matchups?.length||0}]),
@@ -145,13 +148,17 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   }));
   const storedRosterStatusInsufficient=Boolean(ownedPlayers.length&&ownedPlayers.every(player=>normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="UNCLASSIFIED"));
   const pendingStatusChanges=Object.values(rosterStatusManager?.pendingChanges||{});
+  const explicitSourcePlayers=playerRows.filter(player=>["FANTRAX","MANUAL","CSV","LEGACY","UNKNOWN"].includes(player.roster_status_source));
+  const manualOverrides=playerRows.filter(player=>player.roster_status_source==="MANUAL");
+  const manualMissingUser=manualOverrides.filter(player=>!player.roster_status_override_by);
+  const manualMissingTimestamp=manualOverrides.filter(player=>!player.roster_status_override_at);
   const latestRosterStatusUpdate=playerRows.filter(player=>player.roster_status&&player.updated_at).slice().sort((a,b)=>String(b.updated_at||"").localeCompare(String(a.updated_at||"")))[0]||null;
   const manualOverrideGuidance={
-    supported:false,
+    supported:true,
     pendingChanges:pendingStatusChanges.length,
     futureRequirement:"Future Fantrax synchronization must preserve reviewed manual roster-status overrides.",
-    currentSchema:"No reviewed manual override marker was found in the current players schema.",
-    safeBehavior:"Roster Status Manager writes only players.roster_status and players.updated_at. It does not alter ownership, free-agent state, UUIDs, Fantrax IDs, or MLBAM IDs."
+    currentSchema:"players records explicit source, database-stamped override time, and authenticated user.",
+    safeBehavior:"Roster Status Manager writes roster status plus override audit metadata only. Clear preserves status and marks provenance UNKNOWN."
   };
   const ownedFreeAgent=playerRows.filter(player=>player.owner_team_id&&normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="FREE_AGENT");
   const freeAgentWithOwner=playerRows.filter(player=>player.is_free_agent&&player.owner_team_id);
@@ -213,7 +220,12 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Players missing both external IDs",status:bothMissing.length?"WARNING":"PASS",details:detail("Players missing both external IDs",bothMissing)},
     {name:"Roster Status Diagnostics",status:"INFO",details:detail("Roster Status Diagnostics",rosterDiagnostics)},
     {name:"Normalized roster status counts",status:"INFO",details:detail("Normalized roster status counts",normalizedRosterCounts)},
-    {name:"Manual Status Overrides",status:"WARNING",details:detail("Manual Status Overrides",[manualOverrideGuidance])},
+    {name:"Roster Status Source Coverage",status:explicitSourcePlayers.length===playerRows.length?"PASS":"WARNING",details:detail("Roster Status Source Coverage",[{explicit:explicitSourcePlayers.length,total:playerRows.length,missing:playerRows.length-explicitSourcePlayers.length}])},
+    {name:"Manual Overrides Active",status:"INFO",details:detail("Manual Overrides Active",manualOverrides)},
+    {name:"Manual Overrides Missing User",status:manualMissingUser.length?"WARNING":"PASS",details:detail("Manual Overrides Missing User",manualMissingUser)},
+    {name:"Manual Overrides Missing Timestamp",status:manualMissingTimestamp.length?"WARNING":"PASS",details:detail("Manual Overrides Missing Timestamp",manualMissingTimestamp)},
+    {name:"Unknown Status Sources",status:explicitSourcePlayers.length===playerRows.length?"PASS":"WARNING",details:detail("Unknown Status Sources",playerRows.filter(player=>!player.roster_status_source))},
+    {name:"Manual Status Overrides",status:"PASS",details:detail("Manual Status Overrides",[manualOverrideGuidance])},
     {name:"Pending Status Changes",status:pendingStatusChanges.length?"WARNING":"PASS",details:detail("Pending Status Changes",pendingStatusChanges)},
     {name:"Unclassified Count",status:unclassifiedPlayers.length?"WARNING":"PASS",details:detail("Unclassified Count",[{count:unclassifiedPlayers.length}])},
     {name:"Last Manual Update",status:latestRosterStatusUpdate?"INFO":"WARNING",details:detail("Last Manual Update",latestRosterStatusUpdate?[{playerId:latestRosterStatusUpdate.id,playerName:latestRosterStatusUpdate.name,rosterStatus:latestRosterStatusUpdate.roster_status,updatedAt:latestRosterStatusUpdate.updated_at,note:"No manual override marker exists, so this is the latest roster_status row timestamp, not a proven manual-only audit."}]:[manualOverrideGuidance])},

@@ -179,3 +179,13 @@ Decision: Add nullable `teams.fantrax_team_id` with a league-scoped partial uniq
 Consequences: The migration has no backfill and preserves every existing team row and relationship. The mapping repository updates only the identity column while constraining updates by active league and team UUID. Ten mappings passed live protected-field and Chrome validation. This establishes team identity only; V5.4.6B roster synchronization remains blocked by absent manual-override protection. Rollback requires dropping the unique index before the column.
 
 Evidence paths: `supabase/migrations/007_fantrax_team_identity.sql`, `v5/js/services/fantraxTeamIdentityService.js`, `tests/v5FantraxTeamIdentity.test.mjs`.
+
+## ADR-016: Protect Manual Roster-Status Overrides With Database-Stamped Audit Metadata
+
+Status: accepted and migration deployed; controlled override persistence/clear validated, Data Health and live Fantrax conflict acceptance pending.
+
+Decision: Store narrow provenance and override audit fields on `players`. Manual writes set `MANUAL`, while a database trigger—not browser input—records `auth.uid()` and time. Clearing preserves the current status, changes provenance to `UNKNOWN`, and clears override metadata. Null historic provenance is treated as `LEGACY` in application views without backfill.
+
+Consequences: Future Fantrax synchronization must preserve differing active manual overrides, may recommend applying an explicit Fantrax status only where no override exists, and must route unknown Fantrax values to review. Existing league owner/editor RLS continues to scope updates. This decision does not authorize production synchronization.
+
+Evidence paths: `supabase/migrations/008_manual_roster_status_overrides.sql`, `v5/js/services/rosterStatusManagerService.js`, `v5/js/services/fantraxPublicPreviewService.js`, `tests/v5RosterStatusManager.test.mjs`.

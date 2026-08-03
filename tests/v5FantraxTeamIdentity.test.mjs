@@ -56,6 +56,6 @@ assert.doesNotMatch(main,/owner_team_id\s*:|roster_status\s*:/,"team mapping han
 
 const health=fs.readFileSync(new URL("../v5/js/services/dataHealthService.js",import.meta.url),"utf8");
 for(const name of ["Fantrax Teams Found","Fantrax Team IDs Persisted","Fantrax Team Identity Match Rate","Duplicate Fantrax Team IDs","Unmapped Fantrax Teams","Cloud Teams Without Fantrax IDs","Roster Entries With Valid Team Identity","Ownership Differences Detected","Status Differences Detected","Manual Override Protection Available"])assert.match(health,new RegExp(name));
-assert.match(health,/Manual Override Protection Available","WARNING"/);
+assert.match(health,/Manual Override Protection Available","PASS"/);
 
 console.log("V5 Fantrax team identity tests passed.");

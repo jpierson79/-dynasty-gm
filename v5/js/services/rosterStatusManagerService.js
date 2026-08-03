@@ -2,6 +2,7 @@ import { NORMALIZED_ROSTER_STATUSES, normalizeRosterStatus } from "../domain/ros
 
 export const ROSTER_STATUS_MANAGER_VERSION="5.4.4";
 export const EDITABLE_ROSTER_STATUSES=NORMALIZED_ROSTER_STATUSES.filter(status=>status!=="FREE_AGENT");
+export const ROSTER_STATUS_SOURCES=["MANUAL","FANTRAX","CSV","LEGACY","UNKNOWN"];
 
 function same(value,expected){return String(value||"")===String(expected||"")}
 function text(value){return String(value||"").toUpperCase()}
@@ -18,13 +19,18 @@ export function currentRosterStatus(player){
   return normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status});
 }
 export function rosterStatusManagerRows(players=[],teams=[]){
-  return players.map(player=>({
+  return players.map(player=>{
+    const source=ROSTER_STATUS_SOURCES.includes(player.roster_status_source)?player.roster_status_source:"LEGACY";
+    return ({
     ...player,
     ownerName:ownerName(player,teams),
     currentStatus:currentRosterStatus(player),
-    source:player.roster_status?"Cloud":"Blank cloud value",
+    source,
+    manualOverride:source==="MANUAL",
+    missingOverrideMetadata:source==="MANUAL"&&(!player.roster_status_override_at||!player.roster_status_override_by),
     validation:editableStatus(currentRosterStatus(player))||currentRosterStatus(player)==="FREE_AGENT"?"Valid":"Invalid"
-  }));
+    });
+  });
 }
 export function pendingStatusFor(row,pendingChanges={}){
   return pendingChanges[row.id]?.newStatus||row.currentStatus;
@@ -76,9 +82,15 @@ export function filterRosterStatusRows(rows=[],filters={},pendingChanges={}){
     if(filters.freeAgent==="yes"&&!row.is_free_agent)return false;
     if(filters.freeAgent==="no"&&row.is_free_agent)return false;
     if(filters.changedOnly&&!pendingChanges[row.id])return false;
+    if(filters.manualOnly&&!row.manualOverride)return false;
+    if(filters.source&&row.source!==filters.source)return false;
+    if(filters.missingMetadata&&!row.missingOverrideMetadata)return false;
+    if(filters.updatedBy&&row.roster_status_override_by!==filters.updatedBy)return false;
+    if(filters.conflictsOnly&&!row.fantraxConflict)return false;
     return editableStatus(nextStatus)||nextStatus==="FREE_AGENT";
   });
 }
+export function manualOverrideIds(rows=[]){return rows.filter(row=>row.manualOverride).map(row=>row.id)}
 export function statusSummary(rows=[],pendingChanges={}){
   return EDITABLE_ROSTER_STATUSES.map(status=>({
     status,

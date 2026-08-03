@@ -112,6 +112,13 @@ Verified diagnostics:
 
 ## Verified Fantrax Team And League Identity
 
+## V5.4.6B-1 Local Implementation
+
+- Manual roster-status override protection is implemented locally with migration 008, authenticated save/clear paths, source and audit UI, read-only Fantrax conflict recommendations, and Data Health coverage.
+- Migration 008 is applied and schema-verified. A controlled Chrome save/restore/clear test passed without leaving a changed roster status; the tested row now has explicit `UNKNOWN` provenance and no active override metadata.
+- Existing cloud roster statuses, ownership, identities, managers, scores, HKB values, and metrics have not been changed by this local implementation.
+- Remaining acceptance is live Data Health rendering and Fantrax conflict-preview validation with the league configuration. Production Fantrax roster synchronization remains out of scope and blocked until that validation succeeds.
+
 - Ten 16-character alphanumeric Fantrax team IDs matched across `getLeagueInfo`, `getTeamRosters`, `getDraftResults`, `getStandings`, and `getMatchupScores`.
 - The same IDs appeared in tested current and historical periods.
 - Cross-season team-ID stability is not proven.

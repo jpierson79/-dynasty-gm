@@ -30,19 +30,35 @@ export async function positionOptions(leagueId){
   const rows=await selectAllLeagueRows("players",leagueId,{columns:"positions",order:"name",ascending:true});
   return [...new Set(rows.flatMap(player=>Array.isArray(player.positions)?player.positions:String(player.positions||"").split(/[\/,\s]+/)).filter(Boolean))].sort();
 }
-export async function updateRosterStatuses(leagueId,updates,{updatedBy=""}={}){
+async function authenticatedClient(){
+  const supabase=await client();
+  const {data,error}=await supabase.auth.getUser();
+  if(error||!data?.user?.id)throw new Error("Sign in before saving roster-status overrides.");
+  return supabase;
+}
+export async function updateRosterStatuses(leagueId,updates){
   if(!leagueId)throw new Error("Active league is required.");
   if(!Array.isArray(updates)||!updates.length)return [];
-  const supabase=await client();
+  const supabase=await authenticatedClient();
   const updated_at=new Date().toISOString();
   const rows=[];
   for(const update of updates){
-    const row={roster_status:update.roster_status,updated_at};
+    const row={roster_status:update.roster_status,roster_status_source:"MANUAL",updated_at};
     const result=await request(
-      supabase.from("players").update(row).eq("league_id",leagueId).eq("id",update.id).select("id,name,owner_team_id,roster_status,is_free_agent,fantrax_id,mlbam_id,updated_at").single(),
+      supabase.from("players").update(row).eq("league_id",leagueId).eq("id",update.id).select("id,name,owner_team_id,roster_status,roster_status_source,roster_status_override_at,roster_status_override_by,is_free_agent,fantrax_id,mlbam_id,updated_at").single(),
       "players roster_status update"
     );
-    rows.push({...result.data,updated_by:updatedBy||""});
+    rows.push(result.data);
+  }
+  return rows;
+}
+export async function clearRosterStatusOverrides(leagueId,playerIds=[]){
+  if(!leagueId)throw new Error("Active league is required.");
+  if(!playerIds.length)return [];
+  const supabase=await authenticatedClient(),rows=[];
+  for(const id of playerIds){
+    const result=await request(supabase.from("players").update({roster_status_source:"UNKNOWN",roster_status_override_at:null,roster_status_override_by:null,updated_at:new Date().toISOString()}).eq("league_id",leagueId).eq("id",id).eq("roster_status_source","MANUAL").select("id,roster_status,roster_status_source,roster_status_override_at,roster_status_override_by").single(),"players roster override clear");
+    rows.push(result.data);
   }
   return rows;
 }

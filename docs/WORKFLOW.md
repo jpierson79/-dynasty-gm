@@ -65,3 +65,10 @@
 - If no import was run, say so.
 - If no migration was applied, say so.
 - For Fantrax roster work, separately report whether endpoint reads, cloud reads, cloud writes, imports, roster rewrites, migrations, and score recalculations occurred.
+# Manual Roster-Status Overrides
+
+1. Sign in and select the intended league. Only a league owner/editor may save or clear overrides.
+2. Review pending status changes in Roster Status Manager and confirm the status-only save. The database stamps the authenticated user and time.
+3. To clear protection for one, selected, or all filtered manual rows, use Clear Manual Override and confirm. The current status is preserved; no Fantrax request or write is triggered.
+4. Review Fantrax Sync Preview recommendations. `PRESERVE_MANUAL_OVERRIDE` is a hard future-sync guard; `REVIEW_CONFLICT` is never applied automatically.
+5. Before enabling any synchronization, verify Data Health source coverage and missing-audit checks, apply migration 008 once through the approved Supabase workflow, snapshot protected fields, and complete controlled Chrome acceptance.
