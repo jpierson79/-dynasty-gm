@@ -5,15 +5,16 @@ Generated: 2026-08-01 America/Chicago.
 ## Git State
 
 - Active branch: `feature/manager-intelligence`
-- Current HEAD: `94e051a`
-- Current HEAD subject: `Fix prospect visibility and roster recommendations`
-- Initial working tree for this documentation reconciliation: clean.
+- Current HEAD: `8291c980633c87840da05ebef3a98d46e32c767a`
+- Current HEAD subject: `Add manual roster status override protection`
+- Initial tracked working tree for V5.4.6B-2: clean; `.codex/` was already present as unrelated untracked workspace metadata.
 - Recent completed commits:
   - `c11c84a` Stabilize V5 UI workflow and data health
   - `145e06a` Harden cloud imports and data workflow diagnostics
   - `ab8729a` Add V5 regression tests and cache refresh
   - `8aab34f` Preserve player identity during repeat Fantrax imports
   - `94fba81` Build Dynasty Front Office V5 through Trade Center
+  - `8291c98` Add manual roster status override protection
 
 The July 16 operational snapshot that described branch `fix/reliable-repeat-import`, HEAD `acee731`, and uncommitted import work is superseded by this section. That older state remains represented in Git history and durable architecture decisions.
 
@@ -119,6 +120,33 @@ Verified diagnostics:
 - Existing cloud roster statuses, ownership, identities, managers, scores, HKB values, and metrics have not been changed by this local implementation.
 - Remaining acceptance is live Data Health rendering and Fantrax conflict-preview validation with the league configuration. Production Fantrax roster synchronization remains out of scope and blocked until that validation succeeds.
 
+## V5.4.6B-2 Local Implementation
+
+- Reviewed Fantrax roster-status synchronization is implemented locally on top of the B-1 preview recommendations.
+- Only exact `APPLY_FANTRAX_STATUS` rows enter the apply set. Manual overrides, unknown statuses, unmatched player identities, unmapped team identities, and ownership differences are excluded.
+- The UI requires an exact update-set acknowledgement and a separate final confirmation.
+- Writes are grouped by previewed current and target status, constrained by league and reviewed player UUID, and exclude `MANUAL` provenance at write time. Only roster status, `FANTRAX` provenance, and `updated_at` are written.
+- Successful applies reload league data and fetch a fresh Fantrax preview. Stale or newly protected rows are reported as skipped and require another review.
+- Synthetic tests pass. No migration was created for B-2. The guarded recommendation set passed authenticated live acceptance, followed by a successful three-player controlled production apply and post-apply verification.
+- Live ownership-guard acceptance found 566 exact roster identities, six ownership differences, and 560 eligible status updates. The six conflicts are excluded as `REVIEW_CONFLICT`: three cloud free agents and three different-cloud-owner rows.
+- Ownership-conflict diagnostics distinguish `CLOUD_FREE_AGENT` from `DIFFERENT_CLOUD_OWNER` and display cloud owner names rather than raw team UUIDs. No ownership repair is automatic.
+
+## V5.4.6B-3 Local Controlled-Apply Hardening
+
+- Reviewed rows now carry an expected cloud owner, and the apply query requires that owner as well as the previewed current status and non-manual provenance.
+- Apply results classify skipped rows and report failed write groups. Incomplete outcomes are not presented as successful, and league data plus the Fantrax preview refresh after each returned attempt.
+- Data Health now shows an immediate running state, prevents duplicate starts, preserves the last successful report on error, and returns a visible read-only timeout after 60 seconds.
+- Authenticated browser acceptance exposed a real timeout in the initial implementation. The corrected path reuses the already-loaded players, metrics, scores, and teams for diagnostics instead of downloading them again, and runs independent recommendation checks concurrently.
+- An authenticated browser rerun completed and rendered the full report, confirming the timeout correction. The report contained one false failure because an idle Trade Center had no selected partner; this is corrected locally to a warning while missing user teams or invalid selected partners remain failures.
+- Final read-only acceptance reports zero Data Health failures. A fresh Fantrax preview reports 566 roster/status differences, 560 eligible status-only updates, six excluded ownership conflicts split evenly between cloud free agents and different owners, and zero unmatched players, unmapped teams, or unclassified Fantrax statuses.
+- Pre-apply protected baseline: 10,197 players, 565 owned players, zero manual overrides, protected player hash `e2ef7a71366281dd19d575b465b5cb87`, team hash `16bdaf1ec9143a7331e69db87e344ee7`, score hash `accc954d5dffaae8c3e13a64b502d69f`, and metric hash `44940d299bb920b89563486de9b5dfbd`.
+- Controlled-apply review initially exposed all 560 eligible rows as one indivisible manifest, contradicting the approved 1–3-row acceptance plan. The local UI now starts with no selected rows, permits at most three eligible UUIDs, invalidates acknowledgement whenever selection changes, names the selected players in final confirmation, and revalidates only that subset before the guarded repository call.
+- The first controlled production apply succeeded at `2026-08-03T20:55:53.031Z`: Kevin McGonigle, Daylen Lile, and Nico Hoerner changed from `UNCLASSIFIED` to `ACTIVE` in one guarded group. The UI reported 3 reviewed, 3 updated, 0 skipped, and 0 failed groups; the refreshed preview reduced eligible updates from 560 to 557 and showed Nico Hoerner as `NO_CHANGE`.
+- Post-apply player count, owned count, protected player hash, team hash, score hash, and metric hash exactly matched the pre-apply baseline. Data Health completed with zero failures. Controlled production acceptance is complete.
+- V5.4.6B-4 locally blocks roster-status review and apply whenever an explicit historical scoring period is selected. Only the empty `Current` period configuration can enter the reviewed synchronization path; the guard is repeated immediately before apply.
+- Authenticated browser acceptance selected historical scoring period 13, which contained 489 roster rows and 285 apparent eligible updates. The UI displayed the historical-period warning and disabled review, proving no historical snapshot could enter synchronization.
+- The complete 31-file test suite passes locally after the corrections.
+
 - Ten 16-character alphanumeric Fantrax team IDs matched across `getLeagueInfo`, `getTeamRosters`, `getDraftResults`, `getStandings`, and `getMatchupScores`.
 - The same IDs appeared in tested current and historical periods.
 - Cross-season team-ID stability is not proven.
@@ -126,7 +154,7 @@ Verified diagnostics:
 - The current league schema has no structured Fantrax league-integration field.
 - No `userSecretId` is required or approved for storage.
 
-## Next Proposed Phase: V5.4.3B
+## Historical Proposed Phase: V5.4.3B
 
 Fantrax External Identity Foundation and Read-Only Roster Preview:
 
@@ -142,17 +170,13 @@ Fantrax External Identity Foundation and Read-Only Roster Preview:
 
 V5.4.3B must not include roster-status writes, ownership writes, free-agent rewrites, automatic team-name matching, player or team creation, production imports, or remote migration application without explicit approval.
 
-## Current Blockers Before Production Synchronization
+## Remaining Constraints Before Broader Production Use
 
-- Add and review a nullable player API-ID field or equivalent explicit identity bridge.
-- Add and review authoritative Fantrax team-ID storage.
-- Add and review structured Fantrax league integration metadata.
-- Resolve the 36 global catalog misses or keep them explicitly excluded from validated operations.
-- Establish a reviewed team assignment for all configured teams.
+- Broader application of the remaining 557 eligible rows requires a new exact review and explicit authorization; controlled acceptance does not authorize a bulk apply.
+- No active manual overrides existed during controlled acceptance, so the synthetic and write-query manual guard remains the evidence for that branch until a future reviewed conflict is available.
 - Decide and test season rollover behavior because cross-season team-ID stability is unknown.
-- Complete a read-only preview phase before designing any Apply operation.
 
-Production roster synchronization is not currently safe. It becomes eligible for design only after these blockers are addressed and verified.
+The B-3 controlled apply path is production-accepted for the exact three-player test above. No broader roster synchronization is authorized.
 
 ## Operations Not Performed During Documentation Reconciliation
 

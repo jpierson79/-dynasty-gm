@@ -77,12 +77,7 @@ function finalizeGroups(grouped){
   return Object.fromEntries(Object.entries(grouped).map(([key,value])=>[key,{count:value.count,avg:Math.round(value.total/value.count)}]).sort((a,b)=>b[1].avg-a[1].avg));
 }
 
-export async function buildLiveScoreDiagnostics(leagueId,{version="5.1.1"}={}){
-  const [players,metrics,scores]=await Promise.all([
-    playerRepository.allPlayers(leagueId),
-    metricRepository.listMetrics(leagueId),
-    scoreRepository.listScores(leagueId)
-  ]);
+export function buildScoreDiagnosticsFromRows(leagueId,players=[],metrics=[],scores=[],{version="5.1.1"}={}){
   const currentScores=scores.filter(score=>score.score_version===version);
   const latestScoreByPlayer=latestByPlayer(currentScores);
   const metricsByPlayer=new Map();
@@ -161,6 +156,15 @@ export async function buildLiveScoreDiagnostics(leagueId,{version="5.1.1"}={}){
     confidenceAverages:finalizeGroups(confidenceGroups),
     confidenceCoverage:{scoreRows:currentScores.length,confidenceRows,trendConfidenceRows}
   };
+}
+
+export async function buildLiveScoreDiagnostics(leagueId,{version="5.1.1"}={}){
+  const [players,metrics,scores]=await Promise.all([
+    playerRepository.allPlayers(leagueId),
+    metricRepository.listMetrics(leagueId),
+    scoreRepository.listScores(leagueId)
+  ]);
+  return buildScoreDiagnosticsFromRows(leagueId,players,metrics,scores,{version});
 }
 
 export async function buildLiveScoreDiagnosticsForLeagueName(name="Reddit Phanatics",options={}){

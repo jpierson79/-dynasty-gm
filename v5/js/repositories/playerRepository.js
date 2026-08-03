@@ -1,4 +1,5 @@
 import { client, countLeagueRows, pagedLeagueRows, request, selectAllLeagueRows, selectLeagueRows } from "./baseRepository.js";
+import { fantraxRosterSyncSkipReason } from "../services/fantraxRosterSyncService.js?v5-4-6b3-controlled-apply";
 
 export async function listPlayers(leagueId,query={}){
   const filters=[];
@@ -61,4 +62,36 @@ export async function clearRosterStatusOverrides(leagueId,playerIds=[]){
     rows.push(result.data);
   }
   return rows;
+}
+export async function applyFantraxRosterStatuses(leagueId,updates=[]){
+  if(!leagueId)throw new Error("Active league is required.");
+  if(!updates.length)return {reviewed:0,updated:[],skipped:[],failures:[]};
+  const supabase=await authenticatedClient(),updated=[],failures=[],groups=new Map();
+  updates.forEach(update=>{
+    const key=`${update.expectedOwnerTeamId}\u0000${update.currentRosterStatus}\u0000${update.roster_status}`;
+    if(!groups.has(key))groups.set(key,{expectedOwnerTeamId:update.expectedOwnerTeamId,currentRosterStatus:update.currentRosterStatus,rosterStatus:update.roster_status,ids:[]});
+    groups.get(key).ids.push(update.id);
+  });
+  for(const group of groups.values()){
+    try{
+      const result=await request(
+        supabase.from("players").update({roster_status:group.rosterStatus,roster_status_source:"FANTRAX",updated_at:new Date().toISOString()}).eq("league_id",leagueId).in("id",group.ids).eq("owner_team_id",group.expectedOwnerTeamId).eq("roster_status",group.currentRosterStatus).or("roster_status_source.is.null,roster_status_source.neq.MANUAL").select("id,name,owner_team_id,roster_status,roster_status_source,roster_status_override_at,roster_status_override_by,is_free_agent,fantrax_id,mlbam_id,updated_at"),
+        "players reviewed Fantrax roster-status update"
+      );
+      updated.push(...(result.data||[]));
+    }catch(error){
+      failures.push({message:String(error?.message||error),expectedOwnerTeamId:group.expectedOwnerTeamId,currentRosterStatus:group.currentRosterStatus,rosterStatus:group.rosterStatus,playerIds:[...group.ids]});
+      break;
+    }
+  }
+  const updatedIds=new Set(updated.map(row=>row.id));
+  const skippedUpdates=updates.filter(update=>!updatedIds.has(update.id)),currentById=new Map();
+  if(skippedUpdates.length){
+    try{
+      const current=await request(supabase.from("players").select("id,owner_team_id,roster_status,roster_status_source").eq("league_id",leagueId).in("id",skippedUpdates.map(update=>update.id)),"players reviewed Fantrax skip classification");
+      (current.data||[]).forEach(row=>currentById.set(row.id,row));
+    }catch(error){failures.push({message:String(error?.message||error),classificationRead:true,playerIds:skippedUpdates.map(update=>update.id)})}
+  }
+  const skipped=skippedUpdates.map(update=>({...update,reason:fantraxRosterSyncSkipReason(update,currentById.get(update.id),{writeFailed:failures.length>0}),currentRow:currentById.get(update.id)||null}));
+  return {reviewed:updates.length,updated,skipped,failures};
 }

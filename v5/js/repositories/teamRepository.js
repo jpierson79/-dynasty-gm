@@ -16,6 +16,10 @@ export async function teamCount(leagueId){
 
 export async function excludedInvalidTeamRows(leagueId,playerRows=[]){
   const rows=await allTeams(leagueId);
+  return excludedInvalidTeamRowsFromRows(rows,playerRows);
+}
+
+export function excludedInvalidTeamRowsFromRows(rows=[],playerRows=[]){
   const counts=playerCountByTeam(playerRows);
   return rows.filter(team=>!isValidFantasyTeam(team,{playerCount:counts.get(team.id)||0})).map(team=>({
     id:team.id,

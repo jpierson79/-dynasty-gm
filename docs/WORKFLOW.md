@@ -56,6 +56,9 @@
 16. Before any future roster synchronization, require a reviewed manual-override model containing an explicit source and timestamp, a clear-override workflow, and preview diagnostics for conflicts.
 17. A local team-identity checkpoint does not imply deployment: record migration application, persisted mappings, protected-field verification, and Chrome acceptance separately. After a local checkpoint, resume with deployment and live validation rather than reimplementing the feature.
 18. The V5.4.6A deployment baseline is migration 007 applied, 10 distinct reviewed team IDs, zero duplicate groups, matching pre/post protected hashes, and completed Chrome/Data Health acceptance. Do not treat this as authorization or readiness for roster synchronization while manual override protection is absent.
+19. A reviewed Fantrax roster-status apply must include only `APPLY_FANTRAX_STATUS` rows, route ownership differences to `REVIEW_CONFLICT`, require exact-set review and a separate final confirmation, and record the expected owner in the manifest. Re-check expected owner, current status, and manual provenance in the write query; report reasoned skips and partial failures; and refresh league data and the preview after every completed attempt. Never include ownership or free-agent fields in the payload.
+20. Controlled production acceptance must select one to three eligible UUIDs from an empty-by-default review set. Any selection change invalidates acknowledgement. The final confirmation must name the selected players, and the repository must receive only that revalidated subset.
+21. Roster-status synchronization is permitted only from the `Current` Fantrax preview. Any explicit scoring-period value is historical and must disable review and fail final apply validation.
 
 ## Validation Rules
 

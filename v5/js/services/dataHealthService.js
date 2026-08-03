@@ -10,7 +10,7 @@ import { ENGINE_VERSION } from "../engine/dynastyEngine.js";
 import { DECISION_RULE_VERSION, getRosterRecommendations, getWaiverRecommendations } from "./decisionIntelligenceService.js";
 import { TRADE_ANALYSIS_VERSION } from "./tradeAnalysisService.js";
 import { USER_TEAM_RESOLUTION_VERSION, resolveUserFantasyTeam } from "./userTeamResolver.js?v5-4-2-user-team-association";
-import { buildLiveScoreDiagnostics } from "./liveScoreDiagnosticsService.js";
+import { buildScoreDiagnosticsFromRows } from "./liveScoreDiagnosticsService.js";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -29,6 +29,11 @@ function numericInvalid(player){
   return ["age","hkb_value","overall_rank","position_rank"].some(key=>player[key]!==null&&player[key]!==undefined&&player[key]!==""&&!Number.isFinite(Number(player[key])));
 }
 function externalIdMissing(value){return value===null||value===undefined||String(value).trim()===""}
+export function tradeSelectionHealthStatus({userTeamExists=false,partnerTeamId="",partnerExists=false}={}){
+  if(!userTeamExists)return "FAIL";
+  if(!partnerTeamId)return "WARNING";
+  return partnerExists?"PASS":"FAIL";
+}
 function rosterStatusDiagnostics(playerRows){
   const groups=new Map();
   playerRows.forEach(player=>{
@@ -85,7 +90,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     leagues.leagueById(leagueId).then(row=>row?[row]:[]).catch(()=>[])
   ]);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
-  const invalidTeamRows=await teams.excludedInvalidTeamRows(leagueId,playerRows);
+  const invalidTeamRows=teams.excludedInvalidTeamRowsFromRows(rawTeamRows,playerRows);
   const teamIds=new Set(teamRows.map(team=>team.id));
   const playerIds=new Set(playerRows.map(player=>player.id));
   const managerIds=new Set(managerRows.map(manager=>manager.id));
@@ -104,11 +109,13 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const latestScore=scoreRows.slice().sort((a,b)=>String(b.calculated_at||"").localeCompare(String(a.calculated_at||"")))[0]||null;
   const latestEngineVersion=latestScore?.score_version||"none";
   const latestCalculationTime=latestScore?.calculated_at||"none";
-  const scoreDiagnostics=await buildLiveScoreDiagnostics(leagueId,{version:ENGINE_VERSION});
+  const scoreDiagnostics=buildScoreDiagnosticsFromRows(leagueId,playerRows,metricRows,scoreRows,{version:ENGINE_VERSION});
   let decisionDiagnostics={teamId,rosterRecommendations:[],waiverRecommendations:[],error:""};
   try{
-    const waiverPage=await getWaiverRecommendations(leagueId,teamId,{page:1,pageSize:25,scoreVersion:ENGINE_VERSION});
-    const rosterPage=teamId?await getRosterRecommendations(leagueId,teamId,{scoreVersion:ENGINE_VERSION}):null;
+    const [waiverPage,rosterPage]=await Promise.all([
+      getWaiverRecommendations(leagueId,teamId,{page:1,pageSize:25,scoreVersion:ENGINE_VERSION}),
+      teamId?getRosterRecommendations(leagueId,teamId,{scoreVersion:ENGINE_VERSION}):Promise.resolve(null)
+    ]);
     decisionDiagnostics={teamId,rosterRecommendations:rosterPage?.recommendations||[],waiverRecommendations:waiverPage.recommendations||[],error:""};
   }catch(error){
     decisionDiagnostics.error=String(error?.message||error);
@@ -197,7 +204,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const tradeBothSides=tradeOutgoingIds.filter(id=>tradeIncomingIds.includes(id)).map(id=>({id,reason:"selected on both sides"}));
   const currentScorePlayerIds=new Set(currentVersionScores.map(score=>score.player_id));
   const tradeMissingScores=tradeAllIds.filter(id=>!currentScorePlayerIds.has(id)).map(id=>({id,reason:"missing current score"}));
-  const tradeOutgoingOwnerErrors=tradeOutgoingIds.map(id=>playerRows.find(player=>player.id===id)).filter(player=>player&&player.owner_team_id!==teamId);
+  const tradeOutgoingOwnerErrors=tradeOutgoingIds.map(id=>playerRows.find(player=>player.id===id)).filter(player=>player&&player.owner_team_id!==canonicalTeamId);
   const tradeIncomingOwnerErrors=tradeIncomingIds.map(id=>playerRows.find(player=>player.id===id)).filter(player=>player&&player.owner_team_id!==tradeState.partnerTeamId);
   const tradePartnerExists=!tradeState.partnerTeamId||teamIds.has(tradeState.partnerTeamId);
   const lowConfidenceTrade=tradeState.analysis&&Number(tradeState.analysis.confidence)<55?[tradeState.analysis]:[];
@@ -275,7 +282,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Roster recommendation team check",status:rosterDecisionErrors.length?"FAIL":"PASS",details:detail("Roster recommendations referencing another team",rosterDecisionErrors)},
     {name:"Trade analysis version",status:staleTradeVersion.length?"WARNING":"PASS",details:detail("Stale trade analysis version",tradeState.analysis?[{current:tradeState.analysis.tradeAnalysisVersion,expected:TRADE_ANALYSIS_VERSION}]:[])},
     {name:"Trade score version available",status:tradeScoreVersion||latestEngineVersion!=="none"?"PASS":"WARNING",details:detail("Trade score version available",[{tradeScoreVersion,latestEngineVersion}])},
-    {name:"Trade selected team exists",status:teamId&&tradePartnerExists?"PASS":teamId?"WARNING":"FAIL",details:detail("Trade selected team exists",[{teamId,partnerTeamId:tradeState.partnerTeamId||"",partnerExists:tradePartnerExists}])},
+    {name:"Trade selected team exists",status:tradeSelectionHealthStatus({userTeamExists:selectedTeamExists,partnerTeamId:tradeState.partnerTeamId||"",partnerExists:tradePartnerExists}),details:detail("Trade selected team exists",[{userTeamId:canonicalTeamId,partnerTeamId:tradeState.partnerTeamId||"",partnerExists:tradePartnerExists,guidance:tradeState.partnerTeamId?"Selected Trade Center partner must exist in this league.":"No Trade Center partner is selected; this is valid idle state."}])},
     {name:"Trade asset references valid",status:tradeAllIds.every(id=>playerIds.has(id))?"PASS":"FAIL",details:detail("Invalid trade asset references",tradeAllIds.filter(id=>!playerIds.has(id)).map(id=>({id})))},
     {name:"Trade outgoing user owned",status:tradeOutgoingOwnerErrors.length?"FAIL":"PASS",details:detail("Outgoing trade assets not owned by selected team",tradeOutgoingOwnerErrors)},
     {name:"Trade incoming partner owned",status:tradeIncomingOwnerErrors.length?"FAIL":"PASS",details:detail("Incoming trade assets not owned by partner",tradeIncomingOwnerErrors)},

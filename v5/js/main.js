@@ -2,9 +2,10 @@ import { $, $all, debounce, escapeHtml, optionHtml, setHtml } from "./utils/dom.
 import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js";
 import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js";
 import { loadLeagueOverview } from "./services/cloudDataService.js";
-import { runDataHealth } from "./services/dataHealthService.js?v5-4-6b1-manual-overrides";
+import { runDataHealth } from "./services/dataHealthService.js?v5-4-6b3-fast-health";
+import { runWithDataHealthTimeout } from "./services/dataHealthExecutionService.js?v5-4-6b3-data-health";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";
-import { allPlayers, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b1-manual-overrides";
+import { allPlayers, applyFantraxRosterStatuses, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b2-reviewed-sync";
 import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/playerIntelligenceRepository.js";
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
@@ -15,7 +16,8 @@ import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./service
 import { addTradeAssetSelection, removeTradeAssetSelection } from "./services/tradeInteractionService.js";
 import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-user-team-final";
 import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, manualOverrideIds, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js?v5-4-6b1-manual-overrides";
-import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js?v5-4-6b1-manual-overrides";
+import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js?v5-4-6b2-ownership-diagnostics";
+import { controlledFantraxRosterSelection, fantraxRosterSyncPeriodGuard, fantraxRosterSyncSummary, validateControlledFantraxStatusUpdates } from "./services/fantraxRosterSyncService.js?v5-4-6b4-current-period";
 import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings } from "./services/fantraxTeamIdentityService.js";
 import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
 import { memberships } from "./repositories/leagueRepository.js";
@@ -150,7 +152,7 @@ function tradeSelectedPlayers(rows,ids){
 function rosterStatusState(patch={}){
   return {...appState.rosterStatusManager,...patch};
 }
-function fantraxPreviewState(patch={}){return {data:null,externalLeagueId:"",period:"",loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false},pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,lastTeamMappingSave:"",...(appState.fantraxPreview||{}),...patch}}
+function fantraxPreviewState(patch={}){return {data:null,externalLeagueId:"",period:"",loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false},pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,lastTeamMappingSave:"",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],savingRosterSync:false,lastRosterSync:null,...(appState.fantraxPreview||{}),...patch}}
 function fantraxFiltersFromControls(){return {search:$("#fantraxRosterSearch")?.value.trim()||"",teamId:$("#fantraxRosterTeam")?.value||"",sourceStatus:$("#fantraxSourceStatus")?.value||"",normalizedStatus:$("#fantraxNormalizedStatus")?.value||"",matched:$("#fantraxMatched")?.value||"",ownershipDifference:$("#fantraxOwnershipDiff")?.checked||false,statusDifference:$("#fantraxStatusDiff")?.checked||false}}
 async function loadFantraxPreview(){
   const externalLeagueId=$("#fantraxExternalLeagueId")?.value.trim()||appState.fantraxPreview?.externalLeagueId||"";
@@ -174,6 +176,20 @@ async function persistFantraxTeamMappings(){
     const players=await allPlayers(appState.activeLeague.id),next=await fetchFantraxPublicPreview({externalLeagueId:preview.externalLeagueId,period:preview.period,players,teams:appState.teams});
     setState({fantraxPreview:{...next,externalLeagueId:preview.externalLeagueId,period:preview.period,selectedTab:"identity",pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,lastTeamMappingSave:new Date().toISOString()}});
   }catch(error){setState({fantraxPreview:fantraxPreviewState({savingTeamMappings:false,error:String(error?.message||error)})})}
+}
+async function persistReviewedFantraxRosterStatuses(){
+  const preview=appState.fantraxPreview,periodGuard=fantraxRosterSyncPeriodGuard(preview.period),validation=validateControlledFantraxStatusUpdates(preview.data?.rosterItems||[],preview.rosterSyncSelectedIds||[]);
+  if(!periodGuard.valid||!preview.rosterSyncReviewed||!validation.valid){setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:false,error:periodGuard.error||validation.errors.join(" ")||"Review the eligible Fantrax status changes before applying."})});return}
+  setState({fantraxPreview:fantraxPreviewState({savingRosterSync:true,confirmRosterSync:false,error:""})});
+  try{
+    const result=await applyFantraxRosterStatuses(appState.activeLeague.id,validation.updates);
+    const summary=fantraxRosterSyncSummary(result);
+    await refreshLeagueData();
+    const players=await allPlayers(appState.activeLeague.id),next=await fetchFantraxPublicPreview({externalLeagueId:preview.externalLeagueId,period:preview.period,players,teams:appState.teams});
+    setState({fantraxPreview:{...next,externalLeagueId:preview.externalLeagueId,period:preview.period,selectedTab:"rosters",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],savingRosterSync:false,lastRosterSync:{at:new Date().toISOString(),...summary}}});
+    if(summary.skipped||summary.failedGroups)setError(`Fantrax roster-status apply was incomplete: ${summary.updated} updated, ${summary.skipped} skipped, ${summary.failedGroups} failed groups. ${Object.entries(summary.skipReasons).map(([reason,count])=>`${reason}: ${count}`).join("; ")}`);
+    else setState({statusMessage:`Applied all ${summary.updated} reviewed Fantrax roster-status updates.`});
+  }catch(error){setState({fantraxPreview:fantraxPreviewState({savingRosterSync:false,error:String(error?.message||error)})})}
 }
 async function loadRosterStatusManager(){
   if(!appState.activeLeague)return;
@@ -422,6 +438,16 @@ function bindViewEvents(){
   $("#saveFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmTeamMappings:true})}));
   $("#dismissSaveFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmTeamMappings:false})}));
   $("#confirmSaveFantraxTeamMappings")?.addEventListener("click",persistFantraxTeamMappings);
+  $("#reviewFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:true,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],error:""})}));
+  $("#cancelFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],error:""})}));
+  $all("[data-fantrax-roster-select]").forEach(input=>input.addEventListener("change",event=>{
+    const selection=controlledFantraxRosterSelection(appState.fantraxPreview?.rosterSyncSelectedIds||[],event.target.dataset.fantraxRosterSelect,event.target.checked);
+    setState({fantraxPreview:fantraxPreviewState({rosterSyncSelectedIds:selection.selectedIds,rosterSyncReviewed:false,confirmRosterSync:false,error:selection.error})});
+  }));
+  $("#confirmFantraxRosterReview")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({rosterSyncReviewed:event.target.checked,confirmRosterSync:false})}));
+  $("#openFantraxRosterSyncConfirmation")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:true})}));
+  $("#dismissFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:false})}));
+  $("#confirmFantraxRosterSync")?.addEventListener("click",persistReviewedFantraxRosterStatuses);
   $("#playerSearchButton")?.addEventListener("click",async()=>{
     await updatePlayerPage(playerQueryFromControls());
   });
@@ -707,7 +733,15 @@ function bindShellEvents(){
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
-    try{setState({health:await runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview}),healthDetails:null})}catch(error){setError(error)}
+      if(appState.healthRunning)return;
+      setState({healthRunning:true,healthError:""});
+      try{
+        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview}));
+        setState({health,healthDetails:null,healthRunning:false,healthError:""});
+      }catch(error){
+        setState({healthRunning:false,healthError:String(error?.message||error||"Data Health failed.")});
+        setError(error);
+      }
     }
   });
   document.body.addEventListener("change",async event=>{

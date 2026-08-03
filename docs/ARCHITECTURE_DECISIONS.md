@@ -182,10 +182,20 @@ Evidence paths: `supabase/migrations/007_fantrax_team_identity.sql`, `v5/js/serv
 
 ## ADR-016: Protect Manual Roster-Status Overrides With Database-Stamped Audit Metadata
 
-Status: accepted and migration deployed; controlled override persistence/clear validated, Data Health and live Fantrax conflict acceptance pending.
+Status: accepted and migration deployed; controlled override persistence/clear, Data Health, and live Fantrax conflict handling validated.
 
 Decision: Store narrow provenance and override audit fields on `players`. Manual writes set `MANUAL`, while a database trigger—not browser input—records `auth.uid()` and time. Clearing preserves the current status, changes provenance to `UNKNOWN`, and clears override metadata. Null historic provenance is treated as `LEGACY` in application views without backfill.
 
 Consequences: Future Fantrax synchronization must preserve differing active manual overrides, may recommend applying an explicit Fantrax status only where no override exists, and must route unknown Fantrax values to review. Existing league owner/editor RLS continues to scope updates. This decision does not authorize production synchronization.
 
 Evidence paths: `supabase/migrations/008_manual_roster_status_overrides.sql`, `v5/js/services/rosterStatusManagerService.js`, `v5/js/services/fantraxPublicPreviewService.js`, `tests/v5RosterStatusManager.test.mjs`.
+
+## ADR-017: Require Exact Review And Write-Time Guards For Fantrax Roster Status Synchronization
+
+Status: accepted through V5.4.6B-3 controlled production validation.
+
+Decision: Build the apply set only from exact `APPLY_FANTRAX_STATUS` preview recommendations and require both an exact-set review acknowledgement and a separate final confirmation. Ownership differences are `REVIEW_CONFLICT` rows and cannot enter the apply set. Record the expected cloud owner in the reviewed manifest. Group writes by expected owner, previewed current status, and target Fantrax status; constrain them by active league and reviewed player UUID; require the expected owner and current status at write time; and exclude rows with `MANUAL` provenance.
+
+Consequences: The write payload contains only `roster_status`, `roster_status_source = 'FANTRAX'`, and `updated_at`. A row whose owner or status changed after preview, or that gained a manual override, is skipped and classified for review. Partial results and failed write groups are reported, and every completed attempt triggers fresh league data and Fantrax preview reads. Ownership, free-agent state, UUIDs, external identities, scores, HKB values, and metrics remained unchanged in controlled acceptance. Acceptance of one exact subset does not authorize broader synchronization.
+
+Evidence paths: `v5/js/services/fantraxRosterSyncService.js`, `v5/js/repositories/playerRepository.js`, `v5/js/views/fantraxPreviewView.js`, `tests/v5FantraxRosterSync.test.mjs`.
