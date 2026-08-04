@@ -12,13 +12,20 @@ export async function initializeAuth(onStatus){
   const user=await leagues.currentUser();
   setState({authUser:user});
   if(user)await refreshAccessibleLeagues(user.id);
-  client.auth.onAuthStateChange(async(_event,session)=>{
-    const nextUser=session?.user||await leagues.currentUser().catch(()=>null);
-    setState({authUser:nextUser});
-    if(nextUser)await refreshAccessibleLeagues(nextUser.id);
-    else{setActiveLeagueId("");setState({activeLeague:null,dataMode:"offline",players:[],teams:[],managers:[]})}
-  });
+  client.auth.onAuthStateChange((_event,session)=>applyAuthSession(session));
   return client;
+}
+
+export function applyAuthSession(session,{defer=callback=>setTimeout(callback,0),refresh=refreshAccessibleLeagues}={}){
+  const nextUser=session?.user||null;
+  setState({authUser:nextUser});
+  if(!nextUser){
+    setActiveLeagueId("");
+    setState({activeLeague:null,dataMode:"offline",players:[],teams:[],managers:[]});
+    return null;
+  }
+  defer(()=>Promise.resolve(refresh(nextUser.id)).catch(error=>setState({dataMode:"offline",errors:[String(error?.message||error||"Cloud league refresh failed.")]})));
+  return nextUser;
 }
 
 export async function signIn(email,password){return legacyAuth.signIn(email,password)}
