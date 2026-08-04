@@ -3,6 +3,7 @@ const UI_PREF_KEY="dynasty_v5_ui_preferences";
 
 export const appState={
   authUser:null,
+  authSignIn:{pending:false,error:""},
   activeLeague:null,
   dataMode:"offline",
   players:[],

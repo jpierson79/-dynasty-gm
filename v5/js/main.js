@@ -1,6 +1,6 @@
 import { $, $all, debounce, escapeHtml, optionHtml, setHtml } from "./utils/dom.js";
 import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js";
-import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js";
+import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js?v5-4-6b5-auth";
 import { loadLeagueOverview } from "./services/cloudDataService.js";
 import { runDataHealth } from "./services/dataHealthService.js?v5-4-6b3-fast-health";
 import { runWithDataHealthTimeout } from "./services/dataHealthExecutionService.js?v5-4-6b3-data-health";
@@ -56,9 +56,10 @@ function renderMessages(){
 }
 function renderAuthPanel(){
   const signedIn=Boolean(appState.authUser);
+  const signInState=appState.authSignIn||{pending:false,error:""};
   setHtml($("#authPanel"),signedIn
     ?`<h2>Authentication</h2><p class="note">Signed in as ${escapeHtml(appState.authUser.email||"")}</p><div class="toolbar"><button id="signOut" class="secondary">Sign Out</button><button id="retryCloud" class="secondary">Retry Cloud</button></div>`
-    :`<h2>Authentication</h2><p class="note">Sign in to use Supabase Cloud. Local browser league data is not used by V5.</p><form id="signInForm" class="toolbar"><label>Email<input id="email" type="email" autocomplete="email"></label><label>Password<input id="password" type="password" autocomplete="current-password"></label><button class="primary" type="submit">Sign In</button></form>`);
+    :`<h2>Authentication</h2><p class="note">Sign in to use Supabase Cloud. Local browser league data is not used by V5.</p><form id="signInForm" class="toolbar"><label>Email<input id="email" type="email" autocomplete="email" ${signInState.pending?"disabled":""}></label><label>Password<input id="password" type="password" autocomplete="current-password" ${signInState.pending?"disabled":""}></label><button class="primary" type="submit" ${signInState.pending?"disabled":""}>${signInState.pending?"Signing in…":"Sign In"}</button></form>${signInState.error?`<p class="warning-note">${escapeHtml(signInState.error)}</p>`:""}`);
 }
 function renderLeaguePanel(){
   const leagues=appState.accessibleLeagues||[];
@@ -722,11 +723,19 @@ function bindShellEvents(){
   document.body.addEventListener("submit",async event=>{
     if(event.target.id!=="signInForm")return;
     event.preventDefault();
+    const email=$("#email")?.value.trim()||"",password=$("#password")?.value||"";
+    setState({authSignIn:{pending:true,error:""}});
     try{
-      const {error}=await signIn($("#email")?.value.trim(),$("#password")?.value||"");
+      const {error}=await signIn(email,password);
       if(error)throw error;
       await bootstrap();
-    }catch(error){setError(error)}
+    }catch(error){
+      const message=String(error?.message||error||"Authentication failed.");
+      setState({authSignIn:{pending:false,error:message}});
+      setError(error);
+    }finally{
+      if(appState.authSignIn?.pending)setState({authSignIn:{pending:false,error:""}});
+    }
   });
   document.body.addEventListener("click",async event=>{
     if(event.target.id==="signOut"){await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline"});render()}
