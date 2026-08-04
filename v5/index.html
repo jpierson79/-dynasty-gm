@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dynasty Front Office V5</title>
+  <link rel="stylesheet" href="./css/styles.css?v5-4-6a-team-identity">
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Dynasty Front Office V5</h1>
+      <p>Version 5 is under construction. The existing application remains available separately.</p>
+    </div>
+    <div id="modeBadge" class="mode-badge">Loading</div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="nav-section">
+        <b>Front Office</b>
+        <button class="nav-link active" data-view="dashboard">Dashboard</button>
+      </div>
+      <div class="nav-section">
+        <b>League</b>
+        <button class="nav-link" data-view="players">Players</button>
+        <button class="nav-link" data-view="waivers">Waiver Opportunities</button>
+        <button class="nav-link" data-view="tradeCenter">Trade Center</button>
+        <button class="nav-link" data-view="myRoster">My Roster</button>
+        <button class="nav-link" data-view="rosterStatusManager">Roster Status Manager</button>
+        <button class="nav-link" data-view="teamsManagers">Teams & Managers</button>
+      </div>
+      <div class="nav-section">
+        <b>Data</b>
+        <button class="nav-link" data-view="imports">Cloud Imports</button>
+        <button class="nav-link" data-view="fantraxPreview">Fantrax Sync Preview</button>
+        <button class="nav-link" data-view="settings">Settings & Data Health</button>
+      </div>
+    </aside>
+    <main class="workspace">
+      <section id="authPanel" class="panel"></section>
+      <section id="leaguePanel" class="panel"></section>
+      <section id="messagePanel" class="message-panel" aria-live="polite"></section>
+      <section id="viewRoot"></section>
+    </main>
+  </div>
+  <script type="module" src="./js/main.js?v5-4-6b4-current-period"></script>
+</body>
+</html>
