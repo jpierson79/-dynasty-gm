@@ -1,5 +1,20 @@
 # Safe Development Workflow
 
+## Architect-to-Codex Handoff Loop
+
+The repository documents are the durable handoff between ChatGPT acting as architect and Codex acting as implementation agent.
+
+1. The architect reads `AGENTS.md`, durable project memory, current state, architecture decisions, workflow rules, and repository evidence before selecting a phase.
+2. The architect writes the complete authorized implementation specification in `docs/NEXT_TASK.md`, including the verified branch/commit baseline, objective, scope, exclusions, invariants, tests, acceptance criteria, and authority boundaries.
+3. Codex begins by repeating the repository preflight and stops if the baseline, working tree, or current evidence materially contradicts the task.
+4. Codex implements only `docs/NEXT_TASK.md`. It reports blockers before expanding scope or changing an architectural decision.
+5. Codex validates in proportion to risk: focused tests first, then broader tests, browser/manual checks, and read-only diagnostics where applicable. Cloud writes, migrations, deployments, imports, and other production actions require the authority stated in the active task; silence is not authorization.
+6. Codex replaces the reusable template in `docs/NEXT_TASK_RESULT.md` with an evidence-based completion report. The report includes files changed, unrelated work preserved, exact validation results, data operations performed or avoided, deviations, remaining work, and the final commit/push state.
+7. When explicitly authorized, Codex stages only intended files, commits narrowly, pushes the current task branch, and reports the full commit SHA and push result. It never uses broad staging by default.
+8. The architect reviews the code diff and `docs/NEXT_TASK_RESULT.md`, reconciles verified milestones into `docs/CURRENT_STATE.md` and durable decisions where appropriate, then approves remediation or replaces `docs/NEXT_TASK.md` with the next phase.
+
+`docs/NEXT_TASK.md` is the current implementation contract. `docs/NEXT_TASK_RESULT.md` is the returned evidence. Neither file overrides `AGENTS.md`, repository safety rules, or an explicit newer user instruction.
+
 ## Standard Flow
 
 1. Establish known baseline.
