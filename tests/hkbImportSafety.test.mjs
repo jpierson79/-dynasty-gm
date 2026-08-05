@@ -21,13 +21,19 @@ assert.equal(report.classifications[0].player.roster_status,"ACTIVE");
 assert.equal(report.classifications[0].player.is_free_agent,false);
 
 const source=await readFile(new URL("../js/services/cloudCsvImportService.js",import.meta.url),"utf8");
+const v5Main=await readFile(new URL("../v5/js/main.js",import.meta.url),"utf8");
+const v5Controller=await readFile(new URL("../v5/js/imports/cloudImportController.js",import.meta.url),"utf8");
 const hkbImport=source.slice(source.indexOf("async function importHkb"),source.indexOf("const hitterMetrics"));
 assert.match(source,/reviewedPreview\?\.previewSchema!=="hkb-matching-v1"/);
 assert.match(source,/reviewedPreview\.hkbDecisions/);
 assert.match(source,/hkbDiagnostics:diagnosticRows\.map\(hkbExceptionDetail\)/);
 assert.match(source,/legacyMatchSummary:\{matched:legacyMatched,unmatched:rows\.length-legacyMatched\}/);
 assert.match(source,/syncResolvedPlayers\(\{updates:uniqueUpdates,inserts:\[\]\}/,"HKB must batch updates and never insert players");
+assert.match(await readFile(new URL("../js/services/cloudStore.js",import.meta.url),"utf8"),/prepareResolvedPlayerUpdateRows\(updates,existingRows\)/,"resolved batches must hydrate required existing identity fields before upsert");
 assert.doesNotMatch(hkbImport,/cloudStore\.updateRow\("players"/,"HKB must not write players one row at a time");
 assert.match(source,/hkb_value:decision\.sourceValue,overall_rank:decision\.sourceOverallRank,position_rank:decision\.sourcePositionRank/);
+assert.match(v5Main,/cloudImportController\.js\?v5-4-7-hkb-update/);
+assert.match(v5Controller,/cloudCsvImportService\.js\?v5-4-7-hkb-update/);
+assert.match(source,/cloudStore\.js\?v5-4-7-hkb-update/);
 
 console.log("hkbImportSafety tests passed");
