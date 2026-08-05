@@ -168,6 +168,8 @@ Evidence: user-supplied authoritative facts, `js/services/cloudCsvImportService.
 - Custom intelligence export excludes recreatable player pools, raw Statcast data, import progress, credentials, sessions, and raw caches.
 - Fantrax roster-status work must not alter ownership, player UUIDs, external IDs, scoring, metrics, or free-agent state.
 - Unknown Fantrax roster statuses remain visible and normalize to `UNCLASSIFIED`; they are never guessed from position, age, injury, prospect status, or profile data.
+- Fantrax team-identity and roster-status writes require the observed external league ID and season year to match an explicitly reviewed season context. When both sides expose a league-history ID, that identity must match too; absence of the optional history field is reported but not guessed.
+- A new or changed Fantrax season context requires a complete explicit remapping of every observed external team. Prior mappings, names, managers, and roster overlap are non-authoritative suggestions.
 
 Evidence: user-supplied authoritative facts, `supabase/migrations/006_player_external_identity.sql`, `docs/cloud-player-identity.md`, `js/services/customIntelligenceExport.js`, `js/services/authUi.js`.
 

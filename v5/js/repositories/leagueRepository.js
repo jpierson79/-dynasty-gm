@@ -27,3 +27,11 @@ export async function memberships(leagueId){
   const result=await request(supabase.from("league_members").select("*").eq("league_id",leagueId),"League membership check");
   return result.data||[];
 }
+export async function saveFantraxSeasonContext(leagueId,settingsPatch){
+  if(!leagueId)throw new Error("Active league is required.");
+  const supabase=await client();
+  const current=await request(supabase.from("leagues").select("id,settings").eq("id",leagueId).single(),"Fantrax season settings lookup");
+  const settings={...(current.data?.settings||{}),...(settingsPatch||{})};
+  const result=await request(supabase.from("leagues").update({settings}).eq("id",leagueId).select("*").single(),"Fantrax season settings update");
+  return result.data;
+}

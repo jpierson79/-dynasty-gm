@@ -186,3 +186,14 @@ The B-3 controlled apply path is production-accepted for the exact three-player 
 - No imports.
 - No score recalculations.
 - No commits or pushes.
+
+## V5.4.6C Reconciled Implementation — Fantrax Season Rollover Safety
+
+- The Fantrax preview now derives an observed season context from the exact external league ID, Fantrax season year, and optional league-history ID, then compares it with an explicitly reviewed context stored in the active league's existing `settings` object.
+- Missing review, league-ID drift, season-year drift, or an available league-history mismatch blocks both team-identity and roster-status writes while leaving preview data readable.
+- A rollover requires acknowledgement plus an explicit, complete, unique mapping of every observed Fantrax team to a team in the active cloud league. Names, managers, roster overlap, and prior mappings remain suggestions only.
+- Changing league configuration, period, or preview context clears the loaded preview plus pending mapping and roster-review state. Existing current-period, exact-selection, ownership, status, and manual-override guards remain in force.
+- Data Health reports reviewed-versus-observed league, season, optional history, and the resulting write-block state without additional network reads.
+- The implementation was reconciled from `origin/main` (`df89840de0ea8563968b99b7acc75b528e02983f`) onto `origin/feature/manager-intelligence` (`5a89cc0f611e63c5c34da22faeb7680f88b239f1`) while preserving that baseline's auth, HKB import, and UI changes.
+- All 32 standalone Node test files pass locally. Authenticated production Data Health completed read-only with zero failures and no console errors. The local build loaded without console errors, but its separate localhost origin had no authenticated session, so current-context and rollover UI acceptance on the reconciled build remains synthetically verified rather than live-authenticated.
+- No migration, import, roster synchronization, score recalculation, deployment, or cloud write was performed during reconciliation.

@@ -53,10 +53,16 @@ export function fantraxPreviewHealthChecks(preview=null){
   const teamTotal=data?.teamRows?.length||0,teamMatches=data?.teamRows?.filter(row=>row.identityResult==="MATCHED").length||0;
   const persistedIds=(data?.teamRows||[]).filter(row=>row.identityResult==="MATCHED").map(row=>row.fantraxTeamId),duplicateTeamIds=persistedIds.filter((id,index)=>persistedIds.indexOf(id)!==index);
   const rosterRows=data?.rosterItems||[],validTeamRosterRows=rosterRows.filter(row=>row.teamIdentityResult==="MATCHED");
+  const season=data?.seasonContextComparison||{status:"INVALID",writeAllowed:false,reasons:["No loaded season evidence."]},reviewed=season.reviewed||{},observed=season.observed||{};
   const item=(name,status,rows)=>({name,status,details:detail(name,rows)});
   return [
     item("Fantrax Public API Reachable",health.some(row=>row.success)?"PASS":"WARNING",health),
     item("Fantrax League Metadata Available",ok("league-info")?"PASS":"WARNING",[{available:ok("league-info"),previewOnly:true}]),
+    item("Fantrax Season Context Review",season.status==="MATCH"?"PASS":season.status==="INVALID"?"FAIL":"WARNING",[{status:season.status,reasons:season.reasons,networkReads:0}]),
+    item("Reviewed vs Observed Fantrax League ID",reviewed.externalLeagueId&&reviewed.externalLeagueId===observed.externalLeagueId?"PASS":"WARNING",[{reviewed:reviewed.externalLeagueId||"UNREVIEWED",observed:observed.externalLeagueId||"UNAVAILABLE"}]),
+    item("Reviewed vs Observed Fantrax Season Year",reviewed.seasonYear&&reviewed.seasonYear===observed.seasonYear?"PASS":"WARNING",[{reviewed:reviewed.seasonYear||"UNREVIEWED",observed:observed.seasonYear||"UNAVAILABLE"}]),
+    item("Fantrax League History Identity",reviewed.leagueHistoryAvailable&&observed.leagueHistoryAvailable?(reviewed.leagueHistoryId===observed.leagueHistoryId?"PASS":"WARNING"):"INFO",[{reviewed:reviewed.leagueHistoryId||"UNAVAILABLE",observed:observed.leagueHistoryId||"UNAVAILABLE",availabilityOnly:!reviewed.leagueHistoryAvailable||!observed.leagueHistoryAvailable}]),
+    item("Fantrax Team And Status Writes",season.writeAllowed?"PASS":"WARNING",[{blocked:!season.writeAllowed,reasons:season.reasons,period:preview?.period||"CURRENT"}]),
     item("Fantrax Player Identity Match Rate",playerTotal&&playerMatches===playerTotal?"PASS":playerTotal?"WARNING":"INFO",[{matched:playerMatches,total:playerTotal,previewOnly:true}]),
     item("Fantrax Team Identity Match Rate",teamTotal&&teamMatches===teamTotal?"PASS":teamTotal?"WARNING":"INFO",[{matched:teamMatches,total:teamTotal,persistable:Boolean(teamMatches),previewOnly:true}]),
     item("Fantrax Teams Found",teamTotal?"PASS":"WARNING",[{found:teamTotal}]),

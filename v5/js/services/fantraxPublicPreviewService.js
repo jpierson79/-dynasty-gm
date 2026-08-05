@@ -1,4 +1,5 @@
 import { client } from "../repositories/baseRepository.js";
+import {canonicalFantraxSeasonContext,compareFantraxSeasonContexts} from "./fantraxSeasonContextService.js";
 
 export const FANTRAX_PREVIEW_OPERATIONS=["league-info","team-rosters","matchup-scores","standings","draft-picks","draft-results"];
 export const FANTRAX_PREVIEW_VERSION="5.4.5";
@@ -75,7 +76,7 @@ export function compareFantraxPreview(responses,{players=[],teams=[]}={}){
   const unknownStatuses=[...new Set(rosterItems.filter(row=>row.normalizedRosterStatus==="UNCLASSIFIED").map(row=>row.sourceStatus||"(missing)"))];
   return {version:FANTRAX_PREVIEW_VERSION,fetchedAt:new Date().toISOString(),league,playerRows,teamRows,rosterItems,matchups,standings:responses.standings?.data?.standings||[],draftPicks,draftResults,endpointHealth,diagnostics:{invalidWrappedIds:playerIndex.invalidWrappedIds.length,missingStoredIds:playerIndex.missingIds.length,duplicateApiIds:playerIndex.duplicateIds,unknownStatuses,teamMappingBlockers:teamRows.filter(row=>row.identityResult!=="MATCHED").length,playerMappingBlockers:playerRows.filter(row=>row.identityResult!=="MATCHED").length}};
 }
-export async function fetchFantraxPublicPreview({externalLeagueId,period,players=[],teams=[]}={}){
+export async function fetchFantraxPublicPreview({externalLeagueId,period,players=[],teams=[],reviewedSeasonContext=null}={}){
   const supabase=await client(),responses={};
   for(const operation of FANTRAX_PREVIEW_OPERATIONS){
     const {data,error}=await supabase.functions.invoke("fantrax-public-league-preview",{body:{operation,externalLeagueId,period}});
@@ -84,7 +85,13 @@ export async function fetchFantraxPublicPreview({externalLeagueId,period,players
   }
   const failures=Object.values(responses).filter(row=>row?.error);
   if(failures.length===FANTRAX_PREVIEW_OPERATIONS.length)throw new Error(failures[0].error||"Fantrax preview failed.");
-  return buildPreviewState(buildFantraxPreview(responses,{players,teams}));
+  const preview=buildFantraxPreview(responses,{players,teams});
+  const observedSeasonContext=canonicalFantraxSeasonContext({externalLeagueId,seasonYear:preview.league?.seasonYear,leagueHistoryId:preview.league?.leagueHistoryId});
+  const reviewed=canonicalFantraxSeasonContext(reviewedSeasonContext||{});
+  preview.observedSeasonContext=observedSeasonContext;
+  preview.reviewedSeasonContext=reviewed;
+  preview.seasonContextComparison=compareFantraxSeasonContexts(reviewed,observedSeasonContext);
+  return buildPreviewState(preview);
 }
 function buildFantraxPreview(responses,context){return compareFantraxPreview(responses,context)}
 export function buildPreviewState(data){return {data,loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false}}}
