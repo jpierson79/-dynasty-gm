@@ -1,4 +1,4 @@
-import * as cloudStore from "./cloudStore.js";
+import * as cloudStore from "./cloudStore.js?v5-4-7-hkb-update";
 import { PlayerIdentityResolver } from "./PlayerIdentityResolver.js";
 import { InMemoryPlayerIdentityRepository } from "./identity/InMemoryPlayerIdentityRepository.js";
 import { buildPlayerIdentityIndexes, cleanExternalId, cleanMlbamId, normalizeIdentityName, resolvePlayerIdentity } from "./playerIdentity.js";

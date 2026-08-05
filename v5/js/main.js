@@ -9,7 +9,7 @@ import { allPlayers, applyFantraxRosterStatuses, clearRosterStatusOverrides, pos
 import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/playerIntelligenceRepository.js";
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
-import { previewImport, runImport } from "./imports/cloudImportController.js";
+import { previewImport, runImport } from "./imports/cloudImportController.js?v5-4-7-hkb-update";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";

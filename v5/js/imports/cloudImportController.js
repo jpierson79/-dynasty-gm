@@ -1,4 +1,4 @@
-import * as cloudCsvImport from "../../../js/services/cloudCsvImportService.js";
+import * as cloudCsvImport from "../../../js/services/cloudCsvImportService.js?v5-4-7-hkb-update";
 
 export const importTypes=[
   {key:"fantrax",label:"Fantrax Players / Rosters",accept:".csv,text/csv"},

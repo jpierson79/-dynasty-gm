@@ -91,6 +91,29 @@ function stripPlayerUpdateRows(rows){
   });
 }
 
+export function prepareResolvedPlayerUpdateRows(updates,existingRows){
+  const existingById=new Map((existingRows||[]).map(row=>[String(row?.id||""),row]));
+  return (updates||[]).map(update=>{
+    const id=String(update?.id||"").trim();
+    const existing=existingById.get(id);
+    if(!id||!existing)throw new Error(`Resolved update player was not found or is not accessible: ${id||"missing UUID"}`);
+    if(update.league_id&&String(update.league_id)!==String(existing.league_id)){
+      throw new Error(`Resolved update league mismatch for player ${id}`);
+    }
+    if(!existing.name||!existing.normalized_name){
+      throw new Error(`Resolved update player is missing required identity fields: ${id}`);
+    }
+    const prepared=stripPlayerUpdateRow({
+      ...update,
+      league_id:existing.league_id,
+      name:existing.name,
+      normalized_name:existing.normalized_name
+    });
+    prepared.id=id;
+    return prepared;
+  });
+}
+
 function duplicateIds(rows){
   const seen=new Set(),duplicates=new Set();
   rows.forEach(row=>{
@@ -570,8 +593,15 @@ export async function syncResolvedPlayers({updates=[],inserts=[]},{label="Resolv
   const meta={inserted:0,updated:0};
   try{
     if(updates.length){
+      const updateIds=updates.map(row=>String(row?.id||"").trim()).filter(Boolean);
+      const existingResult=await timed(
+        supabase.from("players").select("id,league_id,name,normalized_name").in("id",updateIds),
+        "Resolved player update identity load"
+      );
+      const existingRows=requireOk(existingResult,"Resolved player update identity load")||[];
+      const preparedUpdates=prepareResolvedPlayerUpdateRows(updates,existingRows);
       const result=await timed(
-        supabase.from("players").upsert(stripPlayerUpdateRows(updates),{onConflict:"id"}).select("*"),
+        supabase.from("players").upsert(preparedUpdates,{onConflict:"id"}).select("*"),
         "Resolved player update batch request"
       );
       const rows=requireOk(result,"Resolved player update batch request")||[];

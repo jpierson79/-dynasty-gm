@@ -28,6 +28,6 @@ assert.match(main,/authSignIn:\{pending:true,error:""\}/);
 assert.match(main,/Signing in…/);
 assert.match(main,/const email=.*password=/,"credentials must be captured before pending state rerenders the form");
 assert.match(main,/authService\.js\?v5-4-6b5-auth/);
-assert.match(html,/main\.js\?v5-4-6b5-auth/);
+assert.match(html,/main\.js\?v5-4-7-hkb-update/);
 
 console.log("v5AuthFlow tests passed");
