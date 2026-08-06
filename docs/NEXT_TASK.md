@@ -1,162 +1,64 @@
-# Next Task: V5.4.6C Fantrax Season Rollover Safety
+# Next Task: V5.4.6C-2 Hosted Loading Boundary Repair and Final Acceptance
 
-## Architect Status
+## Status And Baseline
 
-- Status: ready for Codex implementation.
-- Architect baseline branch: `feature/manager-intelligence`.
-- Architect baseline commit: `35bede60e9330ee0a30b8be1ced72b6b293f5c27` (`feat(v5): harden reviewed Fantrax roster sync`).
-- Prepared: 2026-08-05 America/Chicago.
-- This document authorizes implementation only after Codex repeats the repository preflight. It does not authorize migrations, deployments, cloud writes, imports, or a broader roster-status synchronization.
+- Status: authorized for implementation, authenticated preview deployment, final acceptance, narrow commit, and push.
+- Branch: `codex/v5-season-rollover-reconciliation`.
+- Starting commit: `b37c516cc9b53991db689891bae4f7e968c34c90` (`Add Fantrax season rollover safety`).
+- Prepared: 2026-08-06 America/Chicago.
+- Preserve unrelated untracked `.codex/` content and the existing uncommitted acceptance report.
+- Do not merge into `main`.
 
-## Why This Is Next
+## Verified Problem
 
-V5.4.6B-2 through B-4 are implemented and controlled-production accepted for an exact three-player status-only subset. The remaining 557 eligible status rows require a new exact review and explicit user authorization; they are not an unfinished implementation phase.
+The hosted reconciliation branch renders the shell but remains at `Loading`. Repository inspection shows that V5 imports the shared Supabase client, which statically imports `js/config/supabase.js`, while the reconciliation branch ignores and does not track that browser configuration file. GitHub Pages therefore publishes an incomplete module graph. Earlier repository commit `94cc451` established that the public Supabase URL and publishable anonymous key are safe, required production configuration and added a regression test.
 
-The unresolved architectural risk is season rollover. Fantrax team IDs were proven consistent across endpoints and tested periods within the configured 2026 league, but cross-season stability is not proven. The current preview accepts a bare 16-character external league ID, keeps it only in browser state, and does not bind the reviewed team mappings or status-apply eligibility to a verified Fantrax season. Reusing stale mappings after a season change could attach a valid external team ID to the wrong season context.
+Stop before deviating if fresh browser/network evidence contradicts this diagnosis or reveals superseding rollover behavior.
 
 ## Objective
 
-Add a fail-closed, read-only-first season rollover guard around the existing Fantrax preview, team-identity review, and roster-status apply workflow. The application must identify the season returned by Fantrax, compare it with the last explicitly reviewed season context, visibly report rollover or configuration drift, and block all team-identity and roster-status writes until the new season context and all team mappings have been explicitly reviewed.
+Restore the smallest established production configuration boundary so the reconciliation branch boots on its hosted origin, then complete authenticated live acceptance of the season-context workflow. Do not reimplement or broaden V5.4.6C.
 
-## Required Preflight
+## Authorized Scope
 
-Before editing:
+1. Restore tracked browser-safe `js/config/supabase.js` using the established public URL and publishable anonymous key already present in repository history.
+2. Adjust `.gitignore` narrowly so that exact production file can be tracked while local secret variants remain ignored.
+3. Restore or add the focused production-configuration regression test.
+4. Deploy only the reconciliation branch to an authenticated preview origin without merging.
+5. Perform the seven live acceptance scenarios below using read-only behavior or safe simulation wherever a persistence write is not necessary.
+6. Preserve the explicitly approved, fail-closed ordering that saves reviewed team mappings before reviewed season-context settings. Do not make this sequence atomic or reorder it in this phase.
 
-1. Read every applicable `AGENTS.md` plus `docs/PROJECT_MEMORY.md`, `docs/CURRENT_STATE.md`, `docs/ARCHITECTURE_DECISIONS.md`, `docs/WORKFLOW.md`, this file, and the previous `docs/NEXT_TASK_RESULT.md` if it contains a completed report.
-2. Verify the active branch, exact HEAD, remote tracking state, and working tree.
-3. Stop if the baseline has moved in a way that supersedes this phase, or if unrelated dirty files overlap the required work.
-4. Inspect the current Fantrax Edge Function normalization, preview state, team identity service/repository, roster sync service/repository, Data Health diagnostics, views, and focused tests before designing changes.
-5. Record the verified baseline in `docs/NEXT_TASK_RESULT.md`.
+## Required Safety Invariants
 
-## Scope
+- Preserve current-period-only synchronization, exact Fantrax identity matching, manual override protection, stale-preview protection, league scoping, and write-time field restrictions.
+- Do not perform roster synchronization, imports, score recalculation, ownership repair, player/team creation, schema changes, migrations, or unrelated cloud writes.
+- Preview and Data Health remain read-only.
+- Any simulated drift must not replace the production-reviewed season configuration unless a separately confirmed acknowledgement is required for the acceptance and can be safely restored and verified.
+- No credentials, sessions, passwords, private keys, or service-role keys may be logged or committed.
 
-### 1. Define a canonical season context
+## Required Validation
 
-Create a small domain/service model derived only from normalized Fantrax league information. It must include:
+Run focused configuration/auth tests, `v5FantraxSeasonContext` tests, focused Fantrax tests, roster-sync tests, roster-manager tests, Data Health tests, auth tests, every `tests/*.test.mjs` file, and `git diff --check`.
 
-- the exact external league ID supplied for the preview;
-- the returned `seasonYear` as a validated integer;
-- the returned league-history identity when the documented response supplies one;
-- an explicit representation for unavailable optional identity rather than guessing it;
-- a deterministic comparison result such as `MATCH`, `UNREVIEWED`, `ROLLOVER`, or `INVALID`.
+Hosted acceptance must prove:
 
-Do not infer season from the current date, scoring-period number, team names, or cached application data. Do not treat a historical scoring-period selection as a season identity.
+1. current reviewed season context renders as matching;
+2. mocked or safely simulated rollover drift remains readable;
+3. team-identity and roster-status writes are blocked during drift;
+4. the explicit acknowledgement and complete mapping confirmation flow succeeds safely;
+5. period or league-configuration changes invalidate pending review state;
+6. the season guard is repeated immediately before persistence;
+7. Data Health renders the reviewed/observed context and block reason without a new Fantrax read.
 
-### 2. Persist only reviewed configuration through the existing application configuration boundary
+Also verify a clean hosted reload, authenticated session continuity, responsive controls, and no browser console/module-load errors.
 
-Inspect the current league/settings persistence model and choose the narrowest repository-consistent location for reviewed Fantrax season context. If durable cloud schema is genuinely required, design a migration and tests locally, but do not apply it remotely. Do not add credentials, cookies, `userSecretId`, arbitrary URLs, or raw Fantrax payloads.
+## Completion And Git Rules
 
-Any save must be an explicit, separately confirmed configuration action. A preview fetch remains read-only. The write payload must contain only the reviewed Fantrax integration fields required by the selected design and must be constrained to the active application league.
-
-### 3. Fail closed on drift and rollover
-
-When no reviewed season context exists, or when the fetched league/season context differs from it:
-
-- keep preview and diagnostics available;
-- show the expected and observed external league and season identities;
-- block team-identity saves;
-- block roster-status review and final apply in both UI and service-level validation;
-- clear any pending team mapping review, roster selection, acknowledgement, and confirmation state when the context changes;
-- never clear, rewrite, or auto-remap existing `teams.fantrax_team_id` values.
-
-An explicit scoring period must continue to trigger the independent B-4 historical-period block even when season context matches.
-
-### 4. Add a reviewed rollover workflow
-
-For a new or changed season context, require the user to:
-
-1. review the returned league name, external league ID, season year, optional league-history identity, and full external team list;
-2. acknowledge that existing team identities are not assumed stable across seasons;
-3. review a complete one-to-one mapping for every active cloud team using authoritative IDs; and
-4. confirm the season context and mappings in a final summary before any configuration write.
-
-Team names, manager names, roster overlap, and prior mappings may be displayed as suggestions only. They must never be accepted automatically. Duplicate, missing, cross-league, ambiguous, or incomplete mappings block confirmation.
-
-After a successful reviewed save, refresh league data and Fantrax preview before enabling any status review. A rollover review does not itself apply roster statuses.
-
-### 5. Extend Data Health
-
-Add diagnostics for:
-
-- reviewed versus observed external league ID;
-- reviewed versus observed season year;
-- optional league-history identity availability and mismatch;
-- season-context review status;
-- complete, unique team mapping coverage for the reviewed season;
-- whether team-identity and roster-status writes are currently blocked and why.
-
-Routine Data Health rendering must not initiate new Fantrax network calls. Reuse already loaded preview/configuration data and distinguish unavailable evidence from a passing check.
-
-### 6. Preserve all existing guards
-
-The implementation must preserve:
-
-- exact `*API_ID*` player-ID transformation and validation;
-- no name, fuzzy, or MLBAM fallback for Fantrax API identity;
-- separation of ownership, free-agent state, and roster status;
-- exact status normalization with unknown values routed to review;
-- manual override protection and database-stamped audit behavior;
-- expected owner/current status/manual provenance write-time guards;
-- current-period-only roster synchronization;
-- empty-by-default selection, one-to-three-player controlled selection, review acknowledgement, and separate final confirmation;
-- partial failure and reasoned-skip reporting;
-- no player/team creation, identity merging, ownership repair, or score recalculation.
-
-## Explicitly Out of Scope
-
-- Applying any of the remaining 557 roster-status recommendations.
-- Increasing or removing the controlled one-to-three-player apply limit.
-- Automatically accepting previous team mappings for a new season.
-- Automatically changing ownership or free-agent state.
-- Player-level Fantrax fantasy-point ingestion.
-- Fantrax authentication, browser cookies, Selenium, Python Fantrax clients, `/fxpa/req`, or private endpoints.
-- Remote migration application, Edge Function deployment, production configuration writes, imports, or any production acceptance write without a separate explicit authorization.
-- Broad UI redesign or unrelated authentication/import changes.
-
-## Required Tests
-
-Add focused synthetic tests that prove at minimum:
-
-1. canonical season context accepts valid normalized league evidence and rejects missing/invalid season identity;
-2. matching reviewed and observed context permits the existing gates to continue evaluating;
-3. missing review, external league drift, season-year rollover, and available league-history mismatch each fail closed;
-4. preview remains readable while configuration/team/status writes are blocked;
-5. changing league ID, season context, or period clears pending review/confirmation/selection state;
-6. a historical scoring period remains blocked independently of the season guard;
-7. rollover confirmation requires complete one-to-one team mappings and rejects duplicates, cross-league rows, and incomplete coverage;
-8. names and roster overlap remain non-authoritative suggestions;
-9. reviewed configuration writes are league-scoped and field-limited;
-10. Data Health reports match, unreviewed, rollover, invalid, and unavailable states without issuing new Fantrax reads;
-11. the existing B-2 through B-4 roster-sync, team-identity, manual-override, preview, and Data Health regression tests still pass.
-
-Run focused tests first, then the complete repository test suite. If a migration is created, add static SQL tests for constraints, RLS compatibility, idempotence, and documented rollback, but do not apply it.
-
-## Validation And Acceptance
-
-Codex must complete local implementation and automated validation, then stop before any remote or production operation requiring separate authority.
-
-Local acceptance requires:
-
-- a clean reload with no console errors;
-- a matching current-season preview that accurately shows the reviewed state;
-- a synthetic or safely mocked rollover showing preview access but blocked team/status writes;
-- explicit complete remapping and final confirmation behavior;
-- retained B-4 historical-period blocking;
-- responsive review and confirmation controls;
-- Data Health results that explain every block without claiming unverified success.
-
-Do not claim live or production acceptance unless it was separately authorized and actually performed.
-
-## Documentation And Handoff
-
-When implementation is complete:
-
-1. Update `docs/CURRENT_STATE.md` with verified facts and remaining operational steps.
-2. Update `docs/PROJECT_MEMORY.md` and `docs/ARCHITECTURE_DECISIONS.md` only for durable, evidence-backed decisions.
-3. Replace the template content in `docs/NEXT_TASK_RESULT.md` with the completed report described there.
-4. Report every changed file, unrelated dirty file, exact test command/result, browser validation, and every operation not performed.
-5. Commit and push only if the active user instruction explicitly authorizes them. Report the exact commit SHA and push result.
+1. Record root cause, repair, deployment evidence, every acceptance result, data operations, tests, changed files, unrelated dirty files, and final repository state in `docs/NEXT_TASK_RESULT.md`.
+2. Update durable/current project documentation only where verified evidence requires it.
+3. If and only if every required automated and hosted acceptance check passes, stage only intended files, commit with a narrow message, and push the reconciliation branch.
+4. If acceptance does not pass, do not commit or push; record the blocker and leave the branch out of `main`.
 
 ## Definition Of Done
 
-V5.4.6C is complete only when season context is explicit, reviewed, durable through the chosen application boundary, and enforced as an independent fail-closed guard for both team identity and roster-status writes; rollover requires complete reviewed team remapping; existing B-series protections pass regression; local UI/Data Health acceptance passes; and no unauthorized production operation has occurred.
+The hosted reconciliation branch loads with its established public Supabase configuration, all seven authenticated V5.4.6C scenarios pass without unauthorized data mutation, the approved fail-closed two-step save sequence remains unchanged, complete automated validation passes, intended changes are committed and pushed, and no merge into `main` occurs.

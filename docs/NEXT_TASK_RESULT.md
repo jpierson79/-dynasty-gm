@@ -89,3 +89,78 @@
 ## Architect Review Notes
 
 - Review the two-step team-mapping then season-settings save ordering. It fails closed if the settings write fails, but the operations are not database-atomic under the existing repository boundary.
+
+## V5.4.6C-1 Authenticated Deployment Acceptance
+
+### Outcome
+
+- Date: 2026-08-06 (America/Chicago).
+- Branch under acceptance: `codex/v5-season-rollover-reconciliation` at `b37c516cc9b53991db689891bae4f7e968c34c90`.
+- Status: **not accepted for merge**. The branch was published, but the authenticated season-context workflow could not be completed because the hosted application remained at its `Loading` boundary in a fresh Chrome tab. No rollover behavior was reimplemented or changed.
+
+### Deployment Evidence
+
+- GitHub Pages was temporarily configured to publish `codex/v5-season-rollover-reconciliation` from `/ (root)` without merging into `main`.
+- Pages workflow run `31113221538` built commit `b37c516cc9b53991db689891bae4f7e968c34c90`; build and artifact upload succeeded. The deployment job later timed out after 10 minutes 10 seconds with `Timeout reached, aborting!`.
+- A branch-only asset, `/v5/js/services/fantraxSeasonContextService.js`, subsequently returned HTTP 200 with 4,208 bytes, confirming that the branch artifact became reachable despite the workflow timeout.
+- The Pages source setting was restored to `main` immediately after branch publication. No merge was performed.
+
+### Live Workflow Acceptance
+
+- Existing authenticated production tab: could not be reclaimed reliably by browser automation; repeated attempts timed out.
+- Fresh hosted-app tab: navigation rendered, including `Settings & Data Health`, but the main application remained at `Loading` after repeated waits and navigation attempts. The season-context controls were therefore not operable.
+- Current reviewed season context: **not executed**.
+- Safely simulated rollover drift: **not executed live**.
+- Blocked writes during drift: **not executed live**.
+- Successful acknowledgement flow: **not executed live**.
+- Invalidation after period or configuration change: **not executed live**.
+- Repeated guard immediately before persistence: **not executed live**.
+- Data Health season-context rendering: **not executed live**.
+- These scenarios remain covered by the focused automated tests recorded above, but that coverage does not substitute for authenticated deployment acceptance.
+
+### Non-Atomic Save Decision
+
+- **Explicitly approved before merge as a fail-closed sequence**, subject to completing the outstanding authenticated deployment acceptance.
+- The existing order persists reviewed team mappings first and reviewed season-context settings second. If the second save fails, partial mapping changes can remain, but the reviewed season context remains absent or drifted; consequently roster-status writes stay blocked and the operator must retry the review.
+- The sequence remains league-scoped and field-limited, does not bypass exact identity matching or manual-override protection, and does not enable a roster-status write between the two saves.
+- This approval accepts the limited partial-mapping persistence risk; it does not represent database-level atomicity or rollback.
+
+### Safety And Data Operations
+
+- Roster synchronization: not performed.
+- Imports: not performed.
+- Score recalculation: not performed.
+- Roster/status persistence: not performed.
+- Unrelated cloud writes: not performed.
+- Migrations or schema changes: not performed.
+
+### Merge Gate
+
+- Keep the branch out of `main` until an authenticated deployment loads successfully and all seven live workflow checks above pass.
+- Investigate the hosted `Loading` boundary and rerun V5.4.6C-1 acceptance. Do not treat successful static publication or automated tests as authenticated acceptance.
+
+## V5.4.6C-2 Hosted Loading Boundary Repair
+
+### Verified Baseline And Root Cause
+
+- Starting branch/commit: `codex/v5-season-rollover-reconciliation` at `b37c516cc9b53991db689891bae4f7e968c34c90`.
+- Unrelated dirty content: untracked `.codex/`, preserved untouched.
+- The V5 module graph imports `js/services/supabaseClient.js`, which statically imports `js/config/supabase.js`. That configuration file existed locally but was ignored and absent from the reconciliation commit, so the GitHub Pages artifact could not complete module loading and the shell remained at `Loading`.
+- Repository commit `94cc451f9c9bd7780782d8ba9b230ce86e30b818` previously established the same public Supabase project URL, browser-safe publishable key, `.gitignore` rule, and focused regression test. The repair restores that established boundary without changing authentication or rollover behavior.
+
+### Repair
+
+- Track `js/config/supabase.js` with only the established public project URL and `sb_publishable_` anonymous key.
+- Stop ignoring that exact production browser configuration file.
+- Restore `tests/supabaseProductionConfig.test.mjs` to require a valid HTTPS Supabase URL, a browser-safe publishable key, no privileged credential patterns, and inclusion in the Pages artifact.
+- The approved mapping-first/settings-second save sequence is unchanged.
+
+### Automated Validation Before Deployment
+
+- Focused configuration, Fantrax season-context/public-preview/roster-sync, roster-manager, Data Health execution, and cloud-first workflow tests: passed.
+- Full PowerShell loop over all `tests/*.test.mjs`: 33 of 33 files passed.
+- `v5AuthFlow.test.mjs` is not present on this branch; current cloud/auth workflow coverage passed through `cloudFirstWorkflow.test.mjs` and the production configuration regression.
+
+### Deployment And Hosted Acceptance
+
+- Pending deployable commit and authenticated hosted rerun.
