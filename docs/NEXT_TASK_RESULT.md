@@ -710,3 +710,52 @@
 
 - Documentation changed only in `docs/WORKFLOW.md` and `docs/NEXT_TASK_RESULT.md`; the existing Gate 3 task specification was not altered.
 - Gate 3 was not executed. No application code, tests, migrations, schema, database state, cloud data, deployment configuration, release setting, roster status, ownership, identity, import, or calculated score was changed.
+
+## V5.4.6E Gate 3 First Controlled Expanded Fantrax Sync Acceptance
+
+### Baseline, Governance, And Hosted Artifact
+
+- Date: 2026-08-08 (America/Chicago). Execution baseline was clean `feature/manager-intelligence` at `33ebb4c024d2fa5e4609d89651ed89aea8395a4f`.
+- Revised `docs/WORKFLOW.md` rule 20 and the active `docs/NEXT_TASK.md` are consistent: one to three remains the default, while this dedicated architect-approved gate authorized exactly four or five players. No six-to-ten-player authority was used or carried forward.
+- Focused pre-write validation passed 9 of 9 files and the complete sorted standalone suite passed 34 of 34 files. Pre-write Data Health returned 0 failures and 24 existing warnings.
+- GitHub Pages temporarily published the exact baseline in successful `pages-build-deployment` run `31284060497` (run 26, 1 minute 48 seconds; artifact digest `sha256:9de2b435840a73e3266fb12e7a37068fcf2cc90433bc913df9cd8ab2d57392c8`). The authenticated V5 app exited Loading as `joshua.pierson@yahoo.com` in league Reddit Phanatics, and the browser console contained no errors or warnings.
+
+### Fresh Preview And Reviewed Manifest
+
+- A fresh Current-period preview was obtained at `2026-08-08T23:37:23.881Z`. The observed and accepted season context matched league `xryuc2ewmhi0d2vm`, season `2026`, and history `8mifq27zmhi0d2vm`. The preview contained 0 unmatched players, 0 unmapped teams, and 0 unclassified Fantrax statuses.
+- The exact reviewed league-scoped `V5.4.6E_OPT_IN_10` setting was enabled only for this gate. The execution remained deliberately limited to four players despite the database cap of ten.
+- Exactly four status-only candidates passed every eligibility gate; all had exact authoritative Fantrax player identity, exact persisted Fantrax team identity `6uz9ow2gmhi0d2vw`, the expected owner `3b5f6e4f-950a-4443-8db9-a3379d825acc`, known source status, no ownership conflict, no free-agent/release action, and null manual-override fields:
+  - Jacob Wilson (`b1056f45-a842-4140-8141-0a0330190852`, Fantrax API `0622t`): `UNCLASSIFIED` to `RESERVE`.
+  - Nolan Perry (`1160442f-d23a-450c-8e59-66f8f2af122c`, Fantrax API `067xg`): `UNCLASSIFIED` to `MINORS`.
+  - Reid Detmers (`f7a9433f-8b82-46aa-a964-6902b57f5c1e`, Fantrax API `0596g`): `UNCLASSIFIED` to `ACTIVE`.
+  - Curtis Mead (`589b270e-af07-4ac8-9308-f75e878a343c`, Fantrax API `05ahe`): `UNCLASSIFIED` to `IL`.
+- MLBAM identity was null before and after for all four; no inferred identity was used. The final named confirmation and persistence request contained exactly these four UUIDs and target statuses.
+- The inspected deterministic manifest was version 2, release tier `V5.4.6E_OPT_IN_10`, effective cap 10, reviewed count 4, and digest `5d730100e22fe282e1886f35cc91b1569133ddd3deaffc42d15658359baabc51`. Current period, season context, identities, owners, current statuses, and the exact manifest/request match were repeated immediately before persistence.
+
+### Authorized Write And Durable Audit Outcome
+
+- Performed exactly one authorized four-player status synchronization. No second batch and no release/removal operation was attempted.
+- Durable attempt `6196e55e-4d08-4719-a763-1d78ad86222d` was database-stamped to actor `a7049612-645f-4bba-948e-63f8c195950c`, reached `COMPLETED`, and retained the exact reviewed digest, release tier, cap, and four items.
+- All four items finished `APPLIED`: Nolan Perry to `MINORS`, Curtis Mead to `IL`, Jacob Wilson to `RESERVE`, and Reid Detmers to `ACTIVE`. The attempt has four terminal items and zero recoverable items. No item was skipped, failed, or left pending.
+- A database query constrained to the synchronization timestamp found exactly these four player rows and no unselected row. A fresh Current preview reduced eligible differences by four and showed `NO_CHANGE` with exact player/team identity for every selected player.
+
+### Protected Fields, Replay, And Recovery
+
+- Counts remained players 10,199, teams 12, calculated scores 20,020, and player metrics 209. Audit history changed only by the intended one attempt and four items, from 2/4 to 3/8.
+- Protected hashes were identical before and after: player fields excluding the authorized status/provenance/timestamp payload `e15c919d28618816771506438cab5d46`; teams `ebe01fdc9f0056d57d7095fcaab66ad3`; scores `aa01f543d44482df3bf15630b5c39734`; metrics `2da103e7b322d37de5ccf7fc5294d245`. Prior audit attempts/items retained hashes `4a514fa615f208c5fdc71837e2b00653` and `e156f1323f5b72669e266262f85f189a`.
+- Ownership, player UUID, persisted Fantrax identity, MLBAM identity, free-agent state, manual overrides, teams/managers, scores, metrics, and imported data did not change. Only `roster_status`, `roster_status_source = FANTRAX`, and `updated_at` changed on the four reviewed rows.
+- The planned same-manifest idempotency check was rollback-safe and created no player change or durable audit row. A duplicate exact digest was rejected, attempts with that digest remained exactly one, and terminal `APPLIED` items could not be reset to `PENDING`. The accepted attempt remained `COMPLETED` with four applied and zero recoverable items.
+- The two existing historical `FAILED`/`PENDING` items remained present and recoverable under their documented exact-manifest guards; no artificial production failure was injected and no recovery write was attempted.
+
+### Data Health, Restoration, And Validation
+
+- Authenticated post-write Data Health returned 0 failures and 24 existing warnings. Release/cap consistency passed. The audit UI rendered the new attempt as `COMPLETED`, `V5.4.6E_OPT_IN_10`, `4 / 10`, terminal 4, recoverable 0, digest prefix `5d730100e22f`, and the correct attempt UUID.
+- The temporary opt-in was disabled after acceptance and verified as `enabled: false`, preserving its reviewed league/release identity. No new expanded attempt was created during restoration.
+- GitHub Pages was restored to `main`; restoration run `31284829719` (run 27) completed successfully in 38 seconds.
+- Post-acceptance focused validation again passed 9 of 9 files. The complete sorted `tests/*.test.mjs` suite passed 34 of 34 files. `git diff --check` passed.
+
+### Outcome And Safety Boundary
+
+- Status: **accepted** for V5.4.6E Gate 3's single four-player controlled expanded synchronization.
+- No migration, import, ownership or identity repair, manual-override change, score recalculation, unrelated cloud write, second synchronization batch, release operation, six-to-ten-player synchronization, Gate 4 authorization, or merge was performed.
+- This result does not authorize Gate 4 or a ten-player production batch; any future expanded write requires a new dedicated architect-approved gate.
