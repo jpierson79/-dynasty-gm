@@ -659,3 +659,34 @@
 - Focused V5.4.6E validation: 9 of 9 test files passed (`v5FantraxRosterSync`, `v5FantraxSyncAudit`, `v5FantraxSeasonContext`, `v5FantraxTeamIdentity`, `v5FantraxPublicPreview`, `v5RosterStatusManager`, `v5DataHealthExecution`, `cloudFirstWorkflow`, and `supabaseProductionConfig`).
 - Full sorted PowerShell loop over every `tests/*.test.mjs`: 34 discovered, 34 passed, 0 failed.
 - Status: **accepted** for V5.4.6E Gate 2 migration 010/011 deployment and expanded-boundary/UI acceptance. This acceptance does not authorize a ten-player roster synchronization.
+
+## V5.4.6E Gate 3 Planning Result
+
+### Decision And Rationale
+
+- Selected **V5.4.6E Gate 3: First Controlled Expanded Fantrax Sync** as the next task from accepted commit `a743defc0db47d46eb9680fa2b185476ba594cc3`.
+- The first expanded write is deliberately limited to exactly 4 or 5 players. Four is preferred; five is allowed only when the live preview supplies a fifth candidate of equal safety and it improves grouped-write evidence. A 10-player write remains unauthorized.
+- Gate 2 proved the database and hosted boundaries at caps 3 and 10, but it intentionally performed no roster synchronization. The smallest meaningful production expansion is therefore one row above the accepted three-player apply, not the maximum supported tier.
+- Status-only `APPLY_FANTRAX_STATUS` rows are preferred because they exercise the proven narrow payload while excluding ownership repair, releases, free agents, manual overrides, unknown statuses, and identity ambiguity.
+
+### Planning Dependencies
+
+- Production migrations 009–011 and the accepted durable audit/recovery boundary must remain unchanged.
+- The exact reviewed league opt-in is enabled only after pre-write Data Health, fresh Current preview, matching season context, exact candidate review, and protected snapshots pass; it is disabled immediately after acceptance.
+- Candidate eligibility requires exact Fantrax player and team identities, known status mapping, unchanged expected owner/current status, non-manual provenance, no ownership conflict, and no release/free-agent behavior.
+- The plan binds a fresh preview timestamp/hash, Current period, reviewed season context, release tier/cap, exact UUIDs, owners, statuses, and Fantrax identities into one immutable manifest-v2 digest.
+- Protected comparisons cover player identity/ownership/free-agent/manual/HKB fields, team identity/manager fields, calculated scores, metrics, and prior audit history. Only reviewed roster status, `FANTRAX` provenance, and update timestamp may differ.
+- Idempotency is proven by resolving the same exact digest after success with zero writes. Recovery is inspected but no production failure is injected; any real failed/pending rows require a stop and separate architect direction before exact-manifest recovery.
+
+### Acceptance And Stop Conditions
+
+- All 4–5 items must finish `APPLIED`; any unexpected skip, failure, pending row, partial lifecycle, stale preview, guard rejection, audit inconsistency, protected-field difference, or authorization contradiction stops the run.
+- A fresh post-write Current preview must report `NO_CHANGE` for every selected row and no unselected mutation. Data Health and audit rendering must remain accurate.
+- Terminal replay must be blocked, recoverable count must be zero after a fully successful attempt, the opt-in must be disabled, and Pages must be restored to `main` before acceptance can be recorded.
+- Partial application is never automatically reversed. Audit evidence is retained; terminal rows are not replayed, and only original failed/pending rows may be considered for separately approved exact-manifest recovery.
+
+### Planning-Only Safety
+
+- Files planned for change in this checkpoint: `docs/NEXT_TASK.md` and `docs/NEXT_TASK_RESULT.md` only.
+- Application code, tests, migrations, schema, deployment state, release settings, and production data were not changed.
+- No Fantrax preview, roster synchronization, imports, ownership repair, score recalculation, browser acceptance, or cloud read/write was performed.
