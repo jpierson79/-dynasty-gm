@@ -46,6 +46,9 @@ assert.match(migration,/a\.id=new\.attempt_id and a\.league_id=new\.league_id an
 assert.doesNotMatch(migration,/security definer/i,"new audit triggers must not bypass caller RLS");
 assert.match(migration,/security invoker set search_path=public,pg_temp/gi);
 assert.match(migration,/enable row level security/gi);
+assert.match(migration,/private\.is_league_member\(league_id\)/i,"audit read policies use the deployed private membership helper");
+assert.match(migration,/private\.can_edit_league\(league_id\)/i,"audit write policies use the deployed private editor helper");
+assert.doesNotMatch(migration,/public\.(?:is_league_member|can_edit_league)\s*\(/i,"migration 009 must not reference removed public authorization helpers");
 assert.doesNotMatch(migration,/service_role|password|cookie|private_key/i);
 assert.match(repository,/\.eq\("manifest_digest",digest\)/,"same manifest resolves to one durable attempt");
 assert.match(repository,/\.in\("outcome",\["PENDING","FAILED"\]\)/,"only pending or failed rows can receive a recovery outcome");

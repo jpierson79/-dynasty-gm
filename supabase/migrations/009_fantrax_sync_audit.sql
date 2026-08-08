@@ -99,12 +99,12 @@ alter table public.fantrax_sync_attempt_items enable row level security;
 revoke all on public.fantrax_sync_attempts,public.fantrax_sync_attempt_items from anon;
 grant select,insert,update on public.fantrax_sync_attempts,public.fantrax_sync_attempt_items to authenticated;
 
-create policy fantrax_sync_attempts_members_select on public.fantrax_sync_attempts for select to authenticated using (public.is_league_member(league_id));
-create policy fantrax_sync_attempts_editors_insert on public.fantrax_sync_attempts for insert to authenticated with check (public.can_edit_league(league_id) and actor_user_id=(select auth.uid()));
-create policy fantrax_sync_attempts_actor_update on public.fantrax_sync_attempts for update to authenticated using (public.can_edit_league(league_id) and actor_user_id=(select auth.uid())) with check (public.can_edit_league(league_id) and actor_user_id=(select auth.uid()));
-create policy fantrax_sync_items_members_select on public.fantrax_sync_attempt_items for select to authenticated using (public.is_league_member(league_id));
-create policy fantrax_sync_items_actor_insert on public.fantrax_sync_attempt_items for insert to authenticated with check (public.can_edit_league(league_id) and exists(select 1 from public.fantrax_sync_attempts a where a.id=fantrax_sync_attempt_items.attempt_id and a.league_id=fantrax_sync_attempt_items.league_id and a.actor_user_id=(select auth.uid())));
-create policy fantrax_sync_items_actor_update on public.fantrax_sync_attempt_items for update to authenticated using (public.can_edit_league(league_id) and exists(select 1 from public.fantrax_sync_attempts a where a.id=fantrax_sync_attempt_items.attempt_id and a.league_id=fantrax_sync_attempt_items.league_id and a.actor_user_id=(select auth.uid()))) with check (public.can_edit_league(league_id));
+create policy fantrax_sync_attempts_members_select on public.fantrax_sync_attempts for select to authenticated using (private.is_league_member(league_id));
+create policy fantrax_sync_attempts_editors_insert on public.fantrax_sync_attempts for insert to authenticated with check (private.can_edit_league(league_id) and actor_user_id=(select auth.uid()));
+create policy fantrax_sync_attempts_actor_update on public.fantrax_sync_attempts for update to authenticated using (private.can_edit_league(league_id) and actor_user_id=(select auth.uid())) with check (private.can_edit_league(league_id) and actor_user_id=(select auth.uid()));
+create policy fantrax_sync_items_members_select on public.fantrax_sync_attempt_items for select to authenticated using (private.is_league_member(league_id));
+create policy fantrax_sync_items_actor_insert on public.fantrax_sync_attempt_items for insert to authenticated with check (private.can_edit_league(league_id) and exists(select 1 from public.fantrax_sync_attempts a where a.id=fantrax_sync_attempt_items.attempt_id and a.league_id=fantrax_sync_attempt_items.league_id and a.actor_user_id=(select auth.uid())));
+create policy fantrax_sync_items_actor_update on public.fantrax_sync_attempt_items for update to authenticated using (private.can_edit_league(league_id) and exists(select 1 from public.fantrax_sync_attempts a where a.id=fantrax_sync_attempt_items.attempt_id and a.league_id=fantrax_sync_attempt_items.league_id and a.actor_user_id=(select auth.uid()))) with check (private.can_edit_league(league_id));
 
 comment on table public.fantrax_sync_attempts is 'Immutable reviewed Fantrax roster-status manifest identity and lifecycle; no credentials or session data.';
 comment on table public.fantrax_sync_attempt_items is 'Immutable reviewed rows with one terminal audit outcome for replay-safe recovery.';
