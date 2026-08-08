@@ -690,3 +690,23 @@
 - Files planned for change in this checkpoint: `docs/NEXT_TASK.md` and `docs/NEXT_TASK_RESULT.md` only.
 - Application code, tests, migrations, schema, deployment state, release settings, and production data were not changed.
 - No Fantrax preview, roster synchronization, imports, ownership repair, score recalculation, browser acceptance, or cloud read/write was performed.
+
+## V5.4.6E Expanded-Acceptance Governance Correction
+
+### Contradiction Resolved
+
+- The Gate 3 execution attempt correctly stopped because `docs/WORKFLOW.md` rule 20 imposed a one-to-three-player production-acceptance maximum while the dedicated Gate 3 contract authorized four or five players.
+- Rule 20 now preserves one to three as the default and fail-closed limit. It permits four to ten only for an explicitly architect-approved, dedicated gate whose active `docs/NEXT_TASK.md` names the exact batch size.
+- The correction makes clear that `NEXT_TASK.md` cannot silently raise the limit, expanded authority is gate-specific, no authorization carries forward automatically, and any missing, ambiguous, or contradictory prerequisite falls closed to one to three.
+
+### Required Expanded-Gate Safeguards
+
+- An expanded exception requires the deployed and accepted durable audit/recovery boundary and expanded-cap database constraints, plus the exact league-scoped opt-in.
+- It also requires Current-period-only data, accepted season context, exact player/team identity, manual-override protection, stale-preview protection, deterministic manifest/digest semantics, replay prevention, and pre/post protected-field verification.
+- Release candidates remain excluded unless the same dedicated gate separately and explicitly authorizes them.
+- Empty-by-default selection, acknowledgement invalidation after selection changes, exact named final confirmation, and repository receipt of only the revalidated subset remain mandatory for both default and expanded gates.
+
+### Scope And Safety
+
+- Documentation changed only in `docs/WORKFLOW.md` and `docs/NEXT_TASK_RESULT.md`; the existing Gate 3 task specification was not altered.
+- Gate 3 was not executed. No application code, tests, migrations, schema, database state, cloud data, deployment configuration, release setting, roster status, ownership, identity, import, or calculated score was changed.
