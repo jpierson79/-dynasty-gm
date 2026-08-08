@@ -316,3 +316,90 @@
 
 - `docs/NEXT_TASK.md` now contains only the V5.4.6D phase definition.
 - No implementation was performed.
+
+## V5.4.6D Local Implementation And Validation
+
+### Baseline And Scope
+
+- Baseline: `feature/manager-intelligence` at `308961a38b94b18deda825d0d262a9372fde4876`.
+- Required repository documentation and both applicable `AGENTS.md` files were read before implementation.
+- Initial working tree was clean. No unrelated dirty files were present.
+- The implementation remains bounded to the existing one-to-three-player controlled selection. It does not authorize or enable a broad roster-status apply.
+
+### Implemented Boundary
+
+- Added proposed migration `009_fantrax_sync_audit.sql` with league-scoped attempt and manifest-item tables, a unique league/manifest digest boundary, database-stamped authenticated actor and timestamps, constrained lifecycle states, immutable manifest identity, retryable failed rows, terminal successful/skipped outcomes, RLS, and no browser delete permission.
+- Added deterministic versioned manifest canonicalization and SHA-256 digesting over active league, Current period, reviewed season context, permanent player UUID, expected owner, previewed/target statuses, and exact Fantrax player/team identities.
+- Added replay filtering so `APPLIED` and `SKIPPED` rows are never written again; `PENDING` and `FAILED` rows remain eligible for guarded recovery.
+- Added an authenticated repository for attempt preparation, idempotent digest lookup, lifecycle transitions, per-row outcomes, finalization, and league-scoped readback.
+- Integrated attempt preparation before status persistence, repeated season/period guards immediately before every grouped player write, durable outcome recording, partial/completed finalization, and attempt reload after a returned operation.
+- Existing owner, current-status, and manual-override predicates remain in the player update query. Existing status-only payload restrictions remain unchanged.
+- Added a read-only V5 audit panel under Settings & Data Health and Data Health checks for invalid or incomplete attempts. These diagnostics use already loaded attempt rows and perform no Fantrax read.
+- Added focused service, digest, idempotency, recovery, migration/RLS static, repository, repeated-guard, and audit-rendering regression coverage.
+
+### Design Decisions
+
+- Manifest version: `1`; canonical rows are sorted by permanent player UUID before serialization.
+- One attempt is unique by `(league_id, manifest_digest)`.
+- Attempt lifecycle: `PREPARED`, `APPLYING`, `COMPLETED`, `PARTIAL`, `FAILED`, or `ABANDONED`.
+- A browser/network interruption may leave an attempt `APPLYING`; starting the same reviewed digest again is permitted. Already successful/skipped rows are filtered out, while failed/pending rows are re-evaluated through every current guard.
+- Attempt identity and manifest fields cannot change after insert. Successful and skipped item outcomes cannot change after recording. Browser code has no delete path.
+- Abandonment is a durable state transition rather than deletion, but no abandonment control is exposed in this bounded local implementation.
+- The existing three-player limit is enforced both by application validation and the proposed database reviewed-count/ordinal constraints.
+
+### Validation
+
+- Focused `v5FantraxSyncAudit.test.mjs`: passed.
+- Focused `v5FantraxRosterSync.test.mjs`: passed.
+- Focused `v5FantraxSeasonContext.test.mjs`: passed.
+- Focused `v5DataHealthExecution.test.mjs`: passed.
+- Full standalone Node suite: 34 of 34 files passed after the final implementation and documentation update.
+- `git diff --check`: passed after the final implementation and documentation update.
+- Supabase CLI is not installed in this environment, so the proposed SQL has static regression coverage but was not executed against a local database.
+
+### Safety And Production Gate
+
+- Preview remains read-only; audit display and Data Health add no Fantrax network read.
+- Player preloads remain paginated and grouped status writes remain batched by expected owner/current status/target status.
+- Permanent player UUIDs are preserved. Missing MLBAM serialization and all import behavior are unchanged.
+- No migration was applied, no deployment was performed, and no authenticated production acceptance or controlled production status write was attempted.
+- No roster synchronization, import, ownership repair, score recalculation, player/team creation, or unrelated cloud write was performed during this implementation task.
+- The proposed migration requires architect review and separate explicit authorization before application. Controlled authenticated acceptance likewise requires separate explicit authorization under `docs/NEXT_TASK.md`.
+- Because those gates remain outstanding, V5.4.6D is locally implemented and synthetically validated but does not yet satisfy its production Definition of Done.
+
+### Files Changed
+
+- `supabase/migrations/009_fantrax_sync_audit.sql`
+- `v5/js/services/fantraxSyncAuditService.js`
+- `v5/js/repositories/fantraxSyncAuditRepository.js`
+- `v5/js/repositories/playerRepository.js`
+- `v5/js/services/dataHealthService.js`
+- `v5/js/state/appState.js`
+- `v5/js/main.js`
+- `v5/js/views/fantraxSyncAuditView.js`
+- `v5/js/views/settingsDataHealthView.js`
+- `tests/v5FantraxSyncAudit.test.mjs`
+- `tests/v5FantraxRosterSync.test.mjs`
+- `tests/v5DataHealthExecution.test.mjs`
+- `docs/NEXT_TASK_RESULT.md`
+
+## V5.4.6D Architect Checkpoint Review
+
+### Approval And Final Migration Inspection
+
+- Architect approval authorizes checkpointing only. Migration 009 remains unapplied and production synchronization remains prohibited.
+- Final RLS inspection confirmed member-only reads, editor/owner writes through existing league helpers, authenticated-attempt ownership for item insertion/update, no anonymous access, and no browser delete grant or repository delete path.
+- Actor identity is overwritten with `auth.uid()` in a database trigger. Attempt creation, start, completion, and applied-row times are database-controlled with `clock_timestamp()` rather than browser timestamps.
+- Attempt league, actor, digest, manifest version, season context, period, reviewed count, and creation time are immutable after insert.
+- Manifest items validate that the attempt, player, expected cloud team, and persisted Fantrax team identity all belong to the same league. Item identity/status fields are immutable.
+- Lifecycle transitions fail closed. Completed and abandoned attempts cannot transition; prepared/partial/failed attempts can only apply or be abandoned; applying attempts can complete, remain partial, fail, be abandoned, or restart for interrupted recovery.
+- `(league_id, manifest_digest)` prevents duplicate attempts. `APPLIED` and `SKIPPED` item outcomes are terminal and excluded from replay; only `PENDING` and `FAILED` rows can receive a recovery outcome and all current write-time guards run again.
+- Both new trigger functions are `SECURITY INVOKER` with `set search_path=public,pg_temp`; no new `SECURITY DEFINER` function was introduced. Existing RLS helper functions are reused without modification.
+- Final review corrected two pre-checkpoint gaps: browser-supplied lifecycle timestamps and insufficient cross-league foreign-reference validation.
+
+### Checkpoint Validation
+
+- Focused command: `node tests/v5FantraxSyncAudit.test.mjs; node tests/v5FantraxRosterSync.test.mjs; node tests/v5FantraxSeasonContext.test.mjs; node tests/v5DataHealthExecution.test.mjs` — all passed.
+- Full PowerShell loop over sorted `tests/*.test.mjs`: 34 discovered, 34 passed, 0 failed.
+- `git diff --check`: passed.
+- Migration application, cloud writes, imports, roster synchronization, ownership repair, and score recalculation: not performed.

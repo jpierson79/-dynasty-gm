@@ -57,6 +57,7 @@ assert.match(repository,/\.in\("id",group\.ids\)/,"status writes remain grouped 
 assert.match(repository,/\.eq\("roster_status",group\.currentRosterStatus\)/,"stale previews are guarded");
 assert.match(repository,/\.eq\("owner_team_id",group\.expectedOwnerTeamId\)/,"ownership changes are guarded at write time");
 assert.match(repository,/roster_status_source\.is\.null,roster_status_source\.neq\.MANUAL/,"manual overrides are guarded at write time");
+assert.match(repository,/await beforeGroup\(group\)/,"season and period guards can be repeated immediately before every write group");
 assert.doesNotMatch(repository,/applyFantraxRosterStatuses[\s\S]*owner_team_id:/,"sync payload must not write ownership");
 assert.match(main,/rosterSyncReviewed/);
 assert.match(main,/validateControlledFantraxStatusUpdates/);

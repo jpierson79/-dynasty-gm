@@ -63,7 +63,7 @@ export async function clearRosterStatusOverrides(leagueId,playerIds=[]){
   }
   return rows;
 }
-export async function applyFantraxRosterStatuses(leagueId,updates=[]){
+export async function applyFantraxRosterStatuses(leagueId,updates=[],{beforeGroup=()=>{}}={}){
   if(!leagueId)throw new Error("Active league is required.");
   if(!updates.length)return {reviewed:0,updated:[],skipped:[],failures:[]};
   const supabase=await authenticatedClient(),updated=[],failures=[],groups=new Map();
@@ -74,6 +74,7 @@ export async function applyFantraxRosterStatuses(leagueId,updates=[]){
   });
   for(const group of groups.values()){
     try{
+      await beforeGroup(group);
       const result=await request(
         supabase.from("players").update({roster_status:group.rosterStatus,roster_status_source:"FANTRAX",updated_at:new Date().toISOString()}).eq("league_id",leagueId).in("id",group.ids).eq("owner_team_id",group.expectedOwnerTeamId).eq("roster_status",group.currentRosterStatus).or("roster_status_source.is.null,roster_status_source.neq.MANUAL").select("id,name,owner_team_id,roster_status,roster_status_source,roster_status_override_at,roster_status_override_by,is_free_agent,fantrax_id,mlbam_id,updated_at"),
         "players reviewed Fantrax roster-status update"

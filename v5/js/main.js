@@ -22,6 +22,8 @@ import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings
 import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
 import { memberships, saveFantraxSeasonContext } from "./repositories/leagueRepository.js?v5-4-6c-season";
 import { clearFantraxPendingReviews, fantraxSeasonWriteGuard, reviewedFantraxSeasonSettings, validateFantraxSeasonReview } from "./services/fantraxSeasonContextService.js?v5-4-6c-season";
+import { canonicalFantraxSyncManifest, fantraxSyncAttemptStatus, fantraxSyncManifestDigest, fantraxSyncOutcomeRows, pendingFantraxSyncUpdates, validateFantraxSyncManifest } from "./services/fantraxSyncAuditService.js?v5-4-6d-audit";
+import { finalizeFantraxSyncAttempt, listFantraxSyncAttempts, markFantraxSyncAttemptApplying, prepareFantraxSyncAttempt, recordFantraxSyncOutcomes } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6d-audit";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
@@ -165,7 +167,8 @@ async function loadFantraxPreview(){
   try{
     const [players,teams]=await Promise.all([allPlayers(appState.activeLeague.id),Promise.resolve(appState.teams||[])]);
     const next=await fetchFantraxPublicPreview({externalLeagueId,period,players,teams,reviewedSeasonContext:appState.activeLeague?.settings?.fantraxSeasonContext});
-    setState({fantraxPreview:{...next,externalLeagueId,period}});
+    const fantraxSyncAttempts=await listFantraxSyncAttempts(appState.activeLeague.id).catch(()=>[]);
+    setState({fantraxPreview:{...next,externalLeagueId,period},fantraxSyncAttempts});
   }catch(error){setState({fantraxPreview:fantraxPreviewState({externalLeagueId,period,loading:false,error:String(error?.message||error)})})}
 }
 async function persistFantraxTeamMappings(){
@@ -189,11 +192,27 @@ async function persistReviewedFantraxRosterStatuses(){
   if(!seasonGuard.valid||!periodGuard.valid||!preview.rosterSyncReviewed||!validation.valid){setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:false,error:seasonGuard.error||periodGuard.error||validation.errors.join(" ")||"Review the eligible Fantrax status changes before applying."})});return}
   setState({fantraxPreview:fantraxPreviewState({savingRosterSync:true,confirmRosterSync:false,error:""})});
   try{
-    const result=await applyFantraxRosterStatuses(appState.activeLeague.id,validation.updates);
+    const leagueId=appState.activeLeague.id,seasonContext=preview.data?.seasonContextComparison?.observed;
+    const manifest=canonicalFantraxSyncManifest({leagueId,period:preview.period,seasonContext,updates:validation.updates}),manifestValidation=validateFantraxSyncManifest(manifest);
+    if(!manifestValidation.valid)throw new Error(manifestValidation.errors.join(" "));
+    const digest=await fantraxSyncManifestDigest({leagueId,period:preview.period,seasonContext,updates:validation.updates});
+    const attempt=await prepareFantraxSyncAttempt(leagueId,{digest,manifest});
+    const remaining=pendingFantraxSyncUpdates(manifest,attempt.fantrax_sync_attempt_items||[]);
+    if(!remaining.length)throw new Error("This reviewed Fantrax synchronization manifest already has terminal outcomes and cannot be replayed.");
+    await markFantraxSyncAttemptApplying(leagueId,attempt.id);
+    const repeatGuard=()=>{
+      const currentPreview=appState.fantraxPreview,currentSeason=fantraxSeasonWriteGuard(currentPreview.data?.seasonContextComparison),currentPeriod=fantraxRosterSyncPeriodGuard(currentPreview.period);
+      if(!currentSeason.valid||!currentPeriod.valid)throw new Error(currentSeason.error||currentPeriod.error);
+    };
+    const result=await applyFantraxRosterStatuses(leagueId,remaining,{beforeGroup:repeatGuard});
+    const recorded=await recordFantraxSyncOutcomes(leagueId,attempt.id,fantraxSyncOutcomeRows(attempt.id,result));
+    const recordedByPlayer=new Map(recorded.map(item=>[item.player_id,item])),auditItems=(attempt.fantrax_sync_attempt_items||[]).map(item=>recordedByPlayer.get(item.player_id)||item);
+    await finalizeFantraxSyncAttempt(leagueId,attempt.id,fantraxSyncAttemptStatus(auditItems));
     const summary=fantraxRosterSyncSummary(result);
     await refreshLeagueData();
     const players=await allPlayers(appState.activeLeague.id),next=await fetchFantraxPublicPreview({externalLeagueId:preview.externalLeagueId,period:preview.period,players,teams:appState.teams,reviewedSeasonContext:appState.activeLeague?.settings?.fantraxSeasonContext});
-    setState({fantraxPreview:{...next,externalLeagueId:preview.externalLeagueId,period:preview.period,selectedTab:"rosters",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],savingRosterSync:false,lastRosterSync:{at:new Date().toISOString(),...summary}}});
+    const fantraxSyncAttempts=await listFantraxSyncAttempts(leagueId);
+    setState({fantraxPreview:{...next,externalLeagueId:preview.externalLeagueId,period:preview.period,selectedTab:"rosters",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],savingRosterSync:false,lastRosterSync:{at:new Date().toISOString(),attemptId:attempt.id,manifestDigest:digest,...summary}},fantraxSyncAttempts});
     if(summary.skipped||summary.failedGroups)setError(`Fantrax roster-status apply was incomplete: ${summary.updated} updated, ${summary.skipped} skipped, ${summary.failedGroups} failed groups. ${Object.entries(summary.skipReasons).map(([reason,count])=>`${reason}: ${count}`).join("; ")}`);
     else setState({statusMessage:`Applied all ${summary.updated} reviewed Fantrax roster-status updates.`});
   }catch(error){setState({fantraxPreview:fantraxPreviewState({savingRosterSync:false,error:String(error?.message||error)})})}
@@ -746,7 +765,7 @@ function bindShellEvents(){
       if(appState.healthRunning)return;
       setState({healthRunning:true,healthError:""});
       try{
-        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview}));
+        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview,fantraxSyncAttempts:appState.fantraxSyncAttempts}));
         setState({health,healthDetails:null,healthRunning:false,healthError:""});
       }catch(error){
         setState({healthRunning:false,healthError:String(error?.message||error||"Data Health failed.")});

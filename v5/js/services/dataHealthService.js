@@ -11,6 +11,7 @@ import { DECISION_RULE_VERSION, getRosterRecommendations, getWaiverRecommendatio
 import { TRADE_ANALYSIS_VERSION } from "./tradeAnalysisService.js";
 import { USER_TEAM_RESOLUTION_VERSION, resolveUserFantasyTeam } from "./userTeamResolver.js?v5-4-2-user-team-association";
 import { buildScoreDiagnosticsFromRows } from "./liveScoreDiagnosticsService.js";
+import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6d-audit";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -85,7 +86,7 @@ export function fantraxPreviewHealthChecks(preview=null){
     item("Last Fantrax Preview Fetch",data?.fetchedAt?"INFO":"WARNING",[{fetchedAt:data?.fetchedAt||"Never",previewOnly:true,cloudWrites:0}])
   ];
 }
-export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null}={}){
+export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null,fantraxSyncAttempts=[]}={}){
   const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows]=await Promise.all([
     leagues.memberships(leagueId),
     players.allPlayers(leagueId),
@@ -96,6 +97,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     leagues.leagueById(leagueId).then(row=>row?[row]:[]).catch(()=>[])
   ]);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
+  const fantraxAudit=fantraxSyncAuditHealth(fantraxSyncAttempts);
   const invalidTeamRows=teams.excludedInvalidTeamRowsFromRows(rawTeamRows,playerRows);
   const teamIds=new Set(teamRows.map(team=>team.id));
   const playerIds=new Set(playerRows.map(player=>player.id));
@@ -217,6 +219,8 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const staleTradeVersion=tradeState.analysis&&tradeState.analysis.tradeAnalysisVersion!==TRADE_ANALYSIS_VERSION?[tradeState.analysis]:[];
   const tradeScoreVersion=tradeState.analysis?.scoreVersion||tradeState.scoreVersion||"";
   const checks=[
+    {name:"Fantrax Synchronization Audit Integrity",status:fantraxAudit.status,details:detail("Fantrax Synchronization Audit Integrity",fantraxAudit.invalid)},
+    {name:"Incomplete Fantrax Synchronization Attempts",status:fantraxAudit.incomplete.length?"WARNING":"PASS",details:detail("Incomplete Fantrax Synchronization Attempts",fantraxAudit.incomplete)},
     {name:"League exists",status:leagueId?"PASS":"FAIL",details:detail("League exists",leagueId?[{leagueId}]:[])},
     {name:"Membership exists",status:membershipRows.length?"PASS":"FAIL",details:detail("Membership exists",membershipRows)},
     {name:"Player count",status:"INFO",details:detail("Players",playerRows)},
