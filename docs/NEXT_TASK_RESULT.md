@@ -618,3 +618,44 @@
 - Controlled audit records and opt-in setting changes: none.
 - Deployment or Pages changes: none.
 - Fantrax synchronization, player/roster writes, imports, ownership repair, score recalculation, and unrelated cloud writes: none.
+
+## V5.4.6E Gate 2 Migration 010/011 Deployment And Expanded-Batch Acceptance
+
+### Baseline And Migration State
+
+- Resumed from clean `feature/manager-intelligence` commit `dc8acee2b349d86e0376b71e65ca1e329aa950aa`.
+- Confirmed migration 010 was already deployed. Applied committed migration 011 exactly once through the approved authenticated Supabase SQL Editor workflow; execution returned `Success. No rows returned.` Migrations 009 and 010 were neither reapplied nor modified.
+- Migration 011 preserved the existing two attempts and four items, retained `SECURITY INVOKER`, `search_path=public, pg_temp`, private authorization helpers, RLS, and the existing migration-010 release/cap boundary.
+
+### Controlled Database Boundary Acceptance
+
+- Ran 14 authenticated database checks as actor `a7049612-645f-4bba-948e-63f8c195950c` against league `6573ac24-f433-48c7-a834-ffe6b58726bc`; all 14 passed.
+- New manifest-v1 creation was rejected with `New Fantrax synchronization attempts require manifest version 2.` New manifest-v2 creation succeeded, and database actor stamping replaced the supplied bogus actor with the authenticated actor.
+- Existing exact manifest-v1 recovery remained valid, while manifest version remained immutable. Existing history remained exactly two attempts and four items.
+- The default tier rejected four rows; the reviewed expanded tier accepted ten and rejected eleven. A league without the exact opt-in could not create an expanded attempt, and disabling the opt-in blocked new expanded attempts.
+- An existing exact expanded manifest remained recoverable after disablement. `APPLIED`/`SKIPPED` items remained terminal and non-replayable; `FAILED`/`PENDING` items remained recoverable through the reviewed lifecycle.
+- Cross-league membership/edit checks failed for a foreign league UUID. Manifest-v2 persistence bound the release tier and batch limit, and actor identity remained database-stamped.
+- Every successful mutation proof ran inside a deliberately rolled-back PL/pgSQL subtransaction; expected rejection cases wrote nothing. The temporary results table was dropped at commit. No controlled test attempt, item, or setting mutation was retained.
+
+### Hosted Authenticated Acceptance
+
+- GitHub Pages temporarily published exact commit `dc8acee2b349d86e0376b71e65ca1e329aa950aa` from `feature/manager-intelligence` in successful `pages-build-deployment` run `31274131330` (run 24, 45 seconds; artifact digest `sha256:f34a19accc5a72cdb37a5cc0d2264e06113d45849d63db869a0f406e8286ee0a`).
+- Authenticated V5 exited Loading and rendered `Cloud - Reddit Phanatics`. A read-only Current preview matched league `xryuc2ewmhi0d2vm`, season `2026`, history `8mifq27zmhi0d2vm`, with 24 periods.
+- Default mode displayed `CONTROLLED_3`, effective cap 3, and Default mode. The exact reviewed opt-in displayed `V5.4.6E_OPT_IN_10`, effective cap 10, and Opt-in enabled.
+- Changing the release configuration invalidated the existing review before another selection could proceed. In expanded mode exactly ten players could be selected; attempting an eleventh left the checked count at ten. The review was cancelled before confirmation, so no synchronization path was invoked.
+- Settings & Data Health rendered the persisted release, reviewed/cap, terminal, recoverable, manifest, and attempt UUID information for both historical attempts. Data Health completed with 0 failures and 23 expected warnings, including the two intentionally incomplete audit attempts. Release/cap consistency and active release configuration passed.
+- Season-context matching, Current-period-only messaging, stale-review invalidation, manual-override protection availability, exact player/team identity diagnostics, and protected status-only behavior remained visible and active. Browser console error/warning logs were empty.
+- The temporary opt-in was explicitly disabled after acceptance and returned the league to recovery-only expanded configuration. No new expanded attempt was created.
+- GitHub Pages was restored to `main`; restoration `pages-build-deployment` run `31274470989` (run 25) completed successfully in 41 seconds.
+
+### Protected Data And Safety
+
+- Post-acceptance counts remained players 10,199, teams 12, calculated scores 20,020, player metrics 209, audit attempts 2, and audit items 4. Deterministic post-check digests were players `436a02a2b6b7d04a88fd4602b112b0a4`, teams `6a9ade14d3ff86e52f2bbf559fbdf90e`, calculated scores `33d41a5c722b275995e3f6e37fd870b5`, player metrics `0484cc19b1c360f820bb23ee48cda5a7`, audit attempts `8cff8c310e8d22c429bbec475071cb52`, and audit items `85ea5911a416cecd81ad85e1b6b0a4f`. No acceptance operation changed player ownership, roster status, identity, manual-override fields, scores, imports, metrics, teams, or managers.
+- Authorized production mutations were limited to applying migration 011 and temporarily enabling then disabling the reviewed league opt-in. All database behavior records were rolled back; no audit cleanup was required.
+- No actual roster synchronization, import, ownership repair, identity repair, score recalculation, or unrelated cloud write was performed.
+
+### Automated Validation And Outcome
+
+- Focused V5.4.6E validation: 9 of 9 test files passed (`v5FantraxRosterSync`, `v5FantraxSyncAudit`, `v5FantraxSeasonContext`, `v5FantraxTeamIdentity`, `v5FantraxPublicPreview`, `v5RosterStatusManager`, `v5DataHealthExecution`, `cloudFirstWorkflow`, and `supabaseProductionConfig`).
+- Full sorted PowerShell loop over every `tests/*.test.mjs`: 34 discovered, 34 passed, 0 failed.
+- Status: **accepted** for V5.4.6E Gate 2 migration 010/011 deployment and expanded-boundary/UI acceptance. This acceptance does not authorize a ten-player roster synchronization.
