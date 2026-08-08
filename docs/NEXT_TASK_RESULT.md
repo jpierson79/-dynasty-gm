@@ -409,3 +409,62 @@
 - Implementation checkpoint commit: `f24320cde565e2ec06b67434866f32b5d2a8345b` (`Add durable Fantrax sync audit boundary`).
 - Push result: succeeded; `origin/feature/manager-intelligence` advanced from `308961a` to `f24320c`.
 - Migration 009 remained unapplied before and after the push. No deployment or cloud mutation was performed.
+
+## V5.4.6D-1 Failed Deployment Correction
+
+### Failure And Correction
+
+- The first authorized migration-009 deployment attempt failed transactionally while creating RLS policies because production exposes `private.is_league_member(uuid)` and `private.can_edit_league(uuid)`, while the reviewed migration referenced removed `public` helpers.
+- The failed transaction rolled back completely; production retained neither audit table and migration 009 remained unapplied.
+- Migration 009 now uses the existing production `private` helpers for every membership and edit-authorization policy. No public wrapper was added and neither helper function was altered.
+- A full schema-qualification review found no other mismatch: the remaining `public.leagues`, `public.players`, `public.teams`, `auth.users`, and `auth.uid()` references match the repository migration chain, and migration 007 supplies `teams.fantrax_team_id`.
+- Focused regression coverage now requires both private helper references and fails on either removed public helper reference.
+
+### Validation And Safety
+
+- Focused V5.4.6D audit, roster-sync, season-context, and Data Health tests passed.
+- The dedicated migration helper-schema static check passed.
+- Full standalone Node suite: 34 of 34 test files passed.
+- Migration 009 was not applied during this correction. No cloud write, roster synchronization, import, ownership repair, or score recalculation occurred.
+- Per task staging restrictions, this workflow-required correction record is intentionally excluded from the migration/test-only correction commit.
+
+## V5.4.6D-1 Audit Migration Deployment And Controlled Recovery Acceptance
+
+### Baseline And Deployment
+
+- Resumed `feature/manager-intelligence` at `e917a8a518b80e7279a3c67fd3acdb6332862e3e`, preserving the existing uncommitted failed-deployment correction record above.
+- A harmless read-only browser tab listing verified Browser/Chrome communication before any deployment action.
+- Read-only production preflight found both audit tables absent, both required `private` authorization helpers present, both removed `public` helpers absent, and the required team identity column present.
+- The exact reviewed `supabase/migrations/009_fantrax_sync_audit.sql` was applied successfully once through the authenticated Supabase SQL Editor. An earlier editor submission retained preflight text and failed at parse time before executing a migration statement; a read-only check confirmed both tables were still absent before the clean exact-file submission.
+
+### Schema And Authorization Verification
+
+- `fantrax_sync_attempts` and `fantrax_sync_attempt_items` exist with RLS enabled.
+- All six authenticated policies use only `private.is_league_member(uuid)` for reads and `private.can_edit_league(uuid)` for writes; no public helper wrapper exists or was created.
+- Both audit-protection triggers are enabled. Their functions are `SECURITY INVOKER`, with `search_path=public, pg_temp`; no new `SECURITY DEFINER` risk was introduced.
+- Authenticated production simulation resolved `auth.uid()` to the league actor, allowed membership/edit checks for the active league, and rejected both checks for a foreign league UUID.
+
+### Controlled Audit And Recovery Acceptance
+
+- Inserted exactly two audit-only attempts and four manifest items through authenticated RLS for the active league. No roster or player row was written.
+- Database actor stamping replaced a bogus supplied actor with authenticated user `a7049612-645f-4bba-948e-63f8c195950c`; database start and completion timestamps were also present.
+- Attempt `9e7d215e-2cbe-489c-8cb2-42b1c43bd6f9` durably retained `APPLIED` and replay-safe `SKIPPED` outcomes.
+- Attempt `eac30c15-cf03-4f77-9afd-92ceb32b5fdc` durably retained recoverable `FAILED` and `PENDING` outcomes.
+- A rollback-only negative/recovery transaction proved digest and season-context manifest immutability, terminal applied-row replay prevention, invalid lifecycle rejection, duplicate-digest prevention, cross-league isolation, and historical-period rejection. It also proved the permitted partial recovery path from `PARTIAL` through `APPLYING`, item recovery, and final `PARTIAL`; rollback preserved the durable failed/pending evidence.
+- Current season context was league `xryuc2ewmhi0d2vm`, season `2026`, history `8mifq27zmhi0d2vm`, Current period. The historical-period rejection and fresh authenticated current-period preview prove the repeated season/period boundary remained fail closed.
+
+### Hosted Authenticated Acceptance
+
+- GitHub Pages temporarily published exact commit `e917a8a518b80e7279a3c67fd3acdb6332862e3e` from `feature/manager-intelligence` in successful workflow run `31266256312` (`pages-build-deployment` run 22; 47 seconds).
+- A same-origin cache-busted authenticated V5 load rendered `Cloud - Reddit Phanatics`, exited `Loading`, fetched a read-only Current-period Fantrax preview, and reported `Fantrax season context: MATCH` with 24 periods.
+- Settings & Data Health rendered both durable audit attempts with their manifest digests, lifecycle state, reviewed counts, and attempt IDs.
+- Data Health completed with 0 failures and 23 warnings. The audit integrity and two intentionally incomplete attempts appeared as warnings, as designed; browser error/warning logs were empty.
+- GitHub Pages was restored to `main`. Restoration workflow run `31266646176` (`pages-build-deployment` run 23) completed successfully; build, report, and deploy jobs all passed.
+
+### Safety And Outcome
+
+- Status: **accepted** for the bounded V5.4.6D-1 migration and controlled audit/recovery scope.
+- Migration 009 was applied once successfully after the fully rolled-back failed deployment attempt documented above.
+- Authorized cloud mutations were limited to the migration and the two audit-only attempts/four item rows. The Fantrax preview was read-only.
+- Broad roster synchronization, roster/status persistence, imports, ownership repair, score recalculation, player/team mutation, and unrelated cloud writes were not performed.
+- No application code, migration SQL, or tests were modified during acceptance. Only this acceptance record was updated.
