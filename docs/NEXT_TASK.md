@@ -1,64 +1,84 @@
-# Next Task: V5.4.6C-2 Hosted Loading Boundary Repair and Final Acceptance
+# Next Task: V5.4.6D Durable Fantrax Synchronization Audit And Recovery Boundary
 
 ## Status And Baseline
 
-- Status: authorized for implementation, authenticated preview deployment, final acceptance, narrow commit, and push.
-- Branch: `codex/v5-season-rollover-reconciliation`.
-- Starting commit: `b37c516cc9b53991db689891bae4f7e968c34c90` (`Add Fantrax season rollover safety`).
-- Prepared: 2026-08-06 America/Chicago.
-- Preserve unrelated untracked `.codex/` content and the existing uncommitted acceptance report.
-- Do not merge into `main`.
-
-## Verified Problem
-
-The hosted reconciliation branch renders the shell but remains at `Loading`. Repository inspection shows that V5 imports the shared Supabase client, which statically imports `js/config/supabase.js`, while the reconciliation branch ignores and does not track that browser configuration file. GitHub Pages therefore publishes an incomplete module graph. Earlier repository commit `94cc451` established that the public Supabase URL and publishable anonymous key are safe, required production configuration and added a regression test.
-
-Stop before deviating if fresh browser/network evidence contradicts this diagnosis or reveals superseding rollover behavior.
+- Status: authorized for design and implementation only after architect review of this phase definition.
+- Branch baseline: `feature/manager-intelligence` at `26d6b02299b2e3e35b427532c5ba6c28281329e4`.
+- V5.4.6C season-rollover safety is merged, tested, and authenticated-deployment accepted.
+- This phase must not merge into `main` or authorize broad roster synchronization by itself.
 
 ## Objective
 
-Restore the smallest established production configuration boundary so the reconciliation branch boots on its hosted origin, then complete authenticated live acceptance of the season-context workflow. Do not reimplement or broaden V5.4.6C.
+Create a durable, league-scoped audit and recovery boundary for reviewed Fantrax roster-status synchronization attempts. Every attempt must record the exact reviewed manifest and season context, the acting authenticated user, lifecycle state, grouped write outcomes, classified skips, failures, and completion time so an interrupted or partial operation can be inspected and safely reconciled without replaying successful writes.
+
+## Why This Phase Is Next
+
+The guarded V5.4.6B apply path has controlled production acceptance for one exact three-player subset, and V5.4.6C now prevents cross-season misuse. Broader production use remains unauthorized. The current UI retains only the latest apply result in browser session state; there is no durable operation record, idempotency key, or recovery view for partial and interrupted attempts. Expanding synchronization before that boundary would make support, review, and safe retry weaker precisely when the write set becomes larger.
 
 ## Authorized Scope
 
-1. Restore tracked browser-safe `js/config/supabase.js` using the established public URL and publishable anonymous key already present in repository history.
-2. Adjust `.gitignore` narrowly so that exact production file can be tracked while local secret variants remain ignored.
-3. Restore or add the focused production-configuration regression test.
-4. Deploy only the reconciliation branch to an authenticated preview origin without merging.
-5. Perform the seven live acceptance scenarios below using read-only behavior or safe simulation wherever a persistence write is not necessary.
-6. Preserve the explicitly approved, fail-closed ordering that saves reviewed team mappings before reviewed season-context settings. Do not make this sequence atomic or reorder it in this phase.
+1. Design a minimal Supabase schema for immutable synchronization-attempt identity and append-only or otherwise tamper-resistant per-row outcomes.
+2. Scope every attempt and outcome to the active league and reviewed Fantrax season context.
+3. Generate a deterministic manifest digest from the exact reviewed player UUID, expected owner, previewed status, target status, and relevant external identity fields.
+4. Require an authenticated actor and database-controlled timestamps; browser input must not spoof audit identity.
+5. Record attempt lifecycle states that distinguish prepared, applying, completed, partially completed, and failed/interrupted outcomes.
+6. Make retries replay-safe: previously successful rows must not be written again, and every remaining row must still pass the current season, period, identity, owner, status, and manual-override guards immediately before persistence.
+7. Add a read-only V5 audit/recovery view and Data Health diagnostics for incomplete or inconsistent attempts.
+8. Add focused migration, repository, service, UI, RLS, idempotency, partial-failure, and recovery tests.
+9. Perform controlled authenticated acceptance with a deliberately bounded manifest only after migration review and explicit authorization.
 
 ## Required Safety Invariants
 
-- Preserve current-period-only synchronization, exact Fantrax identity matching, manual override protection, stale-preview protection, league scoping, and write-time field restrictions.
-- Do not perform roster synchronization, imports, score recalculation, ownership repair, player/team creation, schema changes, migrations, or unrelated cloud writes.
+- Current-period-only synchronization remains mandatory.
+- The reviewed and observed Fantrax season contexts must match at preparation, immediately before each write group, and during recovery.
+- Exact Fantrax player and team identity remains mandatory; names and fuzzy matching are prohibited.
+- Manual overrides, owner changes, status changes, unmatched identities, ownership conflicts, and unclassified Fantrax statuses remain excluded or classified for review.
+- Write payloads remain limited to roster status, Fantrax provenance, and the established update timestamp. Ownership, free-agent state, UUIDs, external identities, scores, HKB values, metrics, managers, and team identity are never synchronization payload fields.
+- Audit records must be league-scoped under RLS and must not contain credentials, sessions, cookies, private keys, or Supabase service-role keys.
 - Preview and Data Health remain read-only.
-- Any simulated drift must not replace the production-reviewed season configuration unless a separately confirmed acknowledgement is required for the acceptance and can be safely restored and verified.
-- No credentials, sessions, passwords, private keys, or service-role keys may be logged or committed.
+- No automatic ownership repair, player/team creation, import, score recalculation, or unrelated cloud write is permitted.
+- The approved mapping-first/settings-second season-review sequence remains unchanged.
+
+## Required Design Decisions Before Migration
+
+1. Define attempt and row-outcome tables, keys, constraints, lifecycle transitions, retention, and rollback.
+2. Define the deterministic manifest serialization and digest version.
+3. Define which transitions are database-enforced and how authenticated actor identity is stamped.
+4. Define recovery semantics for browser closure, network failure, partial group success, stale season context, and a newly created manual override.
+5. Prove that replay cannot broaden the originally reviewed UUID set or bypass any write-time guard.
+6. Decide how an operator explicitly abandons an incomplete attempt without deleting its evidence.
 
 ## Required Validation
 
-Run focused configuration/auth tests, `v5FantraxSeasonContext` tests, focused Fantrax tests, roster-sync tests, roster-manager tests, Data Health tests, auth tests, every `tests/*.test.mjs` file, and `git diff --check`.
+- Migration and RLS tests.
+- Manifest determinism and tamper-detection tests.
+- Duplicate-attempt and duplicate-row idempotency tests.
+- Interrupted and partial-group recovery tests.
+- Current-period, season-context, exact-identity, expected-owner, previewed-status, and manual-override regression tests.
+- Data Health and audit-view rendering tests.
+- Focused auth tests and every `tests/*.test.mjs` file.
+- `git diff --check`.
+- Authenticated acceptance must prove bounded success, deliberate partial/interrupted recovery, replay safety, newly protected-row skipping, durable results after reload, and unchanged protected-field hashes.
 
-Hosted acceptance must prove:
+## Dependencies
 
-1. current reviewed season context renders as matching;
-2. mocked or safely simulated rollover drift remains readable;
-3. team-identity and roster-status writes are blocked during drift;
-4. the explicit acknowledgement and complete mapping confirmation flow succeeds safely;
-5. period or league-configuration changes invalidate pending review state;
-6. the season guard is repeated immediately before persistence;
-7. Data Health renders the reviewed/observed context and block reason without a new Fantrax read.
+- ADR-015 team identity and the persisted 10-of-10 mappings.
+- ADR-016 database-stamped manual-override provenance.
+- ADR-017 exact reviewed-set and write-time roster-status guards.
+- ADR-018 reviewed Fantrax season-context matching and rollover remapping.
+- The deployed `fantrax-public-league-preview` Edge Function and current-period guard.
+- Existing league membership/RLS boundaries and authenticated user identity.
+- Explicit approval before creating or applying a migration and before any controlled production write.
 
-Also verify a clean hosted reload, authenticated session continuity, responsive controls, and no browser console/module-load errors.
+## Explicitly Out Of Scope
 
-## Completion And Git Rules
-
-1. Record root cause, repair, deployment evidence, every acceptance result, data operations, tests, changed files, unrelated dirty files, and final repository state in `docs/NEXT_TASK_RESULT.md`.
-2. Update durable/current project documentation only where verified evidence requires it.
-3. If and only if every required automated and hosted acceptance check passes, stage only intended files, commit with a narrow message, and push the reconciliation branch.
-4. If acceptance does not pass, do not commit or push; record the blocker and leave the branch out of `main`.
+- Applying the remaining broad eligible roster-status set.
+- Increasing or removing the existing three-player controlled-selection limit.
+- Ownership synchronization or repair.
+- Player, team, manager, score, metric, HKB, or free-agent writes.
+- Fantrax credentials, cookies, Selenium, Python, or undocumented authenticated endpoints.
+- Reworking the V5.4.6C season-review save ordering.
 
 ## Definition Of Done
 
-The hosted reconciliation branch loads with its established public Supabase configuration, all seven authenticated V5.4.6C scenarios pass without unauthorized data mutation, the approved fail-closed two-step save sequence remains unchanged, complete automated validation passes, intended changes are committed and pushed, and no merge into `main` occurs.
+A reviewed migration and application boundary durably records every bounded Fantrax roster-status attempt and per-row outcome, interrupted or partial attempts are recoverable without duplicate writes, all existing guards are repeated during recovery, authenticated acceptance and the full automated suite pass, and protected data remains unchanged. Completion does not authorize broader synchronization or a merge into `main`.

@@ -279,3 +279,40 @@
 
 - GitHub Pages was restored to `main` at repository root after acceptance. Restoration workflow run `31228869896` (`pages-build-deployment` run 21) completed successfully in 41 seconds and repository settings showed `main` as the configured source.
 - No merge was performed. V5.4.6C-2 authenticated deployment acceptance is complete, but merge remains gated on architect review.
+
+## Post-V5.4.6C Architectural Phase Selection
+
+### Decision
+
+- Selected next phase: **V5.4.6D Durable Fantrax Synchronization Audit And Recovery Boundary**.
+- Baseline reviewed: integrated `feature/manager-intelligence` commit `26d6b02299b2e3e35b427532c5ba6c28281329e4`.
+- This documentation task changes no application code, schema, migration, deployment, or cloud data.
+
+### Reasoning
+
+- V5.4.6A established authoritative team identity, V5.4.6B established manual-override provenance plus exact reviewed status-only writes, and V5.4.6C closed the season-rollover gap. Those prerequisites make the write path safe enough for a deliberately bounded apply, but not yet operationally safe for a larger production manifest.
+- Repository evidence explicitly limits production acceptance to one exact three-player apply and states that broader synchronization remains unauthorized.
+- The current `lastRosterSync` result is browser-session state. The repository has no durable synchronization-attempt entity, immutable reviewed-manifest digest, per-row result ledger, idempotency boundary, or operator recovery view.
+- Existing grouped writes correctly classify partial outcomes and re-run owner, current-status, and manual-override checks. A durable audit/recovery layer can preserve those guards while making interruption and retry behavior inspectable and replay-safe.
+- This phase has higher architectural value than immediately expanding the selection limit: it reduces the operational risk of partial writes without broadening data mutation authority.
+
+### Dependencies And Ordering
+
+1. Preserve ADR-015 team identity and league scoping.
+2. Preserve ADR-016 database-stamped manual-override identity and timestamps.
+3. Reuse ADR-017 reviewed manifests, expected-owner/current-status checks, field-limited writes, and classified skips.
+4. Reuse ADR-018 season-context comparison and require it again during recovery.
+5. Review table design, lifecycle transitions, RLS, actor stamping, digest serialization, retention, and rollback before authorizing a migration.
+6. Obtain separate approval before migration application or any controlled production write.
+
+### Alternatives Deferred
+
+- **Broad application of the remaining eligible status rows:** deferred because the existing controlled acceptance does not authorize it and no durable recovery record exists.
+- **Persisting a separate Fantrax API player-ID column:** deferred because the strict stored-ID transformation currently resolves the complete live roster; the 36 catalog misses do not affect the current roster.
+- **Ownership synchronization:** deferred because ownership conflicts remain explicit `REVIEW_CONFLICT` cases and automatic repair is prohibited.
+- **Player-level Fantrax scoring integration:** deferred because the public preview exposes team matchup scores, not verified player fantasy points.
+
+### Documentation Outcome
+
+- `docs/NEXT_TASK.md` now contains only the V5.4.6D phase definition.
+- No implementation was performed.
