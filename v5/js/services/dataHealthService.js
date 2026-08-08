@@ -11,7 +11,8 @@ import { DECISION_RULE_VERSION, getRosterRecommendations, getWaiverRecommendatio
 import { TRADE_ANALYSIS_VERSION } from "./tradeAnalysisService.js";
 import { USER_TEAM_RESOLUTION_VERSION, resolveUserFantasyTeam } from "./userTeamResolver.js?v5-4-2-user-team-association";
 import { buildScoreDiagnosticsFromRows } from "./liveScoreDiagnosticsService.js";
-import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6d-audit";
+import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6e-opt-in";
+import { fantraxRosterSyncReleasePolicy } from "./fantraxRosterSyncService.js?v5-4-6e-opt-in";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -98,6 +99,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   ]);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
   const fantraxAudit=fantraxSyncAuditHealth(fantraxSyncAttempts);
+  const fantraxRelease=fantraxRosterSyncReleasePolicy(leagueRows[0]||{});
   const invalidTeamRows=teams.excludedInvalidTeamRowsFromRows(rawTeamRows,playerRows);
   const teamIds=new Set(teamRows.map(team=>team.id));
   const playerIds=new Set(playerRows.map(player=>player.id));
@@ -220,6 +222,8 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const tradeScoreVersion=tradeState.analysis?.scoreVersion||tradeState.scoreVersion||"";
   const checks=[
     {name:"Fantrax Synchronization Audit Integrity",status:fantraxAudit.status,details:detail("Fantrax Synchronization Audit Integrity",fantraxAudit.invalid)},
+    {name:"Fantrax Synchronization Release And Cap Consistency",status:fantraxAudit.releaseIssues.length?"FAIL":"PASS",details:detail("Fantrax Synchronization Release And Cap Consistency",fantraxAudit.releaseIssues)},
+    {name:"Fantrax Synchronization Active Release Configuration",status:fantraxRelease.valid?fantraxRelease.recoveryOnly?"WARNING":"PASS":"FAIL",details:detail("Fantrax Synchronization Active Release Configuration",[{releaseTier:fantraxRelease.releaseTier,effectiveCap:fantraxRelease.effectiveCap,optedIn:fantraxRelease.optedIn,recoveryOnly:fantraxRelease.recoveryOnly,error:fantraxRelease.error}])},
     {name:"Incomplete Fantrax Synchronization Attempts",status:fantraxAudit.incomplete.length?"WARNING":"PASS",details:detail("Incomplete Fantrax Synchronization Attempts",fantraxAudit.incomplete)},
     {name:"League exists",status:leagueId?"PASS":"FAIL",details:detail("League exists",leagueId?[{leagueId}]:[])},
     {name:"Membership exists",status:membershipRows.length?"PASS":"FAIL",details:detail("Membership exists",membershipRows)},

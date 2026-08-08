@@ -1,5 +1,5 @@
 import { client, countLeagueRows, pagedLeagueRows, request, selectAllLeagueRows, selectLeagueRows } from "./baseRepository.js";
-import { fantraxRosterSyncSkipReason } from "../services/fantraxRosterSyncService.js?v5-4-6b3-controlled-apply";
+import { fantraxRosterSyncSkipReason } from "../services/fantraxRosterSyncService.js?v5-4-6e-opt-in";
 
 export async function listPlayers(leagueId,query={}){
   const filters=[];

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {canonicalFantraxSyncManifest,fantraxSyncAttemptStatus,fantraxSyncAuditHealth,fantraxSyncManifestDigest,fantraxSyncOutcomeRows,pendingFantraxSyncUpdates,serializeFantraxSyncManifest,validateFantraxSyncManifest} from "../v5/js/services/fantraxSyncAuditService.js";
+import {canonicalFantraxSyncManifest,canonicalFantraxSyncManifestV1,fantraxSyncAttemptStatus,fantraxSyncAuditHealth,fantraxSyncManifestDigest,fantraxSyncManifestDigestV1,fantraxSyncOutcomeRows,pendingFantraxSyncUpdates,serializeFantraxSyncManifest,serializeFantraxSyncManifestV1,validateFantraxSyncManifest,validatePreparedFantraxSyncAttempt} from "../v5/js/services/fantraxSyncAuditService.js";
 import {renderFantraxSyncAudit} from "../v5/js/views/fantraxSyncAuditView.js";
 
 const seasonContext={externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:"fedcba0987654321",leagueHistoryAvailable:true};
 const a={id:"00000000-0000-4000-8000-000000000001",expectedOwnerTeamId:"10000000-0000-4000-8000-000000000001",currentRosterStatus:"RESERVE",roster_status:"ACTIVE",fantraxApiPlayerId:"A1",fantraxTeamId:"aaaaaaaaaaaaaaaa"};
 const b={...a,id:"00000000-0000-4000-8000-000000000002",fantraxApiPlayerId:"B1"};
-const input={leagueId:"20000000-0000-4000-8000-000000000001",period:"",seasonContext,updates:[b,a]};
+const input={leagueId:"20000000-0000-4000-8000-000000000001",period:"",seasonContext,releaseTier:"CONTROLLED_3",effectiveCap:3,updates:[b,a]};
 const manifest=canonicalFantraxSyncManifest(input);
 assert.equal(manifest.rows[0].playerId,a.id,"manifest order is deterministic by permanent player UUID");
 assert.equal(validateFantraxSyncManifest(manifest).valid,true);
@@ -14,6 +14,19 @@ assert.equal(validateFantraxSyncManifest({...manifest,period:"13"}).valid,false)
 assert.equal(serializeFantraxSyncManifest(input),serializeFantraxSyncManifest({...input,updates:[a,b]}));
 assert.equal(await fantraxSyncManifestDigest(input),await fantraxSyncManifestDigest({...input,updates:[a,b]}));
 assert.notEqual(await fantraxSyncManifestDigest(input),await fantraxSyncManifestDigest({...input,updates:[{...a,roster_status:"IL"},b]}));
+assert.notEqual(await fantraxSyncManifestDigest(input),await fantraxSyncManifestDigest({...input,releaseTier:"V5.4.6E_OPT_IN_10",effectiveCap:10}),"release tier and cap are part of the deterministic digest");
+const legacyManifest=canonicalFantraxSyncManifestV1(input),legacyDigest=await fantraxSyncManifestDigestV1(input);
+assert.equal(serializeFantraxSyncManifestV1(input),JSON.stringify({version:"1",leagueId:input.leagueId,period:"",seasonContext,rows:manifest.rows}),"v1 canonical serialization remains byte compatible");
+assert.notEqual(legacyDigest,await fantraxSyncManifestDigest(input),"v1 and v2 digests remain distinct");
+assert.equal(validateFantraxSyncManifest(legacyManifest).valid,true,"exact legacy manifests remain recoverable under the default three-row boundary");
+const elevenUpdates=Array.from({length:11},(_,index)=>({...a,id:`00000000-0000-4000-8000-${String(index+1).padStart(12,"0")}`,fantraxApiPlayerId:`P${index+1}`}));
+assert.equal(validateFantraxSyncManifest(canonicalFantraxSyncManifest({...input,releaseTier:"V5.4.6E_OPT_IN_10",effectiveCap:10,updates:elevenUpdates})).valid,false,"application manifests reject attempts above ten");
+const digest=await fantraxSyncManifestDigest(input),preparedAttempt={manifest_digest:digest,manifest_version:manifest.version,release_tier:manifest.releaseTier,batch_limit:manifest.effectiveCap,reviewed_count:manifest.rows.length,fantrax_sync_attempt_items:manifest.rows.map((row,ordinal)=>({player_id:row.playerId,league_id:manifest.leagueId,ordinal,expected_owner_team_id:row.expectedOwnerTeamId,previewed_status:row.previewedStatus,target_status:row.targetStatus,fantrax_api_player_id:row.fantraxApiPlayerId,fantrax_team_id:row.fantraxTeamId,outcome:"PENDING"}))};
+assert.equal(validatePreparedFantraxSyncAttempt(preparedAttempt,manifest,digest).valid,true);
+assert.equal(validatePreparedFantraxSyncAttempt({...preparedAttempt,fantrax_sync_attempt_items:preparedAttempt.fantrax_sync_attempt_items.slice(0,1)},manifest,digest).valid,false,"persistence cannot start without the complete durable item set");
+assert.equal(validatePreparedFantraxSyncAttempt({...preparedAttempt,batch_limit:10},manifest,digest).valid,false,"recovery cannot change release metadata");
+const legacyPrepared={...preparedAttempt,manifest_digest:legacyDigest,manifest_version:"1",release_tier:"CONTROLLED_3",batch_limit:3};
+assert.equal(validatePreparedFantraxSyncAttempt(legacyPrepared,legacyManifest,legacyDigest).valid,true,"migration-009 manifest-v1 attempts remain recoverable after migration 010 defaults are added");
 
 const audited=[{player_id:a.id,outcome:"APPLIED"},{player_id:b.id,outcome:"PENDING"}];
 assert.deepEqual(pendingFantraxSyncUpdates(manifest,audited).map(row=>row.id),[b.id],"recovery never replays a terminal row");
@@ -23,12 +36,14 @@ assert.equal(fantraxSyncAttemptStatus([{outcome:"APPLIED"},{outcome:"APPLIED"}])
 assert.equal(fantraxSyncAttemptStatus([{outcome:"APPLIED"},{outcome:"SKIPPED"}]),"PARTIAL");
 const outcomes=fantraxSyncOutcomeRows("attempt-1",{updated:[{id:a.id,roster_status:"ACTIVE",updated_at:"2026-08-08T00:00:00Z"}],skipped:[{id:b.id,reason:"MANUAL_OVERRIDE",currentRow:{roster_status_source:"MANUAL"}}]});
 assert.deepEqual(outcomes.map(row=>row.outcome),["APPLIED","SKIPPED"]);
-assert.equal(fantraxSyncAuditHealth([{status:"APPLYING",manifest_digest:"abc",actor_user_id:"u",season_context:{}}]).status,"WARNING");
-assert.equal(fantraxSyncAuditHealth([{status:"COMPLETED",manifest_digest:"",actor_user_id:"u",season_context:{}}]).status,"FAIL");
-assert.match(renderFantraxSyncAudit([{id:"attempt-1",status:"PARTIAL",reviewed_count:2,manifest_digest:"abcdef1234567890",created_at:"now"}]),/Synchronization audit and recovery|Fantrax Synchronization Audit/i);
+assert.equal(fantraxSyncAuditHealth([{status:"APPLYING",manifest_digest:"abc",actor_user_id:"u",season_context:{},release_tier:"CONTROLLED_3",batch_limit:3,reviewed_count:2}]).status,"WARNING");
+assert.equal(fantraxSyncAuditHealth([{status:"COMPLETED",manifest_digest:"",actor_user_id:"u",season_context:{},release_tier:"CONTROLLED_3",batch_limit:3,reviewed_count:2}]).status,"FAIL");
+assert.equal(fantraxSyncAuditHealth([{status:"COMPLETED",manifest_digest:"abc",actor_user_id:"u",season_context:{},release_tier:"V5.4.6E_OPT_IN_10",batch_limit:10,reviewed_count:11}]).status,"FAIL");
+assert.match(renderFantraxSyncAudit([{id:"attempt-1",status:"PARTIAL",release_tier:"CONTROLLED_3",batch_limit:3,reviewed_count:2,manifest_digest:"abcdef1234567890",created_at:"now",fantrax_sync_attempt_items:[{outcome:"APPLIED"},{outcome:"FAILED"}]}]),/Synchronization audit and recovery|Fantrax Synchronization Audit/i);
 assert.match(renderFantraxSyncAudit([]),/No durable synchronization attempts recorded/);
 
 const migration=fs.readFileSync(new URL("../supabase/migrations/009_fantrax_sync_audit.sql",import.meta.url),"utf8");
+const expansionMigration=fs.readFileSync(new URL("../supabase/migrations/010_fantrax_sync_opt_in_batch.sql",import.meta.url),"utf8");
 const repository=fs.readFileSync(new URL("../v5/js/repositories/fantraxSyncAuditRepository.js",import.meta.url),"utf8");
 const playerRepository=fs.readFileSync(new URL("../v5/js/repositories/playerRepository.js",import.meta.url),"utf8");
 const main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8");
@@ -50,7 +65,18 @@ assert.match(migration,/private\.is_league_member\(league_id\)/i,"audit read pol
 assert.match(migration,/private\.can_edit_league\(league_id\)/i,"audit write policies use the deployed private editor helper");
 assert.doesNotMatch(migration,/public\.(?:is_league_member|can_edit_league)\s*\(/i,"migration 009 must not reference removed public authorization helpers");
 assert.doesNotMatch(migration,/service_role|password|cookie|private_key/i);
+assert.match(expansionMigration,/release_tier = 'CONTROLLED_3'[\s\S]*reviewed_count between 1 and 3/i);
+assert.match(expansionMigration,/release_tier = 'V5\.4\.6E_OPT_IN_10'[\s\S]*reviewed_count between 1 and 10/i);
+assert.match(expansionMigration,/ordinal between 0 and 9/i);
+assert.match(expansionMigration,/settings->'fantraxRosterSyncRelease'/i,"database requires the league opt-in for expanded attempts");
+assert.match(expansionMigration,/new\.release_tier <> old\.release_tier[\s\S]*new\.batch_limit <> old\.batch_limit/i,"release metadata is immutable");
+assert.match(expansionMigration,/security invoker set search_path=public,pg_temp/i);
+assert.doesNotMatch(expansionMigration,/security definer|public\.(?:is_league_member|can_edit_league)\s*\(/i);
 assert.match(repository,/\.eq\("manifest_digest",digest\)/,"same manifest resolves to one durable attempt");
+assert.match(repository,/release_tier:manifest\.releaseTier,batch_limit:manifest\.effectiveCap/);
+assert.match(repository,/manifest\?\.rows\?\.length>cap/,"repository refuses manifests above the recognized durable cap");
+assert.match(repository,/if\(!allowCreate\)throw new Error/,"disabled opt-in cannot create a new expanded attempt after lookup");
+assert.match(main,/releasePolicy\.releaseTier==="CONTROLLED_3"[\s\S]*fantraxSyncManifestDigestV1[\s\S]*if\(legacyAttempt\)/,"only the default tier may recover an exact manifest-v1 attempt");
 assert.match(repository,/\.in\("outcome",\["PENDING","FAILED"\]\)/,"only pending or failed rows can receive a recovery outcome");
 assert.doesNotMatch(repository,/\.delete\(/,"audit evidence is not deleted by the browser repository");
 assert.match(playerRepository,/await beforeGroup\(group\)/,"every write group repeats caller guards");

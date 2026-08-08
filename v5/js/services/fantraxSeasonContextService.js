@@ -23,7 +23,7 @@ export function fantraxSeasonWriteGuard(comparison){
 }
 
 export function clearFantraxPendingReviews(state={},patch={}){
-  return {...state,...patch,pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,allowReplacement:false,seasonReviewAcknowledged:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[]};
+  return {...state,...patch,pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,allowReplacement:false,seasonReviewAcknowledged:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:""};
 }
 
 export function validateFantraxSeasonReview({leagueId,fantraxTeams=[],cloudTeams=[],pendingMappings={},observedContext,acknowledged=false}={}){

@@ -1,5 +1,5 @@
 import { table } from "../components/table.js";
-import { renderFantraxSyncAudit } from "./fantraxSyncAuditView.js?v5-4-6d-audit";
+import { renderFantraxSyncAudit } from "./fantraxSyncAuditView.js?v5-4-6e-opt-in";
 
 function renderSettingsDataHealthBase(state){
   const health=state.health;

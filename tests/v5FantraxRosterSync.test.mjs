@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {controlledFantraxRosterSelection,fantraxRosterSyncPeriodGuard,fantraxRosterSyncSkipReason,fantraxRosterSyncSummary,reviewedFantraxStatusUpdates,validateControlledFantraxStatusUpdates,validateReviewedFantraxStatusUpdates} from "../v5/js/services/fantraxRosterSyncService.js";
+import {controlledFantraxRosterSelection,fantraxRosterSyncPeriodGuard,fantraxRosterSyncReleasePolicy,fantraxRosterSyncReleaseSignature,fantraxRosterSyncSkipReason,fantraxRosterSyncSummary,reviewedFantraxStatusUpdates,validateControlledFantraxStatusUpdates,validateReviewedFantraxStatusUpdates} from "../v5/js/services/fantraxRosterSyncService.js";
 import {renderFantraxPreview} from "../v5/js/views/fantraxPreviewView.js";
 
 const eligible={futureSyncRecommendation:"APPLY_FANTRAX_STATUS",matchedPlayerUuid:"p1",matchedPlayer:{name:"Alpha"},matchedTeamUuid:"team-1",currentOwnerTeamId:"team-1",currentRosterStatus:"RESERVE",normalizedRosterStatus:"ACTIVE",fantraxApiPlayerId:"F1",fantraxTeamId:"T1",playerIdentityResult:"MATCHED",teamIdentityResult:"MATCHED",activeManualOverride:false};
@@ -25,6 +25,22 @@ assert.equal(validateControlledFantraxStatusUpdates([eligible],["p1"]).valid,tru
 assert.equal(validateControlledFantraxStatusUpdates([eligible],[]).valid,false);
 assert.match(validateControlledFantraxStatusUpdates([eligible],["p1","p2","p3","p4"]).errors.join(" "),/limited to 3/);
 assert.match(validateControlledFantraxStatusUpdates([eligible],["not-eligible"]).errors.join(" "),/not present/);
+const defaultLeague={id:"league-1",settings:{}},defaultPolicy=fantraxRosterSyncReleasePolicy(defaultLeague);
+const optInLeague={id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"V5.4.6E_OPT_IN_10",leagueId:"league-1",enabled:true,reviewed:true}}},optInPolicy=fantraxRosterSyncReleasePolicy(optInLeague);
+assert.deepEqual(defaultPolicy,{valid:true,releaseTier:"CONTROLLED_3",effectiveCap:3,optedIn:false,recoveryOnly:false,error:""});
+assert.equal(optInPolicy.effectiveCap,10);
+assert.equal(fantraxRosterSyncReleasePolicy({id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"UNKNOWN",leagueId:"league-1",enabled:true,reviewed:true}}}).valid,false);
+assert.equal(fantraxRosterSyncReleasePolicy({id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"V5.4.6E_OPT_IN_10",leagueId:"other",enabled:true,reviewed:true}}}).valid,false);
+assert.equal(fantraxRosterSyncReleasePolicy({id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"V5.4.6E_OPT_IN_10",leagueId:"league-1",enabled:true,reviewed:false}}}).valid,false);
+const disabledPolicy=fantraxRosterSyncReleasePolicy({id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"V5.4.6E_OPT_IN_10",leagueId:"league-1",enabled:false,reviewed:true}}});
+assert.equal(disabledPolicy.effectiveCap,10);
+assert.equal(disabledPolicy.recoveryOnly,true,"disabled opt-in permits only exact durable recovery");
+const expandedRows=Array.from({length:11},(_,index)=>({...eligible,matchedPlayerUuid:`p${index+1}`,matchedPlayer:{name:`Player ${index+1}`},fantraxApiPlayerId:`F${index+1}`}));
+assert.equal(validateControlledFantraxStatusUpdates(expandedRows,expandedRows.slice(0,10).map(row=>row.matchedPlayerUuid),optInPolicy.effectiveCap).valid,true);
+assert.match(validateControlledFantraxStatusUpdates(expandedRows,expandedRows.map(row=>row.matchedPlayerUuid),optInPolicy.effectiveCap).errors.join(" "),/limited to 10/);
+assert.match(validateControlledFantraxStatusUpdates(expandedRows,expandedRows.map(row=>row.matchedPlayerUuid),99).errors.join(" "),/limited to 3/,"an arbitrary caller limit cannot create a release above ten");
+assert.match(controlledFantraxRosterSelection(expandedRows.slice(0,10).map(row=>row.matchedPlayerUuid),"p11",true,11).error,/limited to 3/,"unsupported application caps fail back to the three-player boundary");
+[0,-1,2.5,11,25,"10"].forEach(limit=>assert.match(validateControlledFantraxStatusUpdates(expandedRows,expandedRows.slice(0,4).map(row=>row.matchedPlayerUuid),limit).errors.join(" "),/limited to 3/,`unsupported cap ${limit} cannot expand the default release`));
 
 const manifest=reviewedFantraxStatusUpdates([eligible])[0];
 assert.equal(fantraxRosterSyncSkipReason(manifest,{owner_team_id:"team-1",roster_status:"RESERVE",roster_status_source:"MANUAL"}),"MANUAL_OVERRIDE");
@@ -35,7 +51,7 @@ assert.equal(fantraxRosterSyncSkipReason(manifest,{owner_team_id:"team-1",roster
 assert.deepEqual(fantraxRosterSyncSummary({reviewed:3,updated:[{id:"p1"}],skipped:[{reason:"OWNER_CHANGED"},{reason:"OWNER_CHANGED"}],failures:[{}]}),{reviewed:3,updated:1,skipped:2,failedGroups:1,skipReasons:{OWNER_CHANGED:2}});
 
 const matchingSeason={status:"MATCH",writeAllowed:true,reasons:[],reviewed:{valid:true,externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:null,leagueHistoryAvailable:false},observed:{valid:true,externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:null,leagueHistoryAvailable:false}};
-const rendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible,manual,unknown],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",reviewRosterSync:true,rosterSyncReviewed:true,rosterSyncSelectedIds:["p1"],confirmRosterSync:true,filters:{},page:1,pageSize:50}});
+const rendered=renderFantraxPreview({activeLeague:defaultLeague,fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible,manual,unknown],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",reviewRosterSync:true,rosterSyncReviewed:true,rosterSyncSelectedIds:["p1"],rosterSyncReleaseSignature:fantraxRosterSyncReleaseSignature(defaultPolicy),confirmRosterSync:true,filters:{},page:1,pageSize:50}});
 assert.match(rendered,/Review 1 Status Updates/);
 assert.match(rendered,/Alpha/);
 assert.doesNotMatch(rendered,/Manual<\/td><td>RESERVE<\/td><td>ACTIVE/,"manual overrides are not included in the exact apply table");
@@ -43,7 +59,14 @@ assert.match(rendered,/Continue to Confirmation/);
 assert.match(rendered,/Selected: 1 \/ 3/);
 assert.match(rendered,/data-fantrax-roster-select="p1" checked/);
 assert.match(rendered,/Selected players: Alpha/);
-const historicalRendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",period:"131",reviewRosterSync:true,rosterSyncSelectedIds:["p1"],filters:{},page:1,pageSize:50}});
+const expandedRendered=renderFantraxPreview({activeLeague:optInLeague,fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:expandedRows,teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",reviewRosterSync:true,rosterSyncSelectedIds:expandedRows.slice(0,10).map(row=>row.matchedPlayerUuid),rosterSyncReleaseSignature:fantraxRosterSyncReleaseSignature(optInPolicy),filters:{},page:1,pageSize:50}});
+assert.match(expandedRendered,/Selected: 10 \/ 10/);
+assert.match(expandedRendered,/V5\.4\.6E_OPT_IN_10/);
+assert.doesNotMatch(expandedRendered,/Select All/i);
+const recoveryRendered=renderFantraxPreview({activeLeague:{id:"league-1",settings:{fantraxRosterSyncRelease:{releaseId:"V5.4.6E_OPT_IN_10",leagueId:"league-1",enabled:false,reviewed:true}}},fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:expandedRows,teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",filters:{},page:1,pageSize:50}});
+assert.match(recoveryRendered,/Recovery only/);
+assert.match(recoveryRendered,/no new expanded attempt can be created/);
+const historicalRendered=renderFantraxPreview({activeLeague:defaultLeague,fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",period:"131",reviewRosterSync:true,rosterSyncSelectedIds:["p1"],rosterSyncReleaseSignature:fantraxRosterSyncReleaseSignature(defaultPolicy),filters:{},page:1,pageSize:50}});
 assert.match(historicalRendered,/blocked for historical scoring period 131/);
 assert.match(historicalRendered,/id="reviewFantraxRosterSync"[^>]*disabled/);
 assert.doesNotMatch(historicalRendered,/data-fantrax-roster-select/);
@@ -67,7 +90,7 @@ assert.match(main,/fetchFantraxPublicPreview[\s\S]*lastRosterSync/,"preview is r
 assert.match(main,/Fantrax roster-status apply was incomplete/);
 assert.match(view,/Nothing is selected by default/);
 assert.match(view,/I reviewed these \$\{selectedRows\.length\} exact status-only updates/);
-assert.match(view,/Confirm Status-Only Apply/);
+assert.match(view,/Confirm Status-Only \$\{policy\.recoveryOnly\?"Recovery":"Apply"\}/);
 assert.match(view,/Expected cloud owner/);
 assert.match(view,/Skip reasons/);
 assert.match(view,/Ownership, free-agent state, UUIDs, identities, scores, HKB values, and metrics will not change/);

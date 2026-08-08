@@ -1,4 +1,28 @@
 const clean=value=>String(value??"").trim();
+export const FANTRAX_SYNC_DEFAULT_RELEASE="CONTROLLED_3";
+export const FANTRAX_SYNC_OPT_IN_RELEASE="V5.4.6E_OPT_IN_10";
+export const FANTRAX_SYNC_DEFAULT_CAP=3;
+export const FANTRAX_SYNC_OPT_IN_CAP=10;
+
+export function fantraxRosterSyncReleasePolicy(activeLeague={}){
+  const leagueId=clean(activeLeague?.id),setting=activeLeague?.settings?.fantraxRosterSyncRelease;
+  const fallback={valid:Boolean(leagueId),releaseTier:FANTRAX_SYNC_DEFAULT_RELEASE,effectiveCap:FANTRAX_SYNC_DEFAULT_CAP,optedIn:false,recoveryOnly:false,error:leagueId?"":"Active league is required for Fantrax synchronization."};
+  if(setting===undefined||setting===null)return fallback;
+  if(typeof setting!=="object"||Array.isArray(setting))return {...fallback,valid:false,error:"The Fantrax synchronization release setting is malformed."};
+  const releaseId=clean(setting.releaseId),settingLeagueId=clean(setting.leagueId);
+  if(releaseId!==FANTRAX_SYNC_OPT_IN_RELEASE)return {...fallback,valid:false,error:"The Fantrax synchronization release setting is unknown."};
+  if(settingLeagueId!==leagueId)return {...fallback,valid:false,error:"The Fantrax synchronization release setting belongs to another league."};
+  if(setting.reviewed!==true)return {...fallback,valid:false,error:"The Fantrax synchronization release setting has not been explicitly reviewed."};
+  if(setting.enabled===false)return {valid:true,releaseTier:FANTRAX_SYNC_OPT_IN_RELEASE,effectiveCap:FANTRAX_SYNC_OPT_IN_CAP,optedIn:false,recoveryOnly:true,error:""};
+  if(setting.enabled!==true)return {...fallback,valid:false,error:"The Fantrax synchronization release setting must be explicitly enabled or disabled."};
+  return {valid:true,releaseTier:FANTRAX_SYNC_OPT_IN_RELEASE,effectiveCap:FANTRAX_SYNC_OPT_IN_CAP,optedIn:true,recoveryOnly:false,error:""};
+}
+
+export function fantraxRosterSyncReleaseSignature(policy={}){
+  return `${clean(policy.releaseTier)}:${Number(policy.effectiveCap)||0}:${policy.recoveryOnly?"RECOVERY_ONLY":"NEW_ALLOWED"}`;
+}
+
+function supportedBatchLimit(limit){return limit===FANTRAX_SYNC_OPT_IN_CAP?FANTRAX_SYNC_OPT_IN_CAP:FANTRAX_SYNC_DEFAULT_CAP}
 
 export function fantraxRosterSyncPeriodGuard(period=""){
   const selectedPeriod=clean(period);
@@ -38,19 +62,19 @@ export function validateReviewedFantraxStatusUpdates(rosterItems=[]){
   return {valid:updates.length>0&&errors.length===0,updates,errors};
 }
 
-export function controlledFantraxRosterSelection(selectedIds=[],playerId="",checked=false,limit=3){
-  const ids=[...new Set((selectedIds||[]).map(clean).filter(Boolean))],id=clean(playerId);
+export function controlledFantraxRosterSelection(selectedIds=[],playerId="",checked=false,limit=FANTRAX_SYNC_DEFAULT_CAP){
+  const effectiveLimit=supportedBatchLimit(limit),ids=[...new Set((selectedIds||[]).map(clean).filter(Boolean))],id=clean(playerId);
   if(!id)return {selectedIds:ids,error:"A cloud player UUID is required."};
   const next=checked?[...new Set([...ids,id])]:ids.filter(value=>value!==id);
-  if(next.length>limit)return {selectedIds:ids,error:`Controlled acceptance is limited to ${limit} players.`};
+  if(next.length>effectiveLimit)return {selectedIds:ids,error:`Controlled acceptance is limited to ${effectiveLimit} players.`};
   return {selectedIds:next,error:""};
 }
 
-export function validateControlledFantraxStatusUpdates(rosterItems=[],selectedIds=[],limit=3){
-  const ids=(selectedIds||[]).map(clean).filter(Boolean),errors=[];
+export function validateControlledFantraxStatusUpdates(rosterItems=[],selectedIds=[],limit=FANTRAX_SYNC_DEFAULT_CAP){
+  const effectiveLimit=supportedBatchLimit(limit),ids=(selectedIds||[]).map(clean).filter(Boolean),errors=[];
   if(new Set(ids).size!==ids.length)errors.push("The controlled update set contains a duplicate cloud player UUID.");
   if(!ids.length)errors.push("Select at least one eligible status update.");
-  if(ids.length>limit)errors.push(`Controlled acceptance is limited to ${limit} players.`);
+  if(ids.length>effectiveLimit)errors.push(`Controlled acceptance is limited to ${effectiveLimit} players.`);
   const selected=new Set(ids),selectedRows=rosterItems.filter(row=>selected.has(clean(row.matchedPlayerUuid)));
   ids.filter(id=>!selectedRows.some(row=>clean(row.matchedPlayerUuid)===id)).forEach(id=>errors.push(`Selected cloud player ${id} is not present in the preview.`));
   const validation=validateReviewedFantraxStatusUpdates(selectedRows);

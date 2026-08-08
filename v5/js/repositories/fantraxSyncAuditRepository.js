@@ -10,12 +10,20 @@ export async function listFantraxSyncAttempts(leagueId){
   return selectLeagueRows("fantrax_sync_attempts",leagueId,{columns:"*,fantrax_sync_attempt_items(*)",order:"created_at",ascending:false});
 }
 
-export async function prepareFantraxSyncAttempt(leagueId,{digest,manifest}={}){
-  if(!leagueId||leagueId!==manifest?.leagueId)throw new Error("The synchronization manifest must match the active league.");
+export async function findFantraxSyncAttempt(leagueId,digest){
   const supabase=await authenticatedClient();
-  const existing=await request(supabase.from("fantrax_sync_attempts").select("*,fantrax_sync_attempt_items(*)").eq("league_id",leagueId).eq("manifest_digest",digest).maybeSingle(),"Fantrax synchronization attempt lookup");
-  if(existing.data)return existing.data;
-  const created=await request(supabase.from("fantrax_sync_attempts").insert({league_id:leagueId,manifest_digest:digest,manifest_version:manifest.version,season_context:manifest.seasonContext,period:manifest.period,status:"PREPARED",reviewed_count:manifest.rows.length}).select("*").single(),"Fantrax synchronization attempt create");
+  return (await request(supabase.from("fantrax_sync_attempts").select("*,fantrax_sync_attempt_items(*)").eq("league_id",leagueId).eq("manifest_digest",digest).maybeSingle(),"Fantrax synchronization attempt lookup")).data||null;
+}
+
+export async function prepareFantraxSyncAttempt(leagueId,{digest,manifest,allowCreate=true}={}){
+  if(!leagueId||leagueId!==manifest?.leagueId)throw new Error("The synchronization manifest must match the active league.");
+  const cap=Number(manifest?.effectiveCap),tier=String(manifest?.releaseTier||"");
+  if(!((tier==="CONTROLLED_3"&&cap===3)||(tier==="V5.4.6E_OPT_IN_10"&&cap===10))||manifest?.rows?.length>cap)throw new Error("The synchronization manifest exceeds the supported durable batch boundary.");
+  const existing=await findFantraxSyncAttempt(leagueId,digest);
+  if(existing)return existing;
+  if(!allowCreate)throw new Error("The expanded release is disabled. Only an existing exact durable attempt can be recovered.");
+  const supabase=await authenticatedClient();
+  const created=await request(supabase.from("fantrax_sync_attempts").insert({league_id:leagueId,manifest_digest:digest,manifest_version:manifest.version,release_tier:manifest.releaseTier,batch_limit:manifest.effectiveCap,season_context:manifest.seasonContext,period:manifest.period,status:"PREPARED",reviewed_count:manifest.rows.length}).select("*").single(),"Fantrax synchronization attempt create");
   const items=manifest.rows.map((row,index)=>({attempt_id:created.data.id,league_id:leagueId,player_id:row.playerId,ordinal:index,expected_owner_team_id:row.expectedOwnerTeamId,previewed_status:row.previewedStatus,target_status:row.targetStatus,fantrax_api_player_id:row.fantraxApiPlayerId,fantrax_team_id:row.fantraxTeamId,outcome:"PENDING"}));
   const inserted=await request(supabase.from("fantrax_sync_attempt_items").insert(items).select("*"),"Fantrax synchronization manifest create");
   return {...created.data,fantrax_sync_attempt_items:inserted.data||[]};

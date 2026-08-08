@@ -504,3 +504,87 @@
 - Fantrax endpoint reads or cloud reads: none.
 - Cloud writes, roster synchronization, imports, ownership repair, and score recalculation: none.
 - Merge into `main`: not performed.
+
+## V5.4.6E Local Implementation And Validation
+
+### Baseline And Outcome
+
+- Baseline: clean `feature/manager-intelligence` at `0a78e4f99885742d2e84616287ff0d195289f190`.
+- Status: Gate 1 implementation and synthetic validation complete; ready for architect review.
+- Migration 009 and its accepted V5.4.6D audit/recovery behavior were preserved unchanged.
+- No repository contradiction required a scope deviation. The documented migration-009 three-row constraints were the expected reason for additive migration 010.
+
+### Implemented Opt-In Boundary
+
+- Added one centralized release policy with only two recognized tiers: default `CONTROLLED_3` at three rows and reviewed league-scoped `V5.4.6E_OPT_IN_10` at ten rows.
+- The opt-in requires an exact settings object containing the recognized release ID, active league UUID, `reviewed: true`, and an explicit enabled state. Missing settings use the three-row default; malformed, unknown, unreviewed, or cross-league settings fail closed.
+- An explicitly disabled ten-row setting enters recovery-only mode. It can resolve an existing exact durable digest but cannot create a new expanded attempt. Removing the setting restores the normal three-row default after recovery is resolved.
+- Unsupported caller caps, including zero, negative, fractional, string, 11, 25, or 99, cannot expand the application boundary and fall back to the three-row validator. Attempts above ten fail application manifest validation and repository validation.
+- Selection remains empty by default and individually controlled; no Select All path was added. The UI displays release tier, mode, effective cap, exact selected count, and named players in final confirmation.
+- Preview refresh/clear, external league or period change, team-mapping/replacement change, season acknowledgement change, selection change, active league change, and release-setting change invalidate roster acknowledgement and confirmation.
+
+### Durable Audit And Recovery
+
+- Manifest version 2 includes immutable release tier and effective cap in canonical serialization and SHA-256 digesting, in addition to league, Current period, reviewed season context, exact selected UUIDs, expected owners/statuses, and exact Fantrax player/team identities.
+- Existing exact manifest-v1 attempts remain lookup-compatible under the default three-row tier. The application reconstructs the byte-compatible v1 manifest only to find and recover an already durable attempt; all new attempts use manifest v2, and the expanded tier never falls back to v1.
+- Attempt preparation persists release tier and cap. A completeness validator now proves the durable attempt contains the exact reviewed item set and matching ordinals/identity/status fields before any player persistence can begin.
+- Existing digest lookup remains first. Recovery-only mode throws before insert when no exact attempt exists.
+- `APPLIED` and `SKIPPED` rows remain terminal; only `PENDING` and `FAILED` rows remain eligible. The originally reviewed UUID set cannot be broadened during recovery.
+- Active league, release signature, preview timestamp/configuration, matching season context, and Current period are repeated immediately before every grouped write. Existing database predicates still repeat expected owner, previewed current status, and non-manual provenance.
+
+### Additive Migration 010
+
+- Added `010_fantrax_sync_opt_in_batch.sql`; it was created but not applied.
+- Existing migration-009 rows receive immutable defaults `CONTROLLED_3` and batch limit 3.
+- The attempt constraint permits only the exact tier/cap/count combinations 1-3 for `CONTROLLED_3` or 1-10 for `V5.4.6E_OPT_IN_10`. Item ordinals are limited to 0-9, so an eleventh row is rejected by the database boundary.
+- Expanded attempt insertion checks the active league's exact reviewed/enabled release setting. Disabling the setting blocks new expanded inserts while leaving existing lifecycle recovery available.
+- The migration replaces only the attempt-protection trigger function needed to database-stamp and freeze the new columns. Actor stamping, lifecycle transitions, timestamps, RLS policies, private authorization helpers, item immutability, cross-league checks, replay prevention, and `SECURITY INVOKER`/`search_path=public,pg_temp` remain unchanged.
+- Rollback is safe only after proving no attempt exceeds three rows and no opt-in attempt exists; migration 010 contains no destructive automatic rollback.
+
+### UI And Data Health
+
+- The synchronization panel reports the release tier, default/opt-in/recovery-only mode, and effective cap. Recovery-only messaging states that no new expanded attempt can be created.
+- The read-only audit table reports release, reviewed/cap, terminal count, recoverable count, digest, and attempt UUID.
+- Data Health reports release/cap inconsistencies as failures and a disabled recovery-only release as a warning. It reuses already-loaded league and audit rows and adds no Fantrax request.
+
+### Protected-Field Verification Boundary
+
+- The player persistence payload remains exactly `roster_status`, `roster_status_source: "FANTRAX"`, and `updated_at`.
+- Grouped writes still constrain active league, reviewed UUIDs, expected owner, previewed current status, and non-`MANUAL` provenance. Ownership, free-agent state, UUIDs, external identities, manual-override audit fields, scores, HKB values, metrics, teams, and managers are not payload fields.
+- Gate 3 must compare pre/post player, team, calculated-score, and metric counts and deterministic hashes described in `docs/NEXT_TASK.md`. Any difference outside the permitted payload is a failed acceptance.
+
+### Validation
+
+- Focused command covering roster sync, audit/recovery, season context, team identity, public preview, roster manager, Data Health, cloud/auth workflow, and production configuration: 9 of 9 test files passed.
+- Full sorted PowerShell loop over every `tests/*.test.mjs`: 34 discovered, 34 passed, 0 failed.
+- Regression coverage proves default 3, opted-in 10, recovery-only disablement, malformed/unknown/unreviewed/cross-league rejection, arbitrary cap rejection, application rejection above 10, database count/ordinal rejection above 10, deterministic release-aware digests, exact manifest-v1 recovery compatibility, complete durable items before persistence, immutable release metadata, terminal replay exclusion, and no Select All UI.
+- `git diff --check`: passed; only expected LF-to-CRLF working-copy warnings were emitted.
+- Migration 010 received static SQL regression review only. It was intentionally not applied or executed against production under this Gate 1 task.
+- Browser/authenticated deployment validation was not run because deployment and live acceptance belong to later separately authorized gates.
+
+### Files Changed
+
+- `supabase/migrations/010_fantrax_sync_opt_in_batch.sql`
+- `v5/js/services/fantraxRosterSyncService.js`
+- `v5/js/services/fantraxSyncAuditService.js`
+- `v5/js/repositories/fantraxSyncAuditRepository.js`
+- `v5/js/repositories/playerRepository.js` (module cache version only; write logic unchanged)
+- `v5/js/services/fantraxSeasonContextService.js`
+- `v5/js/services/dataHealthService.js`
+- `v5/js/state/appState.js`
+- `v5/js/main.js`
+- `v5/js/views/fantraxPreviewView.js`
+- `v5/js/views/fantraxSyncAuditView.js`
+- `v5/js/views/settingsDataHealthView.js` (module cache version only)
+- `tests/v5FantraxRosterSync.test.mjs`
+- `tests/v5FantraxSyncAudit.test.mjs`
+- `docs/NEXT_TASK_RESULT.md`
+
+### Safety And Remaining Gates
+
+- Fantrax endpoint reads: none.
+- Cloud reads/writes: none.
+- Roster synchronization/status persistence: none.
+- Imports, ownership repair, player/team mutation, score recalculation, deployment, and migration application: none.
+- Commit and push: not performed; architect review is required first.
+- Gate 2 remains additive migration review/application plus read-only schema verification under separate authorization. Gate 3 remains one explicitly approved opt-in production batch with protected-field evidence and authenticated acceptance.

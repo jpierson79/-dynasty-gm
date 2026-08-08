@@ -17,13 +17,13 @@ import { addTradeAssetSelection, removeTradeAssetSelection } from "./services/tr
 import { resolveUserFantasyTeam } from "./services/userTeamResolver.js?v5-4-1-user-team-final";
 import { bulkSetPendingStatus, clearAllPendingStatusChanges, clearPendingStatusChanges, clearSelection, filterRosterStatusRows, manualOverrideIds, rosterStatusManagerRows, savePayload, selectAllFilteredRows, selectPageRows, setPendingStatus, toggleSelection, validateRosterStatusSave } from "./services/rosterStatusManagerService.js?v5-4-6b1-manual-overrides";
 import { fetchFantraxPublicPreview } from "./services/fantraxPublicPreviewService.js?v5-4-6b2-ownership-diagnostics";
-import { controlledFantraxRosterSelection, fantraxRosterSyncPeriodGuard, fantraxRosterSyncSummary, validateControlledFantraxStatusUpdates } from "./services/fantraxRosterSyncService.js?v5-4-6b4-current-period";
+import { controlledFantraxRosterSelection, fantraxRosterSyncPeriodGuard, fantraxRosterSyncReleasePolicy, fantraxRosterSyncReleaseSignature, fantraxRosterSyncSummary, validateControlledFantraxStatusUpdates } from "./services/fantraxRosterSyncService.js?v5-4-6e-opt-in";
 import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings } from "./services/fantraxTeamIdentityService.js";
 import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
-import { memberships, saveFantraxSeasonContext } from "./repositories/leagueRepository.js?v5-4-6c-season";
+import { leagueById, memberships, saveFantraxSeasonContext } from "./repositories/leagueRepository.js?v5-4-6c-season";
 import { clearFantraxPendingReviews, fantraxSeasonWriteGuard, reviewedFantraxSeasonSettings, validateFantraxSeasonReview } from "./services/fantraxSeasonContextService.js?v5-4-6c-season";
-import { canonicalFantraxSyncManifest, fantraxSyncAttemptStatus, fantraxSyncManifestDigest, fantraxSyncOutcomeRows, pendingFantraxSyncUpdates, validateFantraxSyncManifest } from "./services/fantraxSyncAuditService.js?v5-4-6d-audit";
-import { finalizeFantraxSyncAttempt, listFantraxSyncAttempts, markFantraxSyncAttemptApplying, prepareFantraxSyncAttempt, recordFantraxSyncOutcomes } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6d-audit";
+import { canonicalFantraxSyncManifest, canonicalFantraxSyncManifestV1, fantraxSyncAttemptStatus, fantraxSyncManifestDigest, fantraxSyncManifestDigestV1, fantraxSyncOutcomeRows, pendingFantraxSyncUpdates, validateFantraxSyncManifest, validatePreparedFantraxSyncAttempt } from "./services/fantraxSyncAuditService.js?v5-4-6e-opt-in";
+import { finalizeFantraxSyncAttempt, findFantraxSyncAttempt, listFantraxSyncAttempts, markFantraxSyncAttemptApplying, prepareFantraxSyncAttempt, recordFantraxSyncOutcomes } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6e-opt-in";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
@@ -69,11 +69,14 @@ function renderLeaguePanel(){
 }
 async function refreshLeagueData(){
   if(!appState.activeLeague)return;
+  const leagueId=appState.activeLeague.id,previousReleaseSignature=fantraxRosterSyncReleaseSignature(fantraxRosterSyncReleasePolicy(appState.activeLeague));
   setState({loading:true});
   clearErrors();
   try{
-    dashboardOverview=await loadLeagueOverview(appState.activeLeague.id);
-    const membershipRows=await memberships(appState.activeLeague.id).catch(()=>[]);
+    const refreshedLeague=await leagueById(leagueId),nextReleaseSignature=fantraxRosterSyncReleaseSignature(fantraxRosterSyncReleasePolicy(refreshedLeague));
+    setState({activeLeague:refreshedLeague,fantraxPreview:previousReleaseSignature===nextReleaseSignature?appState.fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({error:"Fantrax synchronization release configuration changed. Refresh the preview before reviewing updates."}))});
+    dashboardOverview=await loadLeagueOverview(leagueId);
+    const membershipRows=await memberships(leagueId).catch(()=>[]);
     const userTeamResolution=resolveUserFantasyTeam({
       leagueId:appState.activeLeague.id,
       authenticatedUserId:appState.authUser?.id||"",
@@ -155,15 +158,14 @@ function tradeSelectedPlayers(rows,ids){
 function rosterStatusState(patch={}){
   return {...appState.rosterStatusManager,...patch};
 }
-function fantraxPreviewState(patch={}){return {data:null,externalLeagueId:"",period:"",loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false},pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,seasonReviewAcknowledged:false,lastTeamMappingSave:"",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],savingRosterSync:false,lastRosterSync:null,...(appState.fantraxPreview||{}),...patch}}
+function fantraxPreviewState(patch={}){return {data:null,externalLeagueId:"",period:"",loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false},pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,savingTeamMappings:false,allowReplacement:false,seasonReviewAcknowledged:false,lastTeamMappingSave:"",reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:"",savingRosterSync:false,lastRosterSync:null,...(appState.fantraxPreview||{}),...patch}}
 function fantraxFiltersFromControls(){return {search:$("#fantraxRosterSearch")?.value.trim()||"",teamId:$("#fantraxRosterTeam")?.value||"",sourceStatus:$("#fantraxSourceStatus")?.value||"",normalizedStatus:$("#fantraxNormalizedStatus")?.value||"",matched:$("#fantraxMatched")?.value||"",ownershipDifference:$("#fantraxOwnershipDiff")?.checked||false,statusDifference:$("#fantraxStatusDiff")?.checked||false}}
 async function loadFantraxPreview(){
   const externalLeagueId=$("#fantraxExternalLeagueId")?.value.trim()||appState.fantraxPreview?.externalLeagueId||"";
   const period=$("#fantraxPeriod")?.value||appState.fantraxPreview?.period||"";
   if(!/^[a-z0-9]{16}$/i.test(externalLeagueId)){setState({fantraxPreview:fantraxPreviewState({externalLeagueId,period,error:"Enter a valid 16-character Fantrax league ID."})});return}
-  const changed=externalLeagueId!==appState.fantraxPreview?.externalLeagueId||period!==appState.fantraxPreview?.period;
   const loadingState=fantraxPreviewState({externalLeagueId,period,loading:true,error:""});
-  setState({fantraxPreview:changed?clearFantraxPendingReviews(loadingState):loadingState});
+  setState({fantraxPreview:clearFantraxPendingReviews(loadingState)});
   try{
     const [players,teams]=await Promise.all([allPlayers(appState.activeLeague.id),Promise.resolve(appState.teams||[])]);
     const next=await fetchFantraxPublicPreview({externalLeagueId,period,players,teams,reviewedSeasonContext:appState.activeLeague?.settings?.fantraxSeasonContext});
@@ -188,21 +190,28 @@ async function persistFantraxTeamMappings(){
   }catch(error){setState({fantraxPreview:fantraxPreviewState({savingTeamMappings:false,error:String(error?.message||error)})})}
 }
 async function persistReviewedFantraxRosterStatuses(){
-  const preview=appState.fantraxPreview,periodGuard=fantraxRosterSyncPeriodGuard(preview.period),seasonGuard=fantraxSeasonWriteGuard(preview.data?.seasonContextComparison),validation=validateControlledFantraxStatusUpdates(preview.data?.rosterItems||[],preview.rosterSyncSelectedIds||[]);
-  if(!seasonGuard.valid||!periodGuard.valid||!preview.rosterSyncReviewed||!validation.valid){setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:false,error:seasonGuard.error||periodGuard.error||validation.errors.join(" ")||"Review the eligible Fantrax status changes before applying."})});return}
+  const preview=appState.fantraxPreview,releasePolicy=fantraxRosterSyncReleasePolicy(appState.activeLeague),releaseSignature=fantraxRosterSyncReleaseSignature(releasePolicy),periodGuard=fantraxRosterSyncPeriodGuard(preview.period),seasonGuard=fantraxSeasonWriteGuard(preview.data?.seasonContextComparison),validation=validateControlledFantraxStatusUpdates(preview.data?.rosterItems||[],preview.rosterSyncSelectedIds||[],releasePolicy.effectiveCap),releaseUnchanged=preview.rosterSyncReleaseSignature===releaseSignature;
+  if(!releasePolicy.valid||!releaseUnchanged||!seasonGuard.valid||!periodGuard.valid||!preview.rosterSyncReviewed||!validation.valid){setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:false,rosterSyncReviewed:false,error:releasePolicy.error||(!releaseUnchanged?"The Fantrax synchronization release changed after review. Start a new review.":"")||seasonGuard.error||periodGuard.error||validation.errors.join(" ")||"Review the eligible Fantrax status changes before applying."})});return}
   setState({fantraxPreview:fantraxPreviewState({savingRosterSync:true,confirmRosterSync:false,error:""})});
   try{
-    const leagueId=appState.activeLeague.id,seasonContext=preview.data?.seasonContextComparison?.observed;
-    const manifest=canonicalFantraxSyncManifest({leagueId,period:preview.period,seasonContext,updates:validation.updates}),manifestValidation=validateFantraxSyncManifest(manifest);
+    const leagueId=appState.activeLeague.id,seasonContext=preview.data?.seasonContextComparison?.observed,previewFetchedAt=preview.data?.fetchedAt,externalLeagueId=preview.externalLeagueId;
+    const manifestInput={leagueId,period:preview.period,seasonContext,updates:validation.updates,releaseTier:releasePolicy.releaseTier,effectiveCap:releasePolicy.effectiveCap};
+    let manifest=canonicalFantraxSyncManifest(manifestInput),manifestValidation=validateFantraxSyncManifest(manifest);
     if(!manifestValidation.valid)throw new Error(manifestValidation.errors.join(" "));
-    const digest=await fantraxSyncManifestDigest({leagueId,period:preview.period,seasonContext,updates:validation.updates});
-    const attempt=await prepareFantraxSyncAttempt(leagueId,{digest,manifest});
+    let digest=await fantraxSyncManifestDigest(manifestInput),attempt=await findFantraxSyncAttempt(leagueId,digest);
+    if(!attempt&&releasePolicy.releaseTier==="CONTROLLED_3"){
+      const legacyManifest=canonicalFantraxSyncManifestV1(manifestInput),legacyDigest=await fantraxSyncManifestDigestV1(manifestInput),legacyAttempt=await findFantraxSyncAttempt(leagueId,legacyDigest);
+      if(legacyAttempt){manifest=legacyManifest;digest=legacyDigest;attempt=legacyAttempt}
+    }
+    if(!attempt)attempt=await prepareFantraxSyncAttempt(leagueId,{digest,manifest,allowCreate:!releasePolicy.recoveryOnly});
+    const durableValidation=validatePreparedFantraxSyncAttempt(attempt,manifest,digest);
+    if(!durableValidation.valid)throw new Error(durableValidation.errors.join(" "));
     const remaining=pendingFantraxSyncUpdates(manifest,attempt.fantrax_sync_attempt_items||[]);
     if(!remaining.length)throw new Error("This reviewed Fantrax synchronization manifest already has terminal outcomes and cannot be replayed.");
     await markFantraxSyncAttemptApplying(leagueId,attempt.id);
     const repeatGuard=()=>{
-      const currentPreview=appState.fantraxPreview,currentSeason=fantraxSeasonWriteGuard(currentPreview.data?.seasonContextComparison),currentPeriod=fantraxRosterSyncPeriodGuard(currentPreview.period);
-      if(!currentSeason.valid||!currentPeriod.valid)throw new Error(currentSeason.error||currentPeriod.error);
+      const currentPreview=appState.fantraxPreview,currentRelease=fantraxRosterSyncReleasePolicy(appState.activeLeague),currentSeason=fantraxSeasonWriteGuard(currentPreview.data?.seasonContextComparison),currentPeriod=fantraxRosterSyncPeriodGuard(currentPreview.period),stale=currentPreview.data?.fetchedAt!==previewFetchedAt||currentPreview.externalLeagueId!==externalLeagueId||appState.activeLeague?.id!==leagueId;
+      if(!currentRelease.valid||fantraxRosterSyncReleaseSignature(currentRelease)!==releaseSignature||!currentSeason.valid||!currentPeriod.valid||stale)throw new Error(currentRelease.error||currentSeason.error||currentPeriod.error||"The Fantrax preview or active league changed after review. Refresh and review again.");
     };
     const result=await applyFantraxRosterStatuses(leagueId,remaining,{beforeGroup:repeatGuard});
     const recorded=await recordFantraxSyncOutcomes(leagueId,attempt.id,fantraxSyncOutcomeRows(attempt.id,result));
@@ -454,24 +463,24 @@ function bindViewEvents(){
   $("#fetchFantraxPreview")?.addEventListener("click",loadFantraxPreview);
   $("#fantraxExternalLeagueId")?.addEventListener("change",event=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:event.target.value.trim(),error:"",selectedTab:"summary",page:1}))}));
   $("#fantraxPeriod")?.addEventListener("change",event=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,period:event.target.value,error:"",selectedTab:"summary",page:1}))}));
-  $("#clearFantraxPreview")?.addEventListener("click",()=>setState({fantraxPreview:{...appState.fantraxPreview,data:null,error:"",selectedTab:"summary",page:1}}));
+  $("#clearFantraxPreview")?.addEventListener("click",()=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,error:"",selectedTab:"summary",page:1}))}));
   $all("[data-fantrax-tab]").forEach(button=>button.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({selectedTab:button.dataset.fantraxTab,page:1})})));
   $("#applyFantraxRosterFilters")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({filters:fantraxFiltersFromControls(),page:1})}));
   $("#fantraxPrevPage")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({page:Math.max(1,(appState.fantraxPreview.page||1)-1)})}));
   $("#fantraxNextPage")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({page:(appState.fantraxPreview.page||1)+1})}));
-  $all("[data-fantrax-team-map]").forEach(select=>select.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({pendingTeamMappings:setPendingTeamMapping(appState.fantraxPreview.pendingTeamMappings,event.target.dataset.fantraxTeamMap,event.target.value),reviewTeamMappings:false,confirmTeamMappings:false,error:""})})));
+  $all("[data-fantrax-team-map]").forEach(select=>select.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({pendingTeamMappings:setPendingTeamMapping(appState.fantraxPreview.pendingTeamMappings,event.target.dataset.fantraxTeamMap,event.target.value),reviewTeamMappings:false,confirmTeamMappings:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:"",error:""})})));
   $("#reviewFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewTeamMappings:true,confirmTeamMappings:false})}));
-  $("#cancelFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,allowReplacement:false,error:""})}));
-  $("#confirmFantraxReplacement")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({allowReplacement:event.target.checked})}));
-  $("#confirmFantraxSeasonReview")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({seasonReviewAcknowledged:event.target.checked,confirmTeamMappings:false})}));
+  $("#cancelFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,allowReplacement:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:"",error:""})}));
+  $("#confirmFantraxReplacement")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({allowReplacement:event.target.checked,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:""})}));
+  $("#confirmFantraxSeasonReview")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({seasonReviewAcknowledged:event.target.checked,confirmTeamMappings:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:""})}));
   $("#saveFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmTeamMappings:true})}));
   $("#dismissSaveFantraxTeamMappings")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmTeamMappings:false})}));
   $("#confirmSaveFantraxTeamMappings")?.addEventListener("click",persistFantraxTeamMappings);
-  $("#reviewFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:true,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],error:""})}));
-  $("#cancelFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],error:""})}));
+  $("#reviewFantraxRosterSync")?.addEventListener("click",()=>{const policy=fantraxRosterSyncReleasePolicy(appState.activeLeague);setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:policy.valid,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:policy.valid?fantraxRosterSyncReleaseSignature(policy):"",error:policy.error})})});
+  $("#cancelFantraxRosterSync")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:"",error:""})}));
   $all("[data-fantrax-roster-select]").forEach(input=>input.addEventListener("change",event=>{
-    const selection=controlledFantraxRosterSelection(appState.fantraxPreview?.rosterSyncSelectedIds||[],event.target.dataset.fantraxRosterSelect,event.target.checked);
-    setState({fantraxPreview:fantraxPreviewState({rosterSyncSelectedIds:selection.selectedIds,rosterSyncReviewed:false,confirmRosterSync:false,error:selection.error})});
+    const policy=fantraxRosterSyncReleasePolicy(appState.activeLeague),selection=controlledFantraxRosterSelection(appState.fantraxPreview?.rosterSyncSelectedIds||[],event.target.dataset.fantraxRosterSelect,event.target.checked,policy.effectiveCap);
+    setState({fantraxPreview:fantraxPreviewState({rosterSyncSelectedIds:selection.selectedIds,rosterSyncReviewed:false,confirmRosterSync:false,error:policy.error||selection.error})});
   }));
   $("#confirmFantraxRosterReview")?.addEventListener("change",event=>setState({fantraxPreview:fantraxPreviewState({rosterSyncReviewed:event.target.checked,confirmRosterSync:false})}));
   $("#openFantraxRosterSyncConfirmation")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({confirmRosterSync:true})}));
