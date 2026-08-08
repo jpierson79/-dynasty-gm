@@ -163,4 +163,119 @@
 
 ### Deployment And Hosted Acceptance
 
-- Pending deployable commit and authenticated hosted rerun.
+- Repair commit: `d6aa7695be519897b902faea1b365e6fe4097b89` (`Repair hosted V5 loading boundary`).
+- Push: succeeded, updating `origin/codex/v5-season-rollover-reconciliation` from `b37c516` to `d6aa769`.
+- GitHub Pages was temporarily pointed at the reconciliation branch. Workflow run `31118895088` correctly targeted `d6aa769` but failed during runner setup before checkout/build because GitHub could not resolve its standard action download information (`Service Unavailable`). The stalled first attempt was cancelled after 7 minutes.
+- One rerun was requested. It remained queued while GitHub Actions was unavailable, so no new branch artifact was published and the live application continued serving the older `Loading` artifact.
+- The Pages source setting was restored to `main` and verified in repository settings. Restoration run `31119426895` is also queued behind the GitHub Pages outage. The branch rerun could not be cancelled while GitHub exposed no cancel control; it targets the reconciliation commit, but the configured publication source remains `main`.
+- Hosted authenticated application boot: **not reached on the repaired artifact**.
+- All seven live season-context scenarios: **not executed and not accepted**. No result from the stale artifact was counted.
+
+### Live Acceptance Matrix
+
+1. Current reviewed season context: blocked by preview deployment failure.
+2. Simulated rollover drift: blocked by preview deployment failure.
+3. Writes blocked during drift: blocked by preview deployment failure.
+4. Acknowledgement and complete mapping confirmation: blocked by preview deployment failure.
+5. Period/configuration invalidation: blocked by preview deployment failure.
+6. Repeated pre-persistence guard: blocked by preview deployment failure.
+7. Data Health season-context rendering: blocked by preview deployment failure.
+
+### Data And Safety Outcome
+
+- The fail-closed mapping-first/settings-second sequence was preserved unchanged.
+- Fantrax preview reads on the repaired artifact: none.
+- Cloud reads on the repaired artifact: none.
+- Cloud writes: none.
+- Roster synchronization/status writes: none.
+- Imports: none.
+- Score recalculation: none.
+- Migrations/schema changes: none.
+- Merge into `main`: not performed.
+
+### Final Gate
+
+- V5.4.6C-2 is **not complete and not approved for merge** because GitHub Pages did not publish the repaired artifact and authenticated live acceptance could not begin.
+- Retry deployment after GitHub Actions recovers, verify the hosted module graph loads commit `d6aa769`, then complete all seven scenarios. The repair commit is pushed because its root cause and complete automated suite were validated; this updated failure record remains intentionally uncommitted under the task rule that final acceptance documentation must not be committed until acceptance passes.
+
+## V5.4.6C-2 Resume Attempt
+
+### Baseline
+
+- Resumed from local and remote commit `d6aa7695be519897b902faea1b365e6fe4097b89`; the branch had no application-code changes.
+- Preserved this existing uncommitted acceptance record and unrelated untracked `.codex/` content.
+
+### Publication Attempts
+
+- Confirmed the prior `main` restoration run `31119426895` targeted `df89840` but failed before checkout/build with `Failed to resolve action download info` and `Service Unavailable`.
+- Reconfigured GitHub Pages to `codex/v5-season-rollover-reconciliation` and triggered fresh workflow run `31120104574` for exact commit `d6aa7695be519897b902faea1b365e6fe4097b89`.
+- Run `31120104574` obtained a runner, but its build job `92678765976` failed during job setup before checkout. GitHub retried action metadata downloads and returned `Service Unavailable` repeatedly; report-build-status remained queued and deploy was skipped.
+- A final API-level rerun request for the failed job was rejected with HTTP 403 `Resource not accessible by integration`; no deployment was started by that request.
+- The repaired artifact was never built or published, so its deployed asset could not be compared with `d6aa769` and no application-code diagnosis or modification was authorized.
+
+### Acceptance And Restoration
+
+- All seven authenticated acceptance scenarios remain **not executed** because no successful build produced the repaired artifact.
+- No stale or prior artifact result was counted as acceptance.
+- GitHub Pages source was restored to `main` and verified in repository settings after the failed preview attempt.
+- No Fantrax reads, cloud reads, cloud writes, roster synchronization, imports, score recalculation, migration, schema change, or merge occurred during the resume attempt.
+
+### Resume Outcome
+
+- Status: **externally blocked; not accepted for merge**.
+- The acceptance record remains uncommitted and unpushed because `docs/NEXT_TASK.md` permits the final commit only after every hosted acceptance check passes. Commit `d6aa769` remains the remote branch head.
+
+## Supabase Connection Diagnosis
+
+### Verified Cause
+
+- The configured Supabase project endpoint `https://kgqpbahssuowujjowulr.supabase.co/auth/v1/health` responded with HTTP 401 without an API key. This proves DNS, TLS, and the Supabase Auth service are reachable; the unauthenticated response is expected for that request shape.
+- The live GitHub Pages URL for `/js/config/supabase.js` returned HTTP 404 with a 9,379-byte GitHub Pages error document.
+- A clean live V5 load consequently remained at `Loading`. The deployed artifact is still the earlier incomplete reconciliation artifact and cannot import the shared Supabase client configuration.
+- Source commit `d6aa7695be519897b902faea1b365e6fe4097b89` already contains the correct tracked browser-safe configuration and the passing production-configuration regression test. No additional application-code defect was found or changed.
+
+### Corrective Deployment Attempt
+
+- GitHub Pages was temporarily pointed to `codex/v5-season-rollover-reconciliation`, triggering run `31126081441` for exact commit `d6aa769`.
+- The run remained queued in GitHub Pages and did not build or publish an artifact. Prior same-day runs failed before checkout because GitHub could not download its standard Actions dependencies (`Service Unavailable`).
+- GitHub Pages was restored and verified as configured to `main` after the diagnostic attempt.
+
+### Status
+
+- Source/configuration repair: **complete at `d6aa769`**.
+- Live Supabase connection: **still blocked by stale Pages publication**.
+- Application code changes in this diagnosis: none.
+- Cloud writes, imports, roster synchronization, score recalculation, migrations, schema changes, and merge: none.
+- Required next operation: successfully publish either `d6aa769` for preview acceptance or the already-correct `main` configuration after GitHub Pages runners recover, then verify `/js/config/supabase.js` returns HTTP 200 and the authenticated V5 app exits `Loading`.
+
+## V5.4.6C-2 Final Authenticated Acceptance
+
+### Publication And Loading Boundary
+
+- Date: 2026-08-07 (America/Chicago).
+- GitHub Pages successfully built and deployed exact repair commit `d6aa7695be519897b902faea1b365e6fe4097b89` from `codex/v5-season-rollover-reconciliation` in workflow run `31228177939` (`pages-build-deployment` run 20). The run completed successfully in 57 seconds; its published artifact was 364 KB with digest `sha256:9f8f5b1fd0402a08bb7b50b9e147706eb304b1cd494609e1dcd0f08d20d1dc98`.
+- The deployed `/js/config/supabase.js?acceptance=d6aa769` returned HTTP 200 with 155 bytes.
+- A cache-busted fresh V5 load exited `Loading`, rendered `Cloud · Reddit Phanatics`, retained the authenticated user session, and selected the accessible league. Browser diagnostics contained zero errors or warnings.
+- No application-code change was required after publication; the tracked Supabase configuration repair in `d6aa769` was the complete loading-boundary fix.
+
+### Seven-Scenario Live Acceptance
+
+1. **Current reviewed season context — pass.** A current-period public preview observed league `xryuc2ewmhi0d2vm`, season `2026`, and history `8mifq27zmhi0d2vm`. After review, all three reviewed values matched the observed values and the UI rendered `Fantrax season context: MATCH`.
+2. **Safely simulated rollover drift — pass.** The live workflow began in the fail-closed `UNREVIEWED` rollover-review state while retaining a readable current-period preview: 10 teams, 10,197 players, 564 roster entries, 24 periods, current period 136, and all six public endpoints at HTTP 200 with valid schemas. This exercised the same mandatory full-team review path without altering the external league or manufacturing cloud data.
+3. **Writes blocked during drift — pass.** In `UNREVIEWED`, the hosted UI explicitly reported that team-identity and roster-status writes were blocked and disabled roster review; no roster/status write was attempted.
+4. **Acknowledgement flow — pass.** All 10 external teams were explicitly mapped one-to-one to active-league cloud teams, the season-identity acknowledgement was checked, the complete mapping list was reviewed, and the final confirmation identified league, season, and history. The approved fail-closed sequence saved the same-value team mappings first and the reviewed season-context settings second. The refreshed preview rendered `MATCH`, 10 persisted mappings, 0 pending mappings, and 0 unmapped teams.
+5. **Period/configuration invalidation — pass.** Changing the prepared review from Current to period 13 cleared the preview, disabled Clear Preview, removed the pending review, and removed the confirmation action. Current was restored and a fresh preview was required before continuing.
+6. **Repeated guard immediately before persistence — pass.** The period change was made after all 10 mappings and the acknowledgement had been prepared but before confirmation. The stale confirmation disappeared and no persistence occurred. Only a new current-period fetch and rebuilt complete review could reach final confirmation.
+7. **Data Health rendering — pass.** Before preview, Data Health rendered unavailable/review-required season rows without initiating a Fantrax read. After the successful review, it rendered PASS for season-context review, league ID, season year, history identity, team/status write guard, team identity, persisted IDs, duplicate IDs, unmapped teams, cloud teams without IDs, and roster team identity. Existing ownership/status diagnostic warnings remained informational and caused no write.
+
+### Save-Sequence Decision And Safety
+
+- The previously approved mapping-first/settings-second sequence remains unchanged and accepted as fail-closed, not database-atomic. A settings failure cannot approve the season context, so roster/status writes remain blocked until the operator retries.
+- Authorized cloud writes were limited to the 10 explicitly reviewed same-value team-identity mappings and the league-scoped reviewed `fantraxSeasonContext` settings field.
+- Roster synchronization/status persistence, imports, score recalculation, ownership repair, migrations, schema changes, and unrelated cloud writes were not performed.
+- Exact identity matching, manual-override protection, current-period-only synchronization, stale-preview protection, league scoping, and write-time field restrictions remained in force.
+
+### Pages Restoration And Merge Gate
+
+- GitHub Pages was restored to `main` at repository root after acceptance. Restoration workflow run `31228869896` (`pages-build-deployment` run 21) completed successfully in 41 seconds and repository settings showed `main` as the configured source.
+- No merge was performed. V5.4.6C-2 authenticated deployment acceptance is complete, but merge remains gated on architect review.
