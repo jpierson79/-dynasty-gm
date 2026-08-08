@@ -199,3 +199,15 @@ Decision: Build the apply set only from exact `APPLY_FANTRAX_STATUS` preview rec
 Consequences: The write payload contains only `roster_status`, `roster_status_source = 'FANTRAX'`, and `updated_at`. A row whose owner or status changed after preview, or that gained a manual override, is skipped and classified for review. Partial results and failed write groups are reported, and every completed attempt triggers fresh league data and Fantrax preview reads. Ownership, free-agent state, UUIDs, external identities, scores, HKB values, and metrics remained unchanged in controlled acceptance. Acceptance of one exact subset does not authorize broader synchronization.
 
 Evidence paths: `v5/js/services/fantraxRosterSyncService.js`, `v5/js/repositories/playerRepository.js`, `v5/js/views/fantraxPreviewView.js`, `tests/v5FantraxRosterSync.test.mjs`.
+
+## ADR-018: Fail Closed Across Fantrax Season Context Changes
+
+Status: accepted locally; authenticated browser acceptance pending.
+
+Context: Fantrax team IDs were verified only within the configured league and tested periods. Cross-season stability was not proven, so silently reusing prior mappings could direct later status writes at the wrong cloud teams.
+
+Decision: Canonicalize the observed external league ID, season year, and optional league-history ID and compare them with an explicitly reviewed context stored in the active league's existing `settings` object. Block team-identity and roster-status writes when the context is missing, invalid, or changed. To approve a new context, require acknowledgement and a complete, unique, active-league mapping for every observed Fantrax team. Treat names, managers, roster overlap, and prior mappings as non-authoritative suggestions.
+
+Consequences: Read-only previews remain available during drift. When both contexts expose league-history identity, it must match; an unavailable optional value is surfaced without inventing a mismatch. Existing current-period, exact-selection, ownership, current-status, and manual-override checks still run. No schema migration is required, and saving a reviewed context updates only the league `settings` field while mapping writes remain league- and team-scoped.
+
+Evidence paths: `v5/js/services/fantraxSeasonContextService.js`, `v5/js/services/fantraxPublicPreviewService.js`, `v5/js/repositories/leagueRepository.js`, `v5/js/services/dataHealthService.js`, `tests/v5FantraxSeasonContext.test.mjs`.

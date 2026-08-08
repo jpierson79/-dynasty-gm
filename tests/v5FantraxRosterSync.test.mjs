@@ -34,7 +34,8 @@ assert.equal(fantraxRosterSyncSkipReason(manifest,null),"NOT_FOUND_OR_DENIED");
 assert.equal(fantraxRosterSyncSkipReason(manifest,{owner_team_id:"team-1",roster_status:"RESERVE",roster_status_source:"UNKNOWN"},{writeFailed:true}),"WRITE_FAILED_OR_NOT_ATTEMPTED");
 assert.deepEqual(fantraxRosterSyncSummary({reviewed:3,updated:[{id:"p1"}],skipped:[{reason:"OWNER_CHANGED"},{reason:"OWNER_CHANGED"}],failures:[{}]}),{reviewed:3,updated:1,skipped:2,failedGroups:1,skipReasons:{OWNER_CHANGED:2}});
 
-const rendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},rosterItems:[eligible,manual,unknown],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",reviewRosterSync:true,rosterSyncReviewed:true,rosterSyncSelectedIds:["p1"],confirmRosterSync:true,filters:{},page:1,pageSize:50}});
+const matchingSeason={status:"MATCH",writeAllowed:true,reasons:[],reviewed:{valid:true,externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:null,leagueHistoryAvailable:false},observed:{valid:true,externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:null,leagueHistoryAvailable:false}};
+const rendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible,manual,unknown],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",reviewRosterSync:true,rosterSyncReviewed:true,rosterSyncSelectedIds:["p1"],confirmRosterSync:true,filters:{},page:1,pageSize:50}});
 assert.match(rendered,/Review 1 Status Updates/);
 assert.match(rendered,/Alpha/);
 assert.doesNotMatch(rendered,/Manual<\/td><td>RESERVE<\/td><td>ACTIVE/,"manual overrides are not included in the exact apply table");
@@ -42,7 +43,7 @@ assert.match(rendered,/Continue to Confirmation/);
 assert.match(rendered,/Selected: 1 \/ 3/);
 assert.match(rendered,/data-fantrax-roster-select="p1" checked/);
 assert.match(rendered,/Selected players: Alpha/);
-const historicalRendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},rosterItems:[eligible],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",period:"131",reviewRosterSync:true,rosterSyncSelectedIds:["p1"],filters:{},page:1,pageSize:50}});
+const historicalRendered=renderFantraxPreview({fantraxPreview:{data:{league:{scoringPeriods:[]},seasonContextComparison:matchingSeason,rosterItems:[eligible],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}},selectedTab:"rosters",period:"131",reviewRosterSync:true,rosterSyncSelectedIds:["p1"],filters:{},page:1,pageSize:50}});
 assert.match(historicalRendered,/blocked for historical scoring period 131/);
 assert.match(historicalRendered,/id="reviewFantraxRosterSync"[^>]*disabled/);
 assert.doesNotMatch(historicalRendered,/data-fantrax-roster-select/);
