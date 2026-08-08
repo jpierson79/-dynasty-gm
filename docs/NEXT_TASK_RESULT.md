@@ -468,3 +468,39 @@
 - Authorized cloud mutations were limited to the migration and the two audit-only attempts/four item rows. The Fantrax preview was read-only.
 - Broad roster synchronization, roster/status persistence, imports, ownership repair, score recalculation, player/team mutation, and unrelated cloud writes were not performed.
 - No application code, migration SQL, or tests were modified during acceptance. Only this acceptance record was updated.
+
+## V5.4.6E Planning Result
+
+### Selected Phase
+
+- Selected **V5.4.6E Controlled Fantrax Roster Synchronization Expansion** as the next bounded architectural phase.
+- Planning baseline: accepted `feature/manager-intelligence` commit `82dc2319a6ea414186ed3b248efa63ed9b72d714`, with migration 009 applied and V5.4.6D-1 authenticated audit/recovery acceptance complete.
+- This is documentation-only planning. It does not authorize implementation, migration creation/application, deployment, opt-in activation, or roster writes.
+
+### Rationale
+
+- Exact identity, reviewed team mappings, database-stamped manual override protection, Current-period and season-rollover guards, stale-preview invalidation, status-only write predicates, and durable replay-safe attempt/item evidence are now established prerequisites.
+- The remaining value is a controlled increase in operational batch size, not a broad sync. Moving directly from the accepted three-player test to hundreds of eligible rows would enlarge the failure domain without intermediate production evidence.
+- Migration 009 itself enforces `reviewed_count between 1 and 3` and item `ordinal between 0 and 2`. A UI-only cap increase would fail at the durable boundary and would be architecturally unsafe. The plan therefore requires a separately reviewed additive migration before an expanded tier can be enabled.
+- The first expansion is capped at 10, remains disabled by default, is enabled only by an explicit league-scoped release setting, and is included in the immutable manifest/digest. Values above 10, Select All, background synchronization, and a full eligible-set apply are deferred.
+- The plan makes protected-field verification a hard acceptance gate and retains the exact status-only payload. Any unexpected protected change, partial result, failed group, or audit inconsistency stops the release rather than triggering another batch.
+
+### Dependencies And Gates
+
+1. Preserve ADR-015 exact reviewed team identity and league scoping.
+2. Preserve ADR-016 database-stamped manual-override protection.
+3. Preserve ADR-017 exact selected set, expected-owner/current-status predicates, grouped status-only writes, and classified partial outcomes.
+4. Preserve ADR-018 matching reviewed season context, Current-period-only behavior, and stale-preview invalidation.
+5. Reuse migration 009's immutable manifest, database actor, lifecycle, RLS, duplicate digest, per-row terminal outcomes, and recovery semantics.
+6. Require architect review of the implementation and additive migration before deployment.
+7. Require separate approval for migration application, opt-in activation, and the single controlled production batch.
+8. Require exact pre/post protected-field verification, durable audit evidence, refreshed preview, Data Health, replay proof, opt-in resolution, full automated validation, and authenticated acceptance before checkpoint or merge review.
+
+### Operations Avoided
+
+- Application, test, and migration changes: none.
+- Migration application or schema change: none.
+- Deployment or opt-in activation: none.
+- Fantrax endpoint reads or cloud reads: none.
+- Cloud writes, roster synchronization, imports, ownership repair, and score recalculation: none.
+- Merge into `main`: not performed.
