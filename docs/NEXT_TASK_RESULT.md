@@ -589,3 +589,32 @@
 - Gate 1 implementation checkpoint commit: `e6ba728` (`Add controlled Fantrax sync batch expansion`).
 - Initial push result: succeeded; `origin/feature/manager-intelligence` advanced from `0a78e4f` to `e6ba728`.
 - Gate 2 remains additive migration review/application plus read-only schema verification under separate authorization. Gate 3 remains one explicitly approved opt-in production batch with protected-field evidence and authenticated acceptance.
+
+## V5.4.6E Gate 2A Manifest-v2 Creation Boundary Repair
+
+### Production Evidence And Scope
+
+- Baseline: clean `feature/manager-intelligence` at `57b50bf864226b00a361a74548ee54c310a132c9`.
+- Production migration 010 is already applied successfully. This checkpoint does not reapply or modify migrations 009 or 010.
+- Authenticated read-only inspection found two historical audit attempts, both manifest v1. The `manifest_version` column is non-null text with no default, so migration 011 does not alter its default.
+- The deployed migration-010 attempt trigger is the single authoritative INSERT/UPDATE boundary, remains `SECURITY INVOKER`, and uses `search_path=public, pg_temp`. Six RLS policies remain in place and reference only `private.is_league_member(uuid)` and `private.can_edit_league(uuid)`.
+- The live trigger had no manifest-version INSERT restriction, confirming the narrowly scoped repair requirement. No production row was created, updated, or deleted during inspection.
+
+### Additive Migration 011
+
+- Added `011_fantrax_sync_manifest_v2_creation.sql`; it remains unapplied.
+- Migration 011 replaces only `public.protect_fantrax_sync_attempt_audit()` and adds one INSERT-only guard requiring `new.manifest_version = '2'`.
+- Existing v1 and v2 rows are not scanned, rewritten, backfilled, or constrained. Existing exact v1 attempts continue through the unchanged UPDATE/lifecycle path and retain recovery eligibility.
+- New v1, blank, and unsupported future-version attempts fail at the database trigger even when browser/application validation is bypassed. New v2 attempts continue into the unchanged actor-stamping and release-tier checks.
+- Manifest version, release tier, cap, digest, league, actor, season context, Current period, reviewed count, and creation time remain immutable after creation.
+- Migration-010 default/opt-in caps, league-scoped release setting, actor stamping, RLS, private authorization helpers, cross-league item validation, replay protection, lifecycle transitions, `SECURITY INVOKER`, and reviewed search path are unchanged.
+
+### Safety
+
+- Focused command covering synchronization audit/migration, roster sync, season context, and Data Health: 4 of 4 test files passed.
+- Full sorted PowerShell loop over every `tests/*.test.mjs`: 34 discovered, 34 passed, 0 failed.
+- `git diff --check`: passed; only expected LF-to-CRLF working-copy warnings were emitted.
+- Migration 011 application: not performed.
+- Controlled audit records and opt-in setting changes: none.
+- Deployment or Pages changes: none.
+- Fantrax synchronization, player/roster writes, imports, ownership repair, score recalculation, and unrelated cloud writes: none.

@@ -44,6 +44,7 @@ assert.match(renderFantraxSyncAudit([]),/No durable synchronization attempts rec
 
 const migration=fs.readFileSync(new URL("../supabase/migrations/009_fantrax_sync_audit.sql",import.meta.url),"utf8");
 const expansionMigration=fs.readFileSync(new URL("../supabase/migrations/010_fantrax_sync_opt_in_batch.sql",import.meta.url),"utf8");
+const manifestV2Migration=fs.readFileSync(new URL("../supabase/migrations/011_fantrax_sync_manifest_v2_creation.sql",import.meta.url),"utf8");
 const repository=fs.readFileSync(new URL("../v5/js/repositories/fantraxSyncAuditRepository.js",import.meta.url),"utf8");
 const playerRepository=fs.readFileSync(new URL("../v5/js/repositories/playerRepository.js",import.meta.url),"utf8");
 const main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8");
@@ -72,6 +73,16 @@ assert.match(expansionMigration,/settings->'fantraxRosterSyncRelease'/i,"databas
 assert.match(expansionMigration,/new\.release_tier <> old\.release_tier[\s\S]*new\.batch_limit <> old\.batch_limit/i,"release metadata is immutable");
 assert.match(expansionMigration,/security invoker set search_path=public,pg_temp/i);
 assert.doesNotMatch(expansionMigration,/security definer|public\.(?:is_league_member|can_edit_league)\s*\(/i);
+assert.match(manifestV2Migration,/create or replace function public\.protect_fantrax_sync_attempt_audit\(\)/i,"migration 011 keeps one authoritative attempt boundary");
+assert.match(manifestV2Migration,/if tg_op = 'INSERT' then[\s\S]*if new\.manifest_version <> '2' then[\s\S]*require manifest version 2/i,"all new attempts reject v1 and unsupported versions");
+assert.match(manifestV2Migration,/if new\.manifest_version <> '2'[\s\S]*if new\.release_tier = 'V5\.4\.6E_OPT_IN_10'[\s\S]*fantraxRosterSyncRelease/i,"v2 enforcement preserves migration 010 opt-in validation");
+assert.match(manifestV2Migration,/new\.manifest_version <> old\.manifest_version[\s\S]*identity and manifest are immutable/i,"manifest version remains immutable after creation");
+assert.match(manifestV2Migration,/return new;[\s\S]*end if;[\s\S]*new\.manifest_version <> old\.manifest_version/i,"the v2 creation guard is confined to INSERT so existing v1 lifecycle recovery remains permitted");
+assert.match(manifestV2Migration,/security invoker set search_path=public,pg_temp/i);
+assert.doesNotMatch(manifestV2Migration,/security definer|public\.(?:is_league_member|can_edit_league)\s*\(/i);
+assert.doesNotMatch(manifestV2Migration,/alter table[\s\S]*manifest_version|update\s+public\.fantrax_sync_attempts|delete\s+from|truncate/i,"migration 011 neither backfills nor invalidates historical v1 rows");
+assert.doesNotMatch(manifestV2Migration,/default\s+'?1'?/i,"migration 011 cannot default new attempts to manifest v1");
+assert.match(migration,/create trigger protect_fantrax_sync_attempt_audit before insert or update/i,"the replaced function guards direct client inserts at the database trigger boundary");
 assert.match(repository,/\.eq\("manifest_digest",digest\)/,"same manifest resolves to one durable attempt");
 assert.match(repository,/release_tier:manifest\.releaseTier,batch_limit:manifest\.effectiveCap/);
 assert.match(repository,/manifest\?\.rows\?\.length>cap/,"repository refuses manifests above the recognized durable cap");
