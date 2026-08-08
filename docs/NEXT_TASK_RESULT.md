@@ -586,5 +586,6 @@
 - Cloud reads/writes: none.
 - Roster synchronization/status persistence: none.
 - Imports, ownership repair, player/team mutation, score recalculation, deployment, and migration application: none.
-- Commit and push: not performed; architect review is required first.
+- Gate 1 implementation checkpoint commit: `e6ba728` (`Add controlled Fantrax sync batch expansion`).
+- Initial push result: succeeded; `origin/feature/manager-intelligence` advanced from `0a78e4f` to `e6ba728`.
 - Gate 2 remains additive migration review/application plus read-only schema verification under separate authorization. Gate 3 remains one explicitly approved opt-in production batch with protected-field evidence and authenticated acceptance.
