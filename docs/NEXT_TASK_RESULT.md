@@ -861,3 +861,64 @@
 - Implementation commit: `83db74a016aa017fd89db1eb5721f931180f65bc` (`Fix Fantrax sync audit visibility`).
 - Push result: successful; `origin/feature/manager-intelligence` advanced from `c375c02f30bff1cbfa0a1e3a245405a0bc032cca` to `83db74a016aa017fd89db1eb5721f931180f65bc`.
 - This checkpoint performed no deployment, opt-in change, Fantrax synchronization, audit creation, migration, import, ownership or identity change, score recalculation, or other cloud write. Stop for architect review before any Gate 4 execution.
+
+## V5.4.6E Gate 4B Hosted Audit Visibility Acceptance Attempt
+
+### Exact Artifact And Hosted Loading
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local HEAD and `origin/feature/manager-intelligence` both at exact Gate 4A checkpoint `eaa8e7cad1ce2b65bbf7c46a82801526c391d9c3`.
+- GitHub Pages temporarily published that exact commit successfully. Pages build `1141636688` completed with status `built` in 44,118 ms and reported commit `eaa8e7cad1ce2b65bbf7c46a82801526c391d9c3`.
+- A fresh semantic Chrome inspection opened the hosted V5 artifact successfully. The page title was `Dynasty Front Office V5`, and the application exited `Loading` into the rendered authentication/application shell.
+
+### Authentication Stop Condition
+
+- The hosted artifact reported `Signed out`, rendered the authentication form, selected no cloud league, and displayed `Sign in to connect to Supabase Cloud`.
+- Therefore the required authenticated session and active Reddit Phanatics league were not available. Gate 4B stopped immediately at that prerequisite.
+- Data Health, the Fantrax Synchronization Audit UI, authenticated repository counts, and the 3-attempt/8-item production baseline were not accepted or re-verified from this unauthenticated session. No zero/unavailable/permission-blocked/query-failed hosted-state claim was made.
+- Focused and full tests were not rerun after this stop because hosted authenticated acceptance could not begin. Gate 4B did not pass, so no acceptance commit or push is permitted.
+
+### Restoration And Safety
+
+- GitHub Pages was restored to `main`. Restoration build `1141640896` completed successfully with status `built` in 38,391 ms and reported main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- Expanded opt-in changes, Fantrax preview/candidate reads, synchronization, roster/player writes, audit attempt/item creation, migrations, imports, ownership or identity changes, score recalculation, and unrelated cloud writes: none.
+- Gate 4 remains blocked. Resume Gate 4B only with a reliable authenticated hosted session; do not resume the 10-player Gate 4 synchronization before Gate 4B passes and receives architect review.
+
+### Gate 4B Authentication Resume
+
+- The exact Gate 4A checkpoint was republished a second time after explicit approval. Pages build `1141672227` completed successfully in 31,564 ms and reported commit `eaa8e7cad1ce2b65bbf7c46a82801526c391d9c3`.
+- The hosted sign-in form was used normally. No token, cookie, browser storage, session object, or credential was copied between origins, and authentication was not bypassed.
+- A previously open hosted tab using the stale script `main.js?v5-4-6b4-current-period` reached an authenticated `Cloud · Reddit Phanatics` state. This was not accepted as Gate 4B evidence because it was not the Gate 4A artifact.
+- A cache-busted reload proved the exact checkpoint loaded `main.js?v5-4-6e-gate4a-audit-visibility`. That exact artifact returned to `Signed out`. Its enabled Sign In button produced no authenticated state, visible auth error, redirect, or browser-console error. The observed failure was therefore not a Supabase allowed-origin/redirect rejection; no redirect error or changed redirect configuration was available to report.
+- The exact artifact could not establish the required normal authenticated session. Gate 4B stopped again before league/audit/Data Health validation. The authoritative 3-attempt/8-item baseline was not re-accepted from a stale artifact.
+- Pages was restored again to `main`; restoration build `1141701265` completed successfully in 51,577 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- No Supabase Auth setting was changed. No expanded opt-in, Gate 4 candidate fetch, Fantrax synchronization, audit creation, migration, import, roster write, ownership/identity change, score recalculation, or unrelated cloud write occurred.
+
+## V5.4.6E Gate 4C Hosted Authentication Regression Diagnosis And Repair
+
+### Artifact Comparison And Root Cause
+
+- Target broken artifact: `feature/manager-intelligence` at `eaa8e7cad1ce2b65bbf7c46a82801526c391d9c3`, loading `main.js?v5-4-6e-gate4a-audit-visibility` and an unversioned `v5/js/services/authService.js` import.
+- Last known-good authenticated artifact: hosted `main` at `df89840de0ea8563968b99b7acc75b528e02983f`, containing production auth repair commit `35fec0786c42fcff1f146c5ed00c476ab39957e7` and loading `authService.js?v5-4-6b5-auth`.
+- Repository ancestry proved `35fec07` is not an ancestor of the feature branch. The target artifact had reverted both safeguards from that reviewed repair: its Supabase `onAuthStateChange` callback was async and awaited authenticated repository work, and its Sign In UI had no pending/error state.
+- The Sign In submit event did fire and call the shared root auth service. Supabase auth-state notification then entered the async callback, which attempted another authenticated repository call before returning. This recreated the documented Supabase auth-callback deadlock: the sign-in promise remained pending, no success/error state reached the UI, and the catch path never ran. The missing auth cache token also allowed stale module selection to obscure the regression.
+- No redirect/origin rejection, synchronous throw, asynchronous rejection, Supabase Auth configuration defect, or RLS change explained the observed behavior.
+
+### Narrow Repair And Safe Observability
+
+- Restored the reviewed non-blocking `applyAuthSession` boundary: authenticated user state updates synchronously inside the callback, while league refresh is deferred outside it. Signed-out session restoration still clears active league/cloud data safely.
+- Restored Sign In pending state, disabled in-flight controls, safe `Signing in…` status, and visible sanitized error state. Credentials, tokens, cookies, sessions, and private keys are never logged or rendered.
+- Restored cache-busted module selection with `v5-4-6e-gate4c-auth` on both the V5 entry point and auth-service import. No Supabase redirect setting, auth guard, session-origin boundary, RLS rule, Fantrax behavior, or persistence path changed.
+- Changed files: `v5/index.html`, `v5/js/main.js`, `v5/js/services/authService.js`, `v5/js/state/appState.js`, `tests/v5AuthFlow.test.mjs`, and this preserved result record.
+
+### Regression Coverage And Validation
+
+- Added `tests/v5AuthFlow.test.mjs`, restoring and extending the known-good regression contract. It proves immediate successful auth-state application, signed-out session restoration, deferred repository refresh, absence of the async auth callback, Sign In event binding and auth invocation, visible pending/rejection state, credential capture before rerender, and the exact cache-busted hosted module graph.
+- Focused tests passed 6 of 6: `v5AuthFlow.test.mjs`, `v5FantraxSyncAudit.test.mjs`, `v5DataHealthExecution.test.mjs`, `v5FantraxPublicPreview.test.mjs`, `cloudFirstWorkflow.test.mjs`, and `supabaseProductionConfig.test.mjs`.
+- The complete sorted standalone suite passed 35 of 35 test files. `git diff --check` passed with only the existing Git line-ending notices.
+
+### Hosted Acceptance Boundary
+
+- Hosted repair acceptance is pending. The approved Pages workflow can publish only a remote committed branch artifact, while Gate 4C explicitly withholds checkpoint authorization and requires stopping for architect review after validated changes. No temporary commit or push was created to bypass that authority boundary.
+- GitHub Pages remains restored to `main` at `df89840de0ea8563968b99b7acc75b528e02983f`. The repaired exact artifact has therefore not yet been hosted-authenticated.
+- Gate 4B and Gate 4 remain blocked pending architect approval to checkpoint/push and temporarily deploy this Gate 4C repair.
+- Expanded opt-in changes, candidate fetches, Fantrax synchronization, audit creation, migrations, imports, roster writes, ownership/identity repair, score recalculation, Supabase configuration changes, and unrelated cloud writes: none.
