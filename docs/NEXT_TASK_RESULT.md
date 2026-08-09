@@ -945,3 +945,20 @@
 - Pages was restored to `main`; restoration build `1141803159` completed successfully in 46,041 ms at `df89840de0ea8563968b99b7acc75b528e02983f`.
 - The shared-state correction is not hosted-accepted because it is not yet an approved committed remote artifact. Gate 4C-1 did not pass, so no acceptance-record commit or push was made. Architect review/checkpoint approval is required before republishing the corrected artifact.
 - No Gate 4B audit validation, expanded opt-in, candidate fetch, audit creation, Fantrax synchronization, migration, import, roster write, ownership/identity change, score recalculation, Supabase Auth configuration change, or unrelated cloud write occurred.
+
+## V5.4.6E Gate 4C-2 Hosted Shared-State Authentication Acceptance
+
+### Exact Artifact And Authentication
+
+- GitHub Pages build `1141830421` published exact commit `3b344a068fe39d36a961b38cf710c30a7788c2ca` successfully in 37,443 ms. The hosted page loaded exact entry module `main.js?v5-4-6e-gate4c1-auth-state` and exited Loading.
+- A fresh hosted load restored the existing authenticated session and rendered `Signed in as joshua.pierson@yahoo.com`, `Cloud · Reddit Phanatics`, and the selectable Reddit Phanatics league with a clean console.
+- An explicit hosted Sign Out followed by normal Sign In completed successfully. The authenticated user and active league rendered from the same shared state, and league data loaded after authentication without the prior callback deadlock or the prior signed-out duplicate-state result.
+- Successful authentication completed faster than the browser sampling interval, so the transient `Signing in…` label did not remain long enough for a second live capture. The exact handler still enters that synchronous pending state before awaiting auth; it was directly observed on the preceding hosted Gate 4C-1 artifact, remained unchanged by the shared-state-only repair, and the focused regression test verifies its visible label, disabled controls, and error path.
+- No stale duplicate `appState` behavior appeared after authentication or league loading. Repeated final inspection confirmed authenticated state and Reddit Phanatics together, and browser console errors/warnings remained empty.
+
+### Restoration, Tests, And Scope
+
+- Gate 4B audit visibility acceptance was not performed. The audit/Data Health controls were not operated and their content was not used as Gate 4B evidence.
+- GitHub Pages was restored to `main`; restoration build `1141833937` completed successfully in 40,268 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- Post-hosted focused auth validation passed. The complete sorted standalone suite passed 35 of 35 files, and `git diff --check` passed.
+- Status: **accepted** for Gate 4C-2 hosted shared-state authentication only. No expanded opt-in, Gate 4 candidate fetch, audit creation, Fantrax synchronization, migration, import, roster write, ownership/identity change, score recalculation, or unrelated cloud write occurred.
