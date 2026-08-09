@@ -15,9 +15,11 @@ assert.match(running,/role='status'/);
 
 const failed=renderSettingsDataHealth({health:null,healthRunning:false,healthError:"Timed out safely",engineRun:{}});
 assert.match(failed,/role="alert">Timed out safely/);
-const audited=renderSettingsDataHealth({health:null,healthRunning:false,healthError:"",engineRun:{},fantraxSyncAttempts:[{id:"attempt-1",status:"PARTIAL",reviewed_count:2,manifest_digest:"abcdef1234567890",created_at:"now"}]});
+const audited=renderSettingsDataHealth({health:null,healthRunning:false,healthError:"",engineRun:{},fantraxSyncAuditStatus:"AVAILABLE",fantraxSyncAttempts:[{id:"attempt-1",status:"PARTIAL",reviewed_count:2,manifest_digest:"abcdef1234567890",created_at:"now"}]});
 assert.match(audited,/Fantrax Synchronization Audit/);
 assert.match(audited,/attempt-1/);
+const unavailableAudit=renderSettingsDataHealth({health:null,healthRunning:false,healthError:"",engineRun:{},fantraxSyncAuditStatus:"QUERY_FAILED",fantraxSyncAuditError:"audit read failed",fantraxSyncAttempts:null});
+assert.match(unavailableAudit,/Audit Query failed: audit read failed/);
 
 const root=new URL("../",import.meta.url);
 const main=await readFile(new URL("v5/js/main.js",root),"utf8");

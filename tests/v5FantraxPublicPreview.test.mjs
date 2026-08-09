@@ -114,7 +114,7 @@ assert.doesNotMatch(service,/\.update\(|\.upsert\(|\.insert\(|calculateLeagueSco
 assert.doesNotMatch(`${edge}\n${service}`,/fxpa\/req|selenium|\bpython\b|from ["']fantraxapi["']/i);
 assert.match(html,/data-view="fantraxPreview"/);
 assert.match(html,/v5-4-6a-team-identity/);
-assert.match(main,/dataHealthService\.js\?v5-4-6b3-fast-health/);
+assert.match(main,/dataHealthService\.js\?v5-4-6e-gate4a-audit-visibility/);
 assert.match(main,/fetchFantraxPublicPreview/);
 assert.match(view,/Fantrax standings period semantics have not been verified/);
 assert.match(view,/Team Matchup Scores/);

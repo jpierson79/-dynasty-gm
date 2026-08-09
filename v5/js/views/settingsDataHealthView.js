@@ -1,5 +1,5 @@
 import { table } from "../components/table.js";
-import { renderFantraxSyncAudit } from "./fantraxSyncAuditView.js?v5-4-6e-opt-in";
+import { renderFantraxSyncAudit } from "./fantraxSyncAuditView.js?v5-4-6e-gate4a-audit-visibility";
 
 function renderSettingsDataHealthBase(state){
   const health=state.health;
@@ -16,7 +16,7 @@ function renderSettingsDataHealthBase(state){
   ],health.checks.map((check,index)=>({...check,name:check.name,status:check.status,detailsText:(check.status==="FAIL"||check.status==="WARNING")&&check.details?.count?`View Details (${check.details.count})`:"",index}))).replaceAll("View Details",`View Details`)}`:"<p class='note'>Run Data Health to inspect the active cloud league.</p>"}${health?renderHealthActions(health):""}${renderHealthDetails(details)}</section>`;
 }
 
-export function renderSettingsDataHealth(state){return `${renderSettingsDataHealthBase(state)}${renderFantraxSyncAudit(state.fantraxSyncAttempts||[])}`}
+export function renderSettingsDataHealth(state){return `${renderSettingsDataHealthBase(state)}${renderFantraxSyncAudit(state.fantraxSyncAttempts,{status:state.fantraxSyncAuditStatus,error:state.fantraxSyncAuditError})}`}
 
 function renderHealthActions(health){
   const alwaysVisible=["Score distribution diagnostics","Score grouping diagnostics","Score confidence coverage","Representative score sample"];

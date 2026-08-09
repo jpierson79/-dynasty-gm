@@ -781,3 +781,74 @@
 - Dependencies are the deployed and accepted migrations 009-011, durable audit/recovery and manifest-v2 boundaries, database cap 10, league-scoped reviewed opt-in, season rollover safety, exact identity/team mapping, manual-override protection, Current-period-only enforcement, deterministic manifest/digest, and Gate 3 evidence at commit `70bdaa109c5a2f51817145935f01f5f5743055cf`.
 - This planning commit changes documentation only. It does not execute Fantrax reads or synchronization, enable the opt-in, deploy Pages, alter Supabase, modify roster/cloud data, run imports, repair identity/ownership, recalculate scores, or apply migrations.
 - Even complete Gate 4 acceptance will not authorize routine, bulk, another 10-player, or later synchronization. Routine synchronization requires a separate architect decision after the Gate 4 evidence is reviewed.
+
+## V5.4.6E Gate 4 Execution Attempt
+
+### Preflight Evidence
+
+- Date: 2026-08-08 (America/Chicago). Baseline, local HEAD, and `origin/feature/manager-intelligence` were the clean exact commit `c375c02f30bff1cbfa0a1e3a245405a0bc032cca`.
+- The active Gate 4 contract and WORKFLOW rule 20 were consistent: one exact 10-player batch was explicitly authorized; no smaller, larger, split, routine, or later batch was authorized.
+- Focused validation passed 9 of 9 files. The complete sorted `tests/*.test.mjs` suite passed 34 of 34 files. `git diff --check` passed.
+- Read-only production inspection confirmed RLS enabled on both audit tables, six audit policies, both protection triggers enabled, `SECURITY INVOKER`, `search_path=public, pg_temp`, manifest-v2 creation columns, default/expanded release constraint at 3/10, item ordinals limited to 0-9, and the reviewed expanded setting disabled.
+- The protected baseline was players 10,199, teams 12, calculated scores 20,020, metrics 209, attempts 3, and items 8. Hashes were protected players `ec0aec6c0df605c826ca58a0020271af`, teams `fe8637ae8d30b65dcada99ac1c8f79b3`, scores `8150ac665093b4633827ad528a577451`, metrics `1b160fbd25b2373f4920bcbc1c7654a3`, attempts `5be0edae041416230d9223324129ddb3`, and items `95754ddce6782b31cf7bce87fc8cda63`.
+
+### Deployment And Stop Condition
+
+- GitHub Pages successfully published exact commit `c375c02f30bff1cbfa0a1e3a245405a0bc032cca` from `feature/manager-intelligence` in run `31286365677` (run 28, 43 seconds). The 423 KB artifact digest was `sha256:45c635262c97c98f2e62ffed674cc82b65b0d25f683dd5fae589d85b46a98be4`.
+- The authenticated hosted V5 tab could not be inspected or operated after publication. Repeated targeted authentication/navigation queries, a fresh reload, a DOM snapshot, and a viewport screenshot each timed out, while GitHub and Supabase surfaces remained responsive before the hosted-tab attempts. No hosted loading, Data Health, Current preview, candidate review, or console result was accepted from this state.
+- Gate 4 therefore stopped before release activation, candidate selection, manifest construction, or persistence. The browser surface was not replaced with a local-origin workflow and no application/database safety gate was bypassed.
+- GitHub Pages source was restored to `main` through the authenticated GitHub workflow/API after the browser tab became unresponsive; the Pages configuration reports `main`. The explicitly triggered restoration build completed with status `built` for main commit `df89840de0ea8563968b99b7acc75b528e02983f` in 34,636 ms.
+
+### Safety Outcome And Remaining Gate
+
+- Expanded opt-in changes: none; it remained disabled.
+- Fantrax preview reads: none during this attempt.
+- Roster synchronization, player/roster writes, audit attempt/item creation, imports, releases, ownership repair, identity repair, score recalculation, migration/schema changes, and unrelated cloud writes: none.
+- Gate 4 status: **not executed and not accepted**. Exactly 10 safe candidates were not reviewed because authenticated hosted acceptance could not begin. No acceptance commit or push is permitted.
+- Resume only after Chrome can communicate with the authenticated hosted V5 tab. Reconfirm the exact baseline, clean state, Pages source, database/protected baseline, tests, and every pre-write gate before enabling the opt-in or selecting candidates.
+
+## V5.4.6E Gate 4A Audit Visibility Reconciliation
+
+### Baseline And Environment Identity
+
+- Date: 2026-08-08/09 (America/Chicago). Local HEAD and `origin/feature/manager-intelligence` both remained `c375c02f30bff1cbfa0a1e3a245405a0bc032cca`; the pre-existing uncommitted Gate 4 failure record in this file was preserved.
+- The exact Gate 4 artifact was republished read-only from `feature/manager-intelligence` and the Pages database build reported commit `c375c02f30bff1cbfa0a1e3a245405a0bc032cca` as built. The hosted V5 application used `https://kgqpbahssuowujjowulr.supabase.co`, matching the production dashboard project `kgqpbahssuowujjowulr` and the repository configuration.
+- The hosted session was authenticated as `joshua.pierson@yahoo.com`, selected Reddit Phanatics, and used active league UUID `6573ac24-f433-48c7-a834-ffe6b58726bc`. Production and application paths both referenced `public.fantrax_sync_attempts` and `public.fantrax_sync_attempt_items`.
+
+### Authoritative Database Truth
+
+- A read-only query in the approved authenticated Supabase dashboard confirmed 3 total attempts and 8 total items. All 3 attempts belong to Reddit Phanatics league `6573ac24-f433-48c7-a834-ffe6b58726bc`; the previously accepted baseline still exists unchanged.
+- Attempt `9e7d215e-2cbe-489c-8cb2-42b1c43bd6f9`: manifest v1, `CONTROLLED_3`, cap 3, reviewed 2, `PARTIAL`, actor `a7049612-645f-4bba-948e-63f8c195950c`, 2 items, 2 terminal and 0 recoverable.
+- Attempt `eac30c15-cf03-4f77-9afd-92ceb32b5fdc`: manifest v1, `CONTROLLED_3`, cap 3, reviewed 2, `PARTIAL`, actor `a7049612-645f-4bba-948e-63f8c195950c`, 2 items, 0 terminal and 2 recoverable.
+- Attempt `6196e55e-4d08-4719-a763-1d78ad86222d`: manifest v2, `V5.4.6E_OPT_IN_10`, cap 10, reviewed 4, `COMPLETED`, actor `a7049612-645f-4bba-948e-63f8c195950c`, 4 items, 4 terminal and 0 recoverable.
+- The schema has one database-stamped `actor_user_id` rather than separate requested/created actor fields. No service-role access was used to make the application result appear correct, and no audit row was created, updated, or deleted.
+
+### Authenticated RLS And UI Comparison
+
+- On a fresh authenticated application load, before the audit repository was called, both application state and the Fantrax Synchronization Audit UI reported a literal zero: `No durable synchronization attempts recorded.`
+- A harmless fresh Current Fantrax preview invoked the existing normal application repository path. The same authenticated user then received all 3 league-scoped attempts and all 8 nested items through RLS. The audit UI immediately rendered the three exact attempt UUIDs and their 4/0, 0/2, and 2/0 terminal/recoverable item counts.
+- Data Health after that repository read reported 0 failures and 23 warnings. Audit integrity was `WARNING` because two historical attempts are incomplete; release/cap consistency was `PASS`; incomplete attempts correctly reported 2. The Audit UI count was 3 and matched database truth.
+- Therefore the count became zero before the repository layer: fresh `appState.fantraxSyncAttempts` was initialized to `[]`, league bootstrap/refresh did not load audit history, and Data Health plus the view consumed that placeholder as authoritative data.
+
+### Root Cause And Targeted Repair
+
+- `listFantraxSyncAttempts` itself uses the correct active-league equality predicate, table/schema, nested-item select, descending creation order, and authenticated Supabase client. RLS and league scoping returned the correct 3 rows. No lifecycle or score/version filter exists. The audit list has no explicit repository pagination; the UI intentionally displays the newest 25, but pagination did not cause this three-row defect.
+- Data Health does not independently query audit tables. It consumes `appState.fantraxSyncAttempts`. Before this repair, only a Fantrax preview or completed synchronization populated that state, and preview loading used `.catch(() => [])`, silently converting permission, network, timeout, and query failures into a literal zero.
+- The targeted repair loads audit history during normal active-league refresh, retains the same authenticated league-scoped repository query, and removes the silent empty-array fallback. State now distinguishes `AVAILABLE`, `UNAVAILABLE`, `PERMISSION_BLOCKED`, and `QUERY_FAILED`.
+- The Audit UI now renders a genuine empty result as `0 durable synchronization attempts recorded for this league`, while unavailable, permission-blocked, and failed queries render explicit alerts. Data Health adds an Audit Availability check and fails audit integrity, release/cap consistency, and incomplete-attempt checks closed when audit data is unavailable.
+- Browser cache-bust identifiers were updated only for the repaired V5 entry point and affected modules. No audit history, RLS policy, migration, manifest, digest, release tier, batch cap, replay behavior, actor stamping, lifecycle rule, repository write, or synchronization path was changed.
+
+### Validation And Browser Reliability
+
+- Focused tests passed: `v5FantraxSyncAudit.test.mjs`, `v5DataHealthExecution.test.mjs`, `cloudFirstWorkflow.test.mjs`, and `supabaseProductionConfig.test.mjs`.
+- The first complete-suite run correctly stopped at `v5FantraxPublicPreview.test.mjs` because its static cache-version assertion still named the superseded Data Health module identifier. That regression assertion was updated to the new targeted cache identifier.
+- The complete sorted standalone suite then passed 34 of 34 test files. `git diff --check` passed with only the existing Git line-ending notices.
+- Browser inspection was reliable across repeated semantic navigation among Dashboard, Fantrax Sync Preview, and Settings & Data Health; a hosted viewport capture succeeded, Data Health completed, the audit table remained inspectable, and repeated console inspection returned no errors or warnings.
+- The repaired local artifact was not published because Pages deployment requires a committed branch artifact, while Gate 4A explicitly withholds checkpoint authorization and requires stopping for architect review after validated code changes. Hosted repair verification therefore remains pending an architect-approved checkpoint commit and preview deployment.
+- GitHub Pages was restored to `main` after the diagnostic publication. Gate 4 was not resumed.
+
+### Safety And Review State
+
+- Expanded opt-in changes, Fantrax synchronization, roster/player writes, imports, ownership or identity repair, score recalculation, migrations, audit mutations, and unrelated cloud writes: none.
+- Intended uncommitted repair files are `v5/index.html`, `v5/js/main.js`, `v5/js/state/appState.js`, `v5/js/services/dataHealthService.js`, `v5/js/views/settingsDataHealthView.js`, `v5/js/views/fantraxSyncAuditView.js`, `tests/v5FantraxSyncAudit.test.mjs`, `tests/v5DataHealthExecution.test.mjs`, `tests/v5FantraxPublicPreview.test.mjs`, and this result record.
+- No files were staged, committed, or pushed. The repair is ready for architect review; it does not authorize Gate 4 synchronization.

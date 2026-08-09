@@ -1,8 +1,8 @@
 import { $, $all, debounce, escapeHtml, optionHtml, setHtml } from "./utils/dom.js";
-import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js";
+import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js?v5-4-6e-gate4a-audit-visibility";
 import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js";
 import { loadLeagueOverview } from "./services/cloudDataService.js";
-import { runDataHealth } from "./services/dataHealthService.js?v5-4-6b3-fast-health";
+import { runDataHealth } from "./services/dataHealthService.js?v5-4-6e-gate4a-audit-visibility";
 import { runWithDataHealthTimeout } from "./services/dataHealthExecutionService.js?v5-4-6b3-data-health";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";
 import { allPlayers, applyFantraxRosterStatuses, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b2-reviewed-sync";
@@ -32,7 +32,7 @@ import { renderWaiverOpportunities } from "./views/waiverOpportunitiesView.js";
 import { renderTradeCenter } from "./views/tradeCenterView.js";
 import { renderTeamsManagers } from "./views/teamsManagersView.js";
 import { renderImports } from "./views/importsView.js";
-import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js";
+import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4-6e-gate4a-audit-visibility";
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 
 const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false};
@@ -67,6 +67,20 @@ function renderLeaguePanel(){
   const leagues=appState.accessibleLeagues||[];
   setHtml($("#leaguePanel"),`<h2>Active League</h2><div class="toolbar"><label>Cloud league<select id="leagueSelect"><option value="">Select league</option>${leagues.map(league=>optionHtml(league.id,league.name,appState.activeLeague?.id)).join("")}</select></label><button id="refreshLeague" class="secondary">Refresh League Data</button></div><p class="note">If exactly one accessible league exists, V5 selects it automatically. Empty cloud leagues are valid.</p>`);
 }
+function fantraxSyncAuditFailureState(error){
+  const message=String(error?.message||error||"Fantrax synchronization audit query failed.");
+  return {fantraxSyncAttempts:null,fantraxSyncAuditStatus:/permission|row.level security|not authorized|42501/i.test(message)?"PERMISSION_BLOCKED":"QUERY_FAILED",fantraxSyncAuditError:message};
+}
+async function loadFantraxSyncAudit(leagueId){
+  try{
+    const attempts=await listFantraxSyncAttempts(leagueId);
+    setState({fantraxSyncAttempts:attempts,fantraxSyncAuditStatus:"AVAILABLE",fantraxSyncAuditError:""});
+    return attempts;
+  }catch(error){
+    setState(fantraxSyncAuditFailureState(error));
+    return null;
+  }
+}
 async function refreshLeagueData(){
   if(!appState.activeLeague)return;
   const leagueId=appState.activeLeague.id,previousReleaseSignature=fantraxRosterSyncReleaseSignature(fantraxRosterSyncReleasePolicy(appState.activeLeague));
@@ -76,6 +90,7 @@ async function refreshLeagueData(){
     const refreshedLeague=await leagueById(leagueId),nextReleaseSignature=fantraxRosterSyncReleaseSignature(fantraxRosterSyncReleasePolicy(refreshedLeague));
     setState({activeLeague:refreshedLeague,fantraxPreview:previousReleaseSignature===nextReleaseSignature?appState.fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({error:"Fantrax synchronization release configuration changed. Refresh the preview before reviewing updates."}))});
     dashboardOverview=await loadLeagueOverview(leagueId);
+    await loadFantraxSyncAudit(leagueId);
     const membershipRows=await memberships(leagueId).catch(()=>[]);
     const userTeamResolution=resolveUserFantasyTeam({
       leagueId:appState.activeLeague.id,
@@ -169,8 +184,8 @@ async function loadFantraxPreview(){
   try{
     const [players,teams]=await Promise.all([allPlayers(appState.activeLeague.id),Promise.resolve(appState.teams||[])]);
     const next=await fetchFantraxPublicPreview({externalLeagueId,period,players,teams,reviewedSeasonContext:appState.activeLeague?.settings?.fantraxSeasonContext});
-    const fantraxSyncAttempts=await listFantraxSyncAttempts(appState.activeLeague.id).catch(()=>[]);
-    setState({fantraxPreview:{...next,externalLeagueId,period},fantraxSyncAttempts});
+    await loadFantraxSyncAudit(appState.activeLeague.id);
+    setState({fantraxPreview:{...next,externalLeagueId,period}});
   }catch(error){setState({fantraxPreview:fantraxPreviewState({externalLeagueId,period,loading:false,error:String(error?.message||error)})})}
 }
 async function persistFantraxTeamMappings(){
@@ -774,7 +789,7 @@ function bindShellEvents(){
       if(appState.healthRunning)return;
       setState({healthRunning:true,healthError:""});
       try{
-        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview,fantraxSyncAttempts:appState.fantraxSyncAttempts}));
+        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview,fantraxSyncAttempts:appState.fantraxSyncAttempts,fantraxSyncAuditStatus:appState.fantraxSyncAuditStatus,fantraxSyncAuditError:appState.fantraxSyncAuditError}));
         setState({health,healthDetails:null,healthRunning:false,healthError:""});
       }catch(error){
         setState({healthRunning:false,healthError:String(error?.message||error||"Data Health failed.")});

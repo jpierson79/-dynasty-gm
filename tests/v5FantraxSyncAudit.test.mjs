@@ -40,7 +40,10 @@ assert.equal(fantraxSyncAuditHealth([{status:"APPLYING",manifest_digest:"abc",ac
 assert.equal(fantraxSyncAuditHealth([{status:"COMPLETED",manifest_digest:"",actor_user_id:"u",season_context:{},release_tier:"CONTROLLED_3",batch_limit:3,reviewed_count:2}]).status,"FAIL");
 assert.equal(fantraxSyncAuditHealth([{status:"COMPLETED",manifest_digest:"abc",actor_user_id:"u",season_context:{},release_tier:"V5.4.6E_OPT_IN_10",batch_limit:10,reviewed_count:11}]).status,"FAIL");
 assert.match(renderFantraxSyncAudit([{id:"attempt-1",status:"PARTIAL",release_tier:"CONTROLLED_3",batch_limit:3,reviewed_count:2,manifest_digest:"abcdef1234567890",created_at:"now",fantrax_sync_attempt_items:[{outcome:"APPLIED"},{outcome:"FAILED"}]}]),/Synchronization audit and recovery|Fantrax Synchronization Audit/i);
-assert.match(renderFantraxSyncAudit([]),/No durable synchronization attempts recorded/);
+assert.match(renderFantraxSyncAudit([]),/0 durable synchronization attempts recorded/);
+assert.match(renderFantraxSyncAudit(null,{status:"UNAVAILABLE"}),/Audit Unavailable/);
+assert.match(renderFantraxSyncAudit(null,{status:"PERMISSION_BLOCKED",error:"RLS denied"}),/Audit Permission blocked: RLS denied/);
+assert.match(renderFantraxSyncAudit(null,{status:"QUERY_FAILED",error:"network failed"}),/Audit Query failed: network failed/);
 
 const migration=fs.readFileSync(new URL("../supabase/migrations/009_fantrax_sync_audit.sql",import.meta.url),"utf8");
 const expansionMigration=fs.readFileSync(new URL("../supabase/migrations/010_fantrax_sync_opt_in_batch.sql",import.meta.url),"utf8");
@@ -92,6 +95,8 @@ assert.match(repository,/\.in\("outcome",\["PENDING","FAILED"\]\)/,"only pending
 assert.doesNotMatch(repository,/\.delete\(/,"audit evidence is not deleted by the browser repository");
 assert.match(playerRepository,/await beforeGroup\(group\)/,"every write group repeats caller guards");
 assert.match(main,/pendingFantraxSyncUpdates/);
+assert.match(main,/await loadFantraxSyncAudit\(leagueId\)/,"league refresh loads durable audit history before Data Health renders");
+assert.doesNotMatch(main,/listFantraxSyncAttempts\([^\n]+\.catch\(\(\)=>\[\]\)/,"audit query failures are not converted to a literal zero");
 assert.match(main,/fantraxSeasonWriteGuard\(currentPreview\.data\?\.seasonContextComparison\)/);
 assert.match(main,/fantraxRosterSyncPeriodGuard\(currentPreview\.period\)/);
 assert.match(main,/recordFantraxSyncOutcomes/);
