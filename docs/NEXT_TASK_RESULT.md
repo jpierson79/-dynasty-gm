@@ -962,3 +962,33 @@
 - GitHub Pages was restored to `main`; restoration build `1141833937` completed successfully in 40,268 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
 - Post-hosted focused auth validation passed. The complete sorted standalone suite passed 35 of 35 files, and `git diff --check` passed.
 - Status: **accepted** for Gate 4C-2 hosted shared-state authentication only. No expanded opt-in, Gate 4 candidate fetch, audit creation, Fantrax synchronization, migration, import, roster write, ownership/identity change, score recalculation, or unrelated cloud write occurred.
+
+## V5.4.6E Gate 4B Hosted Audit Visibility Acceptance
+
+### Exact Artifact, Authentication, And Browser Reliability
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local HEAD and `origin/feature/manager-intelligence` both at exact commit `c860cf1a8bc541fe8d7e269381486567fe2eef3c`.
+- GitHub Pages build `1141883415` published that exact commit successfully with status `built` in 38,346 ms. The hosted V5 page loaded `main.js?v5-4-6e-gate4c1-auth-state`, exited Loading, restored the normal authenticated session for `joshua.pierson@yahoo.com`, and rendered `Cloud · Reddit Phanatics` with the correct selectable league.
+- Read-only browser inspection was reliable across fresh capture, Settings and Data Health, Dashboard, and return navigation. The browser console remained free of errors and warnings throughout acceptance.
+
+### Authoritative Audit Reconciliation
+
+- A fresh read-only production SQL query through the approved authenticated Supabase workflow reported 3 total attempts, 3 attempts for Reddit Phanatics, and 8 total items for league `6573ac24-f433-48c7-a834-ffe6b58726bc`.
+- The three durable attempts remained intact: completed manifest-v2 expanded attempt `6196e55e-…` with 4 terminal items; partial manifest-v1 recovery attempt `eac30c15-…` with 2 recoverable items; and partial manifest-v1 terminal attempt `9e7d215e-…` with 2 terminal items. Database actor identity remained stamped as the authenticated production user.
+- On a fresh hosted load, audit history was not yet loaded and the application explicitly displayed `Audit Unavailable: Fantrax synchronization audit has not been loaded.` It did not display a genuine zero.
+- After the normal read-only `Refresh League Data` operation, the authenticated application repository loaded the same 3 attempts and 8 items for the same league. The Fantrax Sync Audit UI rendered all three attempt IDs and all eight item outcomes.
+- Data Health used the same loaded audit state: Synchronization Audit Availability passed, Release And Cap Consistency passed, and the two historical partial attempts were reported as incomplete warnings rather than hidden. The audit section and Audit UI therefore agreed on 3 attempts / 8 items.
+- Data Health also reported one unrelated season-context-review failure because no Fantrax preview was loaded. The task explicitly prohibited fetching Gate 4 candidates or a preview, so this was preserved as an honest unrelated diagnostic and did not alter the accepted audit-visibility result.
+
+### Availability Semantics
+
+- Live hosted behavior proved an unloaded/unavailable query state remains visibly distinct from a genuine zero before league refresh.
+- Focused regression coverage reconfirmed the four separate states: genuine zero, unavailable, permission blocked, and query failed. Repository/query errors remain errors, Data Health fails closed when audit history is unavailable, and neither Data Health nor the audit UI converts an unavailable or failed read into `0 attempts`.
+
+### Validation, Restoration, And Safety
+
+- Focused Gate 4A audit/Data Health validation passed 5 of 5 files: `v5FantraxSyncAudit.test.mjs`, `v5DataHealthExecution.test.mjs`, `v5FantraxPublicPreview.test.mjs`, `cloudFirstWorkflow.test.mjs`, and `supabaseProductionConfig.test.mjs`.
+- The complete sorted standalone suite passed 35 of 35 `tests/*.test.mjs` files. `git diff --check` passed.
+- GitHub Pages was restored to `main`; restoration build `1141888335` completed successfully with status `built` in 32,578 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- Status: **accepted** for Gate 4B hosted audit visibility. No authentication code or application code changed. No expanded opt-in, Gate 4 candidate fetch, audit creation, Fantrax synchronization, migration, import, roster/player write, ownership or identity change, score recalculation, or unrelated cloud write occurred.
+- Gate 4's exactly-10-player synchronization was not resumed and remains blocked pending architect review.
