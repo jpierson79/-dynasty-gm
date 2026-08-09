@@ -759,3 +759,25 @@
 - Status: **accepted** for V5.4.6E Gate 3's single four-player controlled expanded synchronization.
 - No migration, import, ownership or identity repair, manual-override change, score recalculation, unrelated cloud write, second synchronization batch, release operation, six-to-ten-player synchronization, Gate 4 authorization, or merge was performed.
 - This result does not authorize Gate 4 or a ten-player production batch; any future expanded write requires a new dedicated architect-approved gate.
+
+## V5.4.6E Gate 4 Maximum-Batch Planning Result
+
+### Architectural Rationale
+
+- Gate 3 established the first expanded production boundary with one exact four-player status-only attempt: all four items reached `APPLIED`, the attempt reached `COMPLETED`, protected fields remained unchanged, duplicate-manifest and terminal-item replay were rejected, Data Health had zero failures, audit/browser acceptance was clean, the opt-in was disabled, and focused/full tests passed.
+- The highest-value remaining scale question is therefore the already-supported maximum of exactly 10, not a new synchronization capability. Gate 4 tests whether the same accepted controls remain coherent at the database cap and across all 10 durable items and grouped writes.
+- The plan does not infer routine synchronization authority from Gate 3 or from the technical cap. It uses Rule 20's explicit architect-approved expanded exception for one dedicated exact-size gate and makes all future authority expire with that single attempt.
+
+### Safety And Scale Decisions
+
+- Gate 4 authorizes exactly one 10-player status-only acceptance batch during its later execution task. If 10 genuinely eligible candidates do not exist together in one fresh Current preview, execution must stop; a smaller substitute is not Gate 4 acceptance.
+- Candidate eligibility is unchanged from Gate 3: Current period, accepted season context, exact authoritative player and persisted team identity, known Fantrax source status, expected owner, no ambiguity, no manual override/conflict, no release/removal, no ownership/free-agent change, and no identity, score, metric, import, or other protected-field write.
+- The single manifest-v2 digest must bind all 10 exact candidates, cap/release metadata, preview freshness, season/period context, identities, owners, and statuses. Database actor stamping, durable lifecycle/items, write-time guards, stale-preview rejection, protected snapshots, replay prevention, and recovery semantics remain mandatory.
+- The 11th player must remain blocked at every boundary. An intended operation above 10 may not be split across batches, manifests, retries, sessions, or deployments to evade the cap.
+- Acceptance requires individual verification of all 10 outcomes, `COMPLETED` lifecycle with terminal 10/recoverable 0, unchanged protected hashes, fresh-preview `NO_CHANGE`, zero-write idempotency, terminal replay rejection, accurate Data Health/audit UI, clean console, passing focused/full tests, disabled opt-in, and restored Pages/deployment state.
+
+### Authority Boundary And Dependencies
+
+- Dependencies are the deployed and accepted migrations 009-011, durable audit/recovery and manifest-v2 boundaries, database cap 10, league-scoped reviewed opt-in, season rollover safety, exact identity/team mapping, manual-override protection, Current-period-only enforcement, deterministic manifest/digest, and Gate 3 evidence at commit `70bdaa109c5a2f51817145935f01f5f5743055cf`.
+- This planning commit changes documentation only. It does not execute Fantrax reads or synchronization, enable the opt-in, deploy Pages, alter Supabase, modify roster/cloud data, run imports, repair identity/ownership, recalculate scores, or apply migrations.
+- Even complete Gate 4 acceptance will not authorize routine, bulk, another 10-player, or later synchronization. Routine synchronization requires a separate architect decision after the Gate 4 evidence is reviewed.

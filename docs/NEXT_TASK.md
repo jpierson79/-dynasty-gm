@@ -1,94 +1,105 @@
-# Next Task: V5.4.6E Gate 3 First Controlled Expanded Fantrax Sync
+# Next Task: V5.4.6E Gate 4 Controlled Maximum 10-Player Fantrax Synchronization Acceptance
 
 ## Status And Baseline
 
-- Status: execution plan for separate architect authorization. This planning checkpoint does not authorize deployment, release activation, database writes, or roster synchronization.
-- Baseline: accepted `feature/manager-intelligence` commit `a743defc0db47d46eb9680fa2b185476ba594cc3`.
-- Production migrations 009, 010, and 011 are applied. Gate 2 verified manifest-v2 creation, historical manifest-v1 recovery, actor stamping, immutability, lifecycle, replay prevention, RLS, cross-league isolation, default cap 3, and reviewed expanded cap 10.
-- The league-scoped expanded opt-in is disabled. No expanded roster-status synchronization has occurred.
+- Status: execution contract for a separate task. This planning checkpoint does not authorize synchronization, deployment, release-setting changes, database writes, or other cloud writes.
+- Baseline: accepted `feature/manager-intelligence` commit `70bdaa109c5a2f51817145935f01f5f5743055cf`.
+- Gate 3 is accepted: one exact four-player attempt completed with four `APPLIED` items, immutable protected fields, database actor stamping, clean replay checks, zero Data Health failures, correct audit UI, clean browser console, disabled expanded opt-in, and passing focused/full tests.
+- Production migrations 009, 010, and 011 and the durable audit/recovery boundary are deployed and accepted. The expanded league opt-in is disabled.
+- Rule 20 authority for this gate is explicit and exact: Gate 4 may execute one batch containing exactly 10 players. It does not authorize 1-9, 11 or more, a second batch, routine synchronization, or any later gate.
 
 ## Objective
 
-Perform one deliberately conservative authenticated production synchronization of exactly 4 or 5 reviewed status-only players through the `V5.4.6E_OPT_IN_10` durable audit boundary. Four is preferred; use five only when a fresh Current-period preview offers five equally safe candidates and the fifth materially improves grouped-write evidence. Ten players are not authorized.
+Prove scale only by executing exactly one authenticated production status-only synchronization at the currently supported maximum expanded batch size of 10 reviewed players. Do not add capabilities, modify application or database boundaries, or relax any Gate 3 safeguard. If exactly 10 genuinely eligible candidates cannot be established from one fresh Current-period preview, stop without writing.
 
-## Candidate-Selection Criteria
+## Candidate-Selection Contract
 
-Every selected player must satisfy all criteria in the same fresh preview:
+All 10 candidates must satisfy every condition in the same fresh preview:
 
-1. Exact stored Fantrax API player identity and exact persisted Fantrax team identity; no name, fuzzy, MLBAM, or inferred fallback.
-2. Recommendation exactly `APPLY_FANTRAX_STATUS`, with no ownership conflict and the expected cloud owner equal to the reviewed Fantrax team mapping.
-3. Known source status that maps exactly to `ACTIVE`, `RESERVE`, `IL`, or `MINORS`; exclude unknown, missing, and `UNCLASSIFIED` source statuses.
-4. No `MANUAL` provenance, override actor, or override timestamp before review, and no manual override introduced before persistence.
-5. No release candidate, free agent, ownership change, different-owner conflict, player/team mapping issue, identity ambiguity, or proposed ownership repair.
-6. Current cloud status must equal the manifest's previewed status and differ from the exact target status.
-7. Prefer four status-only rows spanning two target-status write groups when equally safe candidates exist. Do not weaken candidate quality merely to create a second group.
-8. Record player UUID, display name, exact Fantrax player/team IDs, cloud owner UUID, previewed status, target status, and exclusion-check result before acknowledgement.
+1. Recommendation is exactly `APPLY_FANTRAX_STATUS`; current cloud status differs from the known target status.
+2. Fantrax source status is exactly `ACTIVE`, `RESERVE`, `INJURED_RESERVE`, or `MINORS`, mapping only to `ACTIVE`, `RESERVE`, `IL`, or `MINORS`. Exclude unknown, missing, and `UNCLASSIFIED` Fantrax source statuses.
+3. Player identity is an exact authoritative Fantrax API identity derived through the accepted strict wrapper rule. No name, fuzzy, inferred, or MLBAM fallback is permitted.
+4. Team identity is the exact authoritative persisted `fantrax_team_id` in the active league. No name suggestion or inferred team mapping is authoritative.
+5. Expected cloud owner exactly matches the reviewed team mapping. Exclude ownership differences, free agents, different-owner conflicts, releases, removals, and any ownership repair.
+6. No candidate has `MANUAL` provenance, an override actor, an override timestamp, an override conflict, or a manual override introduced after preview.
+7. Player UUID, league UUID, current status, owner, player/team identities, release policy, and season/period context match the reviewed manifest immediately before persistence.
+8. Each row is status-only. No ownership, free-agent, identity, manual-override, score, metric, import, HKB, team, manager, or other player-field change is authorized.
+9. Record for each candidate: name, player UUID, exact Fantrax player ID, persisted Fantrax team ID, expected owner UUID, previewed status, target status, provenance/override state, and every exclusion check.
+10. Selection starts empty, contains exactly 10 named players, and any selection or input change invalidates acknowledgement and requires complete re-review.
 
-If fewer than four candidates meet every rule, stop without enabling or writing. If more than five qualify, choose the smallest, clearest four-row set; do not increase scope.
+The 11th player must remain blocked in the UI, service, manifest, repository, and database boundaries. Do not split an intended operation of more than 10 players into multiple batches, retries, manifests, accounts, sessions, or deployments to circumvent the cap. Evidence that the intended operation exceeds 10 is a stop condition, not permission to partition it.
 
 ## Pre-Write Gates
 
-1. Confirm clean expected branch/commit and rerun focused Fantrax/audit/roster tests, the full `tests/*.test.mjs` suite, and `git diff --check`.
-2. Verify migrations 009–011, audit triggers, RLS, private authorization helpers, and production release setting shape without altering schema.
-3. Publish the exact authorized commit through the authenticated preview workflow and record the Pages run, commit, and asset identity.
-4. Run Data Health before mutation. Require zero failures in synchronization integrity, release/cap consistency, season context, identity, team mapping, manual-override protection, RLS, and protected-write diagnostics.
-5. Fetch a new `Current` preview only. Require observed league ID, season year, and league-history ID to match the reviewed context.
-6. Capture the preview fetch timestamp plus a deterministic hash of the exact normalized preview inputs used by the selected manifest. Any refresh, league/configuration/period/mapping/season/release change invalidates selection and acknowledgement.
-7. Capture deterministic pre-write counts and hashes for all protected fields and audit-history counts. Record the exact 4–5 candidate manifest before release activation.
-8. Enable the exact reviewed league-scoped `V5.4.6E_OPT_IN_10` setting only after all earlier gates pass. Refresh league data and preview, then reselect and re-review the exact candidates if activation invalidates state.
-9. Require explicit review acknowledgement and the separate final confirmation showing release tier, effective cap, exact selected names, manifest digest, and status-only scope.
+1. Confirm the expected branch/commit, clean tree, applicable repository instructions, and consistency among Rule 20, this contract, deployed schema, and production authorization.
+2. Rerun focused Gate 4/Fantrax, audit/recovery, season-context, team-identity, roster-manager, Data Health, auth/configuration tests and the complete sorted `tests/*.test.mjs` suite; require all to pass. Run `git diff --check`.
+3. Verify migrations 009-011 exactly once as already deployed; do not reapply them. Verify audit tables/triggers, RLS, private authorization helpers, manifest-v2 creation, lifecycle/immutability rules, replay prevention, actor stamping, cross-league isolation, default cap 3, expanded cap 10, and item ordinals 0-9.
+4. Publish the exact authorized commit through the established authenticated preview workflow. Record the Pages run, exact commit, artifact identity, and successful application loading.
+5. Run authenticated pre-write Data Health. Require zero failures in audit integrity, release/cap consistency, RLS, season context, identity, team mapping, manual-override protection, and protected-write diagnostics.
+6. Fetch one fresh `Current` Fantrax preview. Require the exact observed league ID, season year, and available league-history ID to match the accepted reviewed season context. Any explicit period is historical and blocks the gate.
+7. Identify exactly 10 candidates satisfying every criterion. If only 9 or fewer qualify, stop. Do not weaken criteria, substitute ambiguous rows, include releases, or reduce the batch size under this authorization.
+8. Capture the preview timestamp and deterministic hash of the normalized inputs. Capture pre-write counts, exact projections, and deterministic hashes for all protected fields, teams, scores, metrics, and pre-existing audit history.
+9. Enable only the exact reviewed league-scoped `V5.4.6E_OPT_IN_10` setting after all earlier gates pass. Refresh league data and obtain another fresh Current preview if activation invalidates state, then rebuild and re-review the exact 10-player set.
+10. Construct and inspect one manifest-v2 binding release tier, cap 10, reviewed count 10, preview hash/timestamp, Current period, accepted season context, exact UUIDs, identities, owners, current statuses, targets, and item ordinals 0-9. Record the deterministic digest.
+11. Prove an attempted 11th selection/submission remains blocked without creating an attempt or player write. Return to the exact reviewed 10-player selection and regenerate evidence if this check invalidates review state.
+12. Require exact-set acknowledgement and a separate final confirmation naming all 10 players, release tier, effective cap, manifest digest, and status-only scope. Confirm the persistence request is byte-for-byte/field-for-field equivalent to the reviewed manifest.
+
+Any stale preview, season/period drift, changed configuration, identity/owner/status/provenance mismatch, manifest/request discrepancy, Data Health failure, or authorization contradiction stops the run before persistence.
 
 ## Authorized Write Boundary
 
-- Exactly one new manifest-v2 attempt containing 4 or 5 rows.
-- Only `roster_status`, `roster_status_source = 'FANTRAX'`, and the established update timestamp may change.
-- Immediately before each grouped persistence call, repeat active-league, release signature, fresh-preview hash/timestamp, matching season context, Current period, exact player/team identity, expected owner, previewed current status, allowed target status, and non-manual provenance guards.
-- Do not continue to a second batch. Any partial, failed, unexpected skipped, stale, ambiguous, or guard-rejected result stops the run and preserves the durable evidence for inspection.
+- Execute exactly one new manifest-v2 attempt with exactly 10 items. Do not execute a smaller batch, an 11th item, a second batch, or an automatic retry.
+- The only permitted player payload fields are `roster_status`, `roster_status_source = 'FANTRAX'`, and the established update timestamp.
+- Immediately before attempt creation and every grouped persistence call, repeat active-league, expanded-release signature, fresh-preview hash/timestamp, matching accepted season context, Current period, exact player/team identity, expected owner, previewed current status, allowed target status, non-manual provenance, and exact-manifest guards.
+- Any unexpected skip, failure, pending row, partial lifecycle, stale guard, ambiguous result, protected-field difference, or database contradiction stops the gate. Preserve durable evidence and do not continue with another batch.
 
 ## Protected-Field Snapshot
 
-Before and after the attempt, compare row counts and deterministic hashes or exact projections covering:
+Before and after the attempt, compare counts plus deterministic hashes or exact projections covering:
 
 - player UUID and league UUID;
 - owner team and free-agent state;
 - Fantrax ID, MLBAM ID, name, normalized name, MLB organization, and positions;
-- HKB value, ranks, asset class, notes, and other non-status player attributes;
-- manual-override actor and timestamp;
+- manual-override source, actor, and timestamp;
+- HKB values/ranks, asset class, notes, imported attributes, and every non-status player field;
 - team UUID, league UUID, Fantrax team ID, name, abbreviation, and manager assignment;
-- every calculated score row and score-bearing value;
-- every player metric row and metric payload;
-- pre-existing Fantrax audit attempts/items and their immutable manifest/lifecycle fields.
+- every calculated-score row and score-bearing value;
+- every player-metric row and metric payload;
+- every pre-existing Fantrax audit attempt/item and immutable manifest/lifecycle field.
 
-For selected players, the only permitted differences are the reviewed target `roster_status`, `roster_status_source` changing to `FANTRAX`, and the expected update timestamp. Any other difference fails acceptance.
+For the selected 10 players, the only permitted differences are the reviewed target `roster_status`, `roster_status_source` becoming `FANTRAX`, and the expected update timestamp. Any other difference fails acceptance.
 
 ## Post-Write Acceptance Gates
 
-1. Verify one database-stamped actor, one immutable manifest-v2 digest, release `V5.4.6E_OPT_IN_10`, cap 10, exact reviewed count 4 or 5, and exact item ordinals/identities/statuses.
-2. Require every selected item to be `APPLIED` with no skipped, failed, pending, or missing item. Require the attempt lifecycle and timestamps to be internally consistent.
-3. Refresh league data and fetch another fresh Current preview. Confirm selected rows now produce `NO_CHANGE`, season context still matches, and no unselected roster row changed.
-4. Compare all protected pre/post snapshots. Require exact equality outside the permitted status provenance/timestamp fields.
-5. Run Data Health and the audit UI. Require accurate release, cap, terminal/recoverable counts, digest, actor/lifecycle information, and no new failure.
-6. Submit the same exact manifest/digest once as an idempotency replay check. It must resolve to the existing attempt and perform zero player writes; terminal rows must remain non-replayable.
-7. Inspect recovery state after replay. Require zero recoverable rows for a fully successful attempt. Do not inject a production failure merely to manufacture recovery evidence.
-8. Disable the expanded opt-in immediately after verification. Confirm new expanded attempts are blocked while the exact durable attempt remains inspectable.
-9. Restore GitHub Pages to `main`, verify restoration succeeds, rerun focused tests, the full suite, and `git diff --check`, then record all evidence.
+1. Verify exactly 10 intended player rows changed and no unselected player row changed. Verify every before/after status individually.
+2. Verify one database-stamped actor, one immutable manifest-v2 digest, release `V5.4.6E_OPT_IN_10`, cap 10, reviewed count 10, and exact item ordinals, identities, owners, current statuses, and targets.
+3. Require all 10 items to reach `APPLIED` with no skipped, failed, pending, duplicated, or missing item. Require the attempt to reach `COMPLETED` with internally consistent lifecycle timestamps, terminal count 10, and recoverable count 0.
+4. Compare all protected counts, projections, and hashes. Require exact equality outside the authorized status/provenance/timestamp fields.
+5. Refresh league data and obtain a new Current preview. Require `NO_CHANGE` for all 10 selected rows, matching season context, and no evidence of an unselected mutation.
+6. Submit the same exact manifest/digest once as the planned idempotency check. It must resolve to the existing attempt, perform zero player changes, create no duplicate attempt/items, and preserve terminal non-replayability.
+7. Confirm terminal item replay remains rejected. Inspect existing failed/pending rows only to verify documented recovery semantics; do not inject a production failure or recover unrelated history.
+8. Run authenticated Data Health and inspect the audit UI. Require zero new failure and correct release, cap, actor, digest, reviewed, terminal, recoverable, lifecycle, attempt, and item rendering.
+9. Verify the browser console has no errors or warnings attributable to Gate 4.
+10. Disable the expanded league opt-in immediately after acceptance and verify new expanded attempts are blocked while the exact completed attempt remains inspectable.
+11. Restore GitHub Pages or any temporary deployment configuration to `main` according to the established workflow and verify the restoration deployment succeeds.
+12. Rerun the focused tests, the complete sorted standalone suite, and `git diff --check`. Record exact commands and results.
 
-## Rollback And Recovery Plan
+## Recovery And Stop Plan
 
-- Operational stop: disable the league opt-in first. This blocks new expanded attempts without deleting audit evidence.
-- Do not delete or rewrite attempt/item rows, alter digests, or manually mark outcomes.
-- If no player write occurred, retain the failed/pending attempt for diagnosis and use the exact-manifest recovery path only after architect approval.
-- If a subset applied, do not issue compensating roster writes automatically. Preserve terminal `APPLIED`/`SKIPPED` rows, inspect `FAILED`/`PENDING` rows and all repeated guards, and request architect direction before exact-manifest recovery.
-- Recovery may address only the original failed/pending rows, with the original digest and selected set, after a fresh matching Current preview proves owner/status/identity/manual/season/release guards. It may never broaden or replace the manifest.
-- Any protected-field difference, authorization contradiction, cross-league visibility, audit inconsistency, or uncertain outcome is an immediate stop. Preserve evidence; do not retry or clean up destructively.
+- Disable the league opt-in first after any uncertain or incomplete outcome. Do not delete or rewrite audit rows, digests, manifests, or outcomes.
+- Do not automatically compensate or reverse an applied player status. Preserve terminal rows and all protected snapshots.
+- A real `FAILED` or `PENDING` item ends Gate 4. Recovery is not authorized by this task; it requires separate architect review and may address only the original exact manifest under every fresh guard.
+- Never replay `APPLIED` or `SKIPPED` items, broaden the manifest, replace a candidate, or create a second attempt to complete the intended operation.
+- Stop immediately on any identity ambiguity, owner/status/provenance change, manual override, period/season drift, stale preview, manifest mismatch, protected-field change, replay weakness, cross-league exposure, unexpected database result, or repository contradiction.
 
 ## Explicitly Prohibited
 
-- Selecting 6–10 players, a second batch, Select All, background/automatic retries, or a full eligible-set synchronization.
-- Release candidates, unknown statuses, manual overrides, ownership conflicts, free-agent or ownership changes, fuzzy/name/MLBAM fallback, unmapped teams, or ambiguous identities.
-- Imports, player/team creation, identity repair, ownership repair, score recalculation, HKB/metric writes, manager changes, migration/schema changes, audit deletion, or unrelated cloud writes.
-- Merging into `main` without completed acceptance and architect review.
+- Any synchronization other than one exact 10-player Gate 4 batch, including 1-9 players, 11 or more players, a second batch, a split batch, routine/bulk synchronization, background retry, or Select All.
+- Releases/removals, unknown or `UNCLASSIFIED` Fantrax source statuses, ownership/free-agent changes, identity repair, fuzzy/name/MLBAM fallback, manual-override changes, or ambiguous/unmapped identities.
+- Imports, player/team creation, ownership repair, score recalculation, HKB/metric writes, manager changes, migration/schema changes, audit deletion, or unrelated cloud writes.
+- Application, test, or migration changes merely to make Gate 4 pass. Any required capability change is a separate architect-reviewed task.
+- Merging into `main`, authorizing Gate 5, or treating acceptance as routine synchronization authority.
 
 ## Definition Of Done
 
-Gate 3 is accepted only when one exact 4–5 player status-only manifest completes with all items applied, replay performs zero writes, recovery inspection is clean, the refreshed Current preview reports no remaining differences for the selected rows, every protected comparison matches, Data Health and audit rendering are accurate, the opt-in is disabled, Pages is restored to `main`, automated validation passes, and architect review approves the evidence. A successful Gate 3 does not authorize ten players or any later batch.
+Gate 4 is accepted only when exactly one 10-player status-only manifest completes with all 10 items `APPLIED`, the attempt is `COMPLETED`, the 11th player remains blocked, no cap-circumvention split occurs, replay performs zero writes, protected fields match, the fresh Current preview reports `NO_CHANGE` for all selected rows, Data Health/audit UI/browser console are clean, the opt-in is disabled, deployment configuration is restored, and all tests/checks pass. Gate 4 acceptance does not authorize routine or bulk synchronization; that requires a separate architect decision after review of the complete Gate 4 evidence.
