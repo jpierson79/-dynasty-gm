@@ -992,3 +992,38 @@
 - GitHub Pages was restored to `main`; restoration build `1141888335` completed successfully with status `built` in 32,578 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
 - Status: **accepted** for Gate 4B hosted audit visibility. No authentication code or application code changed. No expanded opt-in, Gate 4 candidate fetch, audit creation, Fantrax synchronization, migration, import, roster/player write, ownership or identity change, score recalculation, or unrelated cloud write occurred.
 - Gate 4's exactly-10-player synchronization was not resumed and remains blocked pending architect review.
+
+## V5.4.6E Gate 4 Controlled Maximum Sync Attempt — Pre-Write Stop
+
+### Repository, Artifact, And Authentication
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed a clean `feature/manager-intelligence` worktree with local HEAD and `origin/feature/manager-intelligence` both at exact authorized commit `98d6837ae852fca41a752962a8ebb5f1fc6bece2`.
+- `docs/WORKFLOW.md` Rule 20 and `docs/NEXT_TASK.md` were consistent in authorizing only one exact 10-player Gate 4 acceptance batch. No authority existed for 1–9 players, an 11th player, a split batch, a second batch, or routine synchronization.
+- The exact commit was temporarily published through the approved GitHub Pages workflow. The Pages build reached `built` at commit `98d6837ae852fca41a752962a8ebb5f1fc6bece2`, and the hosted V5 page loaded entry module `main.js?v5-4-6e-gate4c1-auth-state` and exited Loading.
+- The hosted session authenticated normally as `joshua.pierson@yahoo.com`, selected `Cloud · Reddit Phanatics`, loaded the existing three-attempt/eight-item audit history, and produced no browser console errors or warnings.
+
+### Mandatory Data Health Stop
+
+- The pre-write Data Health run completed before any preview, opt-in, candidate selection, manifest construction, audit creation, or roster-status persistence.
+- Data Health reported 1 failure and 31 warnings. The failing check was `Fantrax Season Context Review`; the audit availability and release/cap consistency checks passed.
+- The active Gate 4 contract requires the pre-write Data Health gate to pass and states that any Data Health failure stops the run before persistence. It separately places the fresh Current-period Fantrax preview after that Data Health gate. Reordering the gates or fetching a preview to clear the failure would have deviated from the exact approved contract without architect direction.
+- Gate 4 therefore stopped fail-closed. No Fantrax preview was fetched, expanded opt-in was not enabled, no candidates were selected, and the exactly-10-player synchronization was not attempted. Candidate eligibility, the 11th-selection boundary, protected snapshots, manifest-v2/digest, persistence guards, audit outcomes, replay behavior, and post-write hashes remain unexecuted rather than inferred.
+
+### Validation, Restoration, And Safety
+
+- Pre-write focused validation passed 9 of 9 files: `v5FantraxRosterSync.test.mjs`, `v5FantraxSeasonContext.test.mjs`, `v5FantraxSyncAudit.test.mjs`, `v5FantraxTeamIdentity.test.mjs`, `v5RosterStatusManager.test.mjs`, `v5DataHealthExecution.test.mjs`, `v5AuthFlow.test.mjs`, `v5FantraxPublicPreview.test.mjs`, and `supabaseProductionConfig.test.mjs`.
+- The complete sorted standalone suite passed 35 of 35 `tests/*.test.mjs` files. The pre-write `git diff --check` passed.
+- GitHub Pages was restored to `main`. The restoration build completed with status `built` at main commit `df89840de0ea8563968b99b7acc75b528e02983f`; the Pages source was verified as `main` and status as `built`.
+- No application, authentication, audit-visibility, test, migration, or schema code changed. No expanded opt-in change, Fantrax read, audit attempt/item creation, roster/player write, import, release, ownership or identity repair, migration, score recalculation, or unrelated cloud write occurred.
+- Status: **Gate 4 did not pass and remains blocked for architect review.** No acceptance commit or push is permitted from this failed attempt.
+
+## V5.4.6E Gate 4 Readiness Sequencing Governance Correction
+
+- The failed attempt proved a circular requirement in the Gate 4 execution contract: it required `Fantrax Season Context Review` to pass in pre-write Data Health before the workflow was allowed to acquire the fresh Current-period preview that supplies the observed league, season, and history context for that comparison.
+- The correction separates readiness into two fail-closed stages without weakening any safeguard. Gate A verifies every prerequisite available before an external observation: authentication, active league, hosted health, persisted team identity, audit availability and recovery readiness, manual-override protection, deployed database cap/release constraints, inspectable browser state, and console health.
+- At Gate A, preview-dependent season context may be explicitly unavailable or review-required. It is not called a pass and cannot authorize persistence. This distinction prevents missing observation data from being mistaken for either successful season review or a general readiness failure that makes the required preview unreachable.
+- Gate B begins only after a fresh read-only Current-period preview. It derives the observed external league, season year, league-history identity, and period, compares them with the reviewed persisted context, and requires the season-context result plus all remaining identity, team, status, manual-override, stale-preview, and write-readiness checks to pass before any persisted action.
+- No persisted write is allowed between preview acquisition and successful Gate B. Expanded opt-in is enabled only afterward; because that configuration change invalidates authorization, the workflow must then acquire another fresh Current preview and repeat Gate B before selecting the exact 10 candidates or building the manifest.
+- Any change to period, league/configuration, season context, candidate set, release setting, or preview invalidates the gate. Preview remains read-only, a failed post-preview comparison still stops execution, and neither preview acquisition nor Gate A alone authorizes a write.
+- `docs/WORKFLOW.md` Rule 20 does not contain the circular ordering and remains unchanged. Its default 1–3 limit, architect-approved gate-specific 4–10 exception, exact task-level batch, durable audit/recovery, expanded-cap constraints, league opt-in, Current-only data, accepted season context, exact identity, manual-override protection, stale-preview protection, deterministic manifest/digest, replay prevention, protected-field verification, release exclusion, and fail-closed behavior all remain intact.
+- Gate 4 remains limited to one exactly-10-player acceptance batch. This documentation correction does not resume Gate 4 and authorizes no preview, opt-in change, audit creation, synchronization, migration, deployment, import, ownership/identity change, or score recalculation.
