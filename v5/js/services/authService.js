@@ -1,7 +1,7 @@
 import { initializeSupabaseClient } from "../config/supabaseClient.js";
 import * as legacyAuth from "../../../js/services/authService.js";
 import * as leagues from "../repositories/leagueRepository.js";
-import { appState, getActiveLeagueId, setActiveLeagueId, setState } from "../state/appState.js";
+import { appState, getActiveLeagueId, setActiveLeagueId, setState } from "../state/appState.js?v5-4-6e-gate4c1-auth-state";
 
 export async function initializeAuth(onStatus){
   const client=await initializeSupabaseClient({onStatus});

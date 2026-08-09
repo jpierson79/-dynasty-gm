@@ -1,7 +1,7 @@
 import { $, $all, debounce, escapeHtml, optionHtml, setHtml } from "./utils/dom.js";
-import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js?v5-4-6e-gate4a-audit-visibility";
-import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js?v5-4-6e-gate4c-auth";
-import { loadLeagueOverview } from "./services/cloudDataService.js";
+import { appState, clearErrors, preferredTeamIdForLeague, saveLeagueUiPreferences, saveUiPreferences, setError, setState, setStateSilently, subscribe } from "./state/appState.js?v5-4-6e-gate4c1-auth-state";
+import { initializeAuth, refreshAccessibleLeagues, selectLeague, signIn, signOut } from "./services/authService.js?v5-4-6e-gate4c1-auth-state";
+import { loadLeagueOverview } from "./services/cloudDataService.js?v5-4-6e-gate4c1-auth-state";
 import { runDataHealth } from "./services/dataHealthService.js?v5-4-6e-gate4a-audit-visibility";
 import { runWithDataHealthTimeout } from "./services/dataHealthExecutionService.js?v5-4-6b3-data-health";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";

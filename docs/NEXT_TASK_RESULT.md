@@ -922,3 +922,26 @@
 - GitHub Pages remains restored to `main` at `df89840de0ea8563968b99b7acc75b528e02983f`. The repaired exact artifact has therefore not yet been hosted-authenticated.
 - Gate 4B and Gate 4 remain blocked pending architect approval to checkpoint/push and temporarily deploy this Gate 4C repair.
 - Expanded opt-in changes, candidate fetches, Fantrax synchronization, audit creation, migrations, imports, roster writes, ownership/identity repair, score recalculation, Supabase configuration changes, and unrelated cloud writes: none.
+
+## V5.4.6E Gate 4C-1 Hosted Authentication Acceptance Attempt
+
+### Exact Hosted Artifact And Auth Trace
+
+- GitHub Pages build `1141779421` published exact repair commit `04349dc68fd68322c963b21c98143c7b439bc619` successfully in 37,779 ms.
+- The hosted artifact loaded exact entry module `main.js?v5-4-6e-gate4c-auth`, exited Loading, rendered an enabled Sign In control, and initially had a clean console.
+- A normal Sign In submission visibly entered `Signing in…` and disabled both credential fields. This proves the delegated submit handler fired, credentials were captured before rerender, and the original async auth-callback deadlock was repaired.
+- After the auth request completed, the exact artifact returned to `Signed out` without a visible auth rejection. Authenticated user state and Reddit Phanatics did not render, so Gate 4C-1 failed before any Gate 4B audit validation.
+
+### Newly Verified Module-Singleton Defect
+
+- Gate 4A had changed only `main.js` to import `appState.js?v5-4-6e-gate4a-audit-visibility`. `authService.js` and `cloudDataService.js` still imported unversioned `appState.js`.
+- Browser ES-module identity includes the query string. The exact hosted graph therefore created separate application-state singletons: auth and deferred league loading updated the unversioned instance while the UI rendered the versioned instance. This precisely explains successful pending-state rendering followed by a signed-out UI with no auth error.
+- The smallest local correction gives `main.js`, `authService.js`, and `cloudDataService.js` one shared `appState.js?v5-4-6e-gate4c1-auth-state` identity and cache-busts the entry/auth/cloud modules together. No auth policy, Supabase setting, RLS, Fantrax, audit, manifest, or persistence boundary changed.
+- `v5AuthFlow.test.mjs` now asserts the shared singleton across the exact module graph in addition to the existing deadlock, pending/error, successful-state, and restoration checks.
+
+### Validation, Restoration, And Review Boundary
+
+- Focused auth/Gate 4A validation passed 5 of 5 files. The complete sorted standalone suite passed 35 of 35 files. `git diff --check` passed with only the existing line-ending notices.
+- Pages was restored to `main`; restoration build `1141803159` completed successfully in 46,041 ms at `df89840de0ea8563968b99b7acc75b528e02983f`.
+- The shared-state correction is not hosted-accepted because it is not yet an approved committed remote artifact. Gate 4C-1 did not pass, so no acceptance-record commit or push was made. Architect review/checkpoint approval is required before republishing the corrected artifact.
+- No Gate 4B audit validation, expanded opt-in, candidate fetch, audit creation, Fantrax synchronization, migration, import, roster write, ownership/identity change, score recalculation, Supabase Auth configuration change, or unrelated cloud write occurred.

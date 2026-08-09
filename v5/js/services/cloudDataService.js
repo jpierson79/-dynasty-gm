@@ -4,7 +4,7 @@ import * as managers from "../repositories/managerRepository.js";
 import * as metrics from "../repositories/metricRepository.js";
 import * as scores from "../repositories/scoreRepository.js";
 import * as imports from "../repositories/importJobRepository.js";
-import { setState } from "../state/appState.js";
+import { setState } from "../state/appState.js?v5-4-6e-gate4c1-auth-state";
 import { validFantasyTeamsForPlayers } from "../domain/teamRules.js";
 
 export async function loadLeagueOverview(leagueId){
