@@ -1063,3 +1063,55 @@
 - No third preview is ordinarily required. Any later period, league, configuration, release, candidate-set, reviewed-input, preview, or season-context change invalidates Preview B and requires another fresh Current preview plus a complete Gate B rerun before persistence.
 - This correction preserves and clarifies stale-preview protection. It does not weaken Rule 20, which contains no conflicting preview-count rule and remains unchanged. Gate 4 still authorizes only one exactly-10-player batch; the 11th player, a second batch, and split-batch cap circumvention remain prohibited.
 - This was documentation-only governance work. Gate 4 was not resumed, and no deployment, Fantrax read, opt-in change, manifest, audit record, synchronization, migration, import, ownership/identity change, or score recalculation was performed.
+
+## V5.4.6E Gate 4 Resume At `4a14aa8` — Browser-Reliability Stop After Preview B
+
+### Preflight, Gate A, And Preview A
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local HEAD and `origin/feature/manager-intelligence` both at exact commit `4a14aa8d25fa4c1d024ea634c7b2a353b6a28ac2`. The corrected two-preview `docs/NEXT_TASK.md` and `docs/WORKFLOW.md` Rule 20 were consistent.
+- Pre-write focused validation passed all 9 required files, the complete sorted standalone suite passed 35 of 35 `tests/*.test.mjs` files, and `git diff --check` passed.
+- GitHub Pages build `1142044124` published the exact authorized artifact successfully. The hosted V5 application exited Loading, restored the authenticated `joshua.pierson@yahoo.com` session, selected Reddit Phanatics, rendered the existing 3-attempt/8-item audit history, and had no browser console errors or warnings.
+- Gate A passed every non-preview-dependent check. Pre-preview Data Health reported the expected single preview-dependent `Fantrax Season Context Review` failure; audit availability, release/cap consistency, league and RLS access, expected team count, persisted team identity, manual-override protection, recovery visibility, and browser/console health passed.
+- Preview A was fetched read-only at `2026-08-09T23:57:40.020Z`. Current resolved to period `138`; observed external league `xryuc2ewmhi0d2vm`, season `2026`, and history `8mifq27zmhi0d2vm` exactly matched reviewed context. All six endpoints returned HTTP 200 with valid schemas, with 10 teams, 569 roster entries, no unmatched roster players, no unmapped teams, and no unknown source statuses.
+- Post-Preview-A Data Health passed with 0 failures. The exact reviewed candidates were Eli Willits, Theo Gillen, Cam Cannarella, Miguel Vargas, Emil Morales, Landen Roupp, Braxton Garrett, Carlos Rodon, David Peterson, and Shea Langeliers. Jared Jones remained excluded because duplicate-name ambiguity was not independently resolved. Each candidate retained exact stable player/team identity, non-free-agent ownership by team `3b5f6e4f-950a-4443-8db9-a3379d825acc`, `UNCLASSIFIED` cloud status, a known Fantrax target status, no ownership conflict, and null manual-override provenance.
+- A fresh protected baseline captured at `2026-08-09T23:59:40.624408Z` preserved: 10,199 players with protected hash `e15c919d28618816771506438cab5d46`; 12 team rows with hash `ebe01fdc9f0056d57d7095fcaab66ad3`; 20,020 calculated-score rows with hash `79ee3447d15cff79d006729447574c7e`; 209 metric rows with hash `8d86a3569d0f44396f1acc1a9d2969df`; 3 audit attempts with hash `4898c4d697853b7a070ca460307b163f`; and 8 audit items with hash `8f9ae2970dee06af7cba993ff7f4bc66`.
+
+### Opt-In Transition, Preview B, And Mandatory Stop
+
+- The reviewed league-scoped expanded opt-in was enabled at `2026-08-09T23:59:59.624992Z` only after Preview A candidate and protected-baseline review. The application immediately displayed that the release configuration changed and required a refreshed preview; Preview A was therefore invalidated and was not used to create a manifest or audit attempt.
+- Preview B was fetched fresh after opt-in at `2026-08-10T00:00:53.240Z`. It independently observed the same reviewed league, season, history identity, Current period `138`, 10 teams, 569 roster entries, and six valid HTTP 200 endpoint responses. A complete post-Preview-B Gate B rerun passed with 0 failures; active release configuration, season context, Current-period write guard, identity coverage, manual-override protection, stale-preview readiness, audit availability, and release/cap consistency all passed.
+- The Preview B candidate review again showed the same ten named rows with exact player and team identity, known target statuses, no owner difference, and no ownership conflict. While establishing the exact checkbox state and the required 11th-player rejection evidence, browser inspection timed out. Repeated attempts to reclaim the hosted and SQL tabs also timed out until the stalled controls were explicitly released and a fresh cleanup session was established.
+- Because reliable browser inspection is an explicit precondition and the exact selection state could no longer be trusted, Gate 4 stopped before acknowledgement or confirmation. No manifest-v2, digest, audit attempt, audit item, or roster-status persistence was created. The exactly-one 10-player synchronization was **not performed**.
+
+### Cleanup And Final State
+
+- The expanded opt-in was disabled through the approved Supabase SQL workflow at `2026-08-10T00:10:19.708072Z`. A follow-up read verified `enabled: false`, the authoritative audit baseline still exactly 3 attempts / 8 items, and all ten reviewed player statuses still `UNCLASSIFIED`.
+- GitHub Pages was restored to source `main` with path `/`; the Pages API reported source `main` and status `built`. No second batch, 11th player, release, import, migration, ownership or identity repair, manual-override change, score recalculation, or unrelated cloud write occurred.
+- Status: **Gate 4 did not execute and remains blocked for architect review.** This record preserves the successful Gate A/Preview A/Preview B evidence and the browser-reliability stop. The required acceptance-only commit and push are prohibited because Gate 4 did not pass.
+
+## V5.4.6E Gate 4D Deterministic Acceptance Harness Planning
+
+### Architectural Rationale
+
+- The repeated Gate 4 stops do not show a Fantrax synchronization, identity, audit, cap, or stale-preview defect. The latest run passed Gate A, both fresh-preview Gate B evaluations, exact candidate review, protected-baseline capture, release transition invalidation, and database cleanup. It stopped because a long, high-volume browser interaction became unreliable while establishing the exact checkbox state and 11th-player boundary.
+- Browser-only orchestration is therefore no longer sufficient as the primary acceptance mechanism. A fragile inspection session can lose trusted UI state after the expensive preview and readiness sequence, forcing a correct fail-closed stop even though the production boundaries remain healthy. Repeating the same click-heavy path adds operational risk without increasing business-logic coverage.
+- Gate 4D plans a deterministic checkpoint harness inside the authenticated hosted V5 module graph. It records explicit prerequisite digests and advances only from canonical production results. A compact human-review pause presents the exact candidate UUIDs, manifest-v2 digest, and protected-field summary before any future write, reducing browser interaction to authentication and secondary visual confirmation.
+
+### Production-Logic Reuse
+
+- The harness is not a second synchronization path. Preview, season comparison, release/period guards, exact candidate validation, manifest serialization/digest, audit preparation/lifecycle, guarded grouped status writes, and replay handling remain owned by the existing production services and repositories.
+- Any apply orchestration needed by both `v5/js/main.js` and the harness must be extracted once into a shared production coordinator. The normal UI and harness call that same coordinator; neither may copy its predicates or issue raw status/audit writes.
+- Acceptance-only logic is limited to checkpoint sequencing, deterministic evidence serialization, read-only protected projections/hashes, human-readable rendering, invalidation, and a one-call latch. It does not decide identity, eligibility, cap, lifecycle, recovery, or persistence.
+
+### Security Boundaries And Stops
+
+- The harness uses the normal hosted sign-in, canonical Supabase singleton, one canonical app-state instance, authenticated user, active Reddit Phanatics league, production RLS, private authorization helpers, database actor stamping, manifest immutability, lifecycle triggers, replay prevention, cross-league isolation, and caps. It accepts no copied tokens/cookies, service-role key, user-ID override, database credential, fuzzy identity, or alternate origin.
+- Every checkpoint distinguishes `PASS`, `FAIL`, and `UNAVAILABLE`. Missing, failed, timed-out, permission-blocked, stale, or malformed evidence fails closed; it is never represented as zero or pass. Each later checkpoint binds the digest of its prerequisites.
+- Exact stop conditions include auth/league/artifact drift, unavailable audit history, non-Current period, season/history mismatch, stale preview, release/configuration change, candidate count other than 10, 11th/split-batch intent, substitution, identity/team/owner/status/provenance mismatch, releases, unknown statuses, manual overrides, manifest/digest/request mismatch, protected-field change, partial outcomes, replay weakness, or failed opt-in cleanup.
+- Expanded opt-in disablement is the first safe cleanup action after success, failure, cancellation, timeout, or uncertainty. No stop permits a smaller fallback, retry, candidate replacement, compensation, audit deletion, or second batch.
+
+### Browser Role And Dependencies
+
+- The hosted browser remains important but secondary: it confirms normal authentication, exact artifact, selected league, Data Health and audit rendering, human acknowledgement, and console health. It no longer has to carry the authoritative state of dozens of clicks across two previews and a large candidate table.
+- Gate 4D depends on the accepted Gate 4A audit visibility semantics, Gate 4C shared authentication state, Gate 4B hosted audit acceptance, migrations 009-011, Gate 3 audit/replay acceptance, current exact identity/team mapping, manual-override protection, two-preview sequencing, and Rule 20.
+- Gate 4D is planning-only. No application code, tests, migration, Supabase state, Pages configuration, Fantrax state, opt-in state, manifest, audit record, roster, ownership, identity, import, metric, or score was changed. Gate 4 remains blocked, and a future exact ten-player write requires separate architect authorization after harness implementation and read-only hosted acceptance.
