@@ -1115,3 +1115,56 @@
 - The hosted browser remains important but secondary: it confirms normal authentication, exact artifact, selected league, Data Health and audit rendering, human acknowledgement, and console health. It no longer has to carry the authoritative state of dozens of clicks across two previews and a large candidate table.
 - Gate 4D depends on the accepted Gate 4A audit visibility semantics, Gate 4C shared authentication state, Gate 4B hosted audit acceptance, migrations 009-011, Gate 3 audit/replay acceptance, current exact identity/team mapping, manual-override protection, two-preview sequencing, and Rule 20.
 - Gate 4D is planning-only. No application code, tests, migration, Supabase state, Pages configuration, Fantrax state, opt-in state, manifest, audit record, roster, ownership, identity, import, metric, or score was changed. Gate 4 remains blocked, and a future exact ten-player write requires separate architect authorization after harness implementation and read-only hosted acceptance.
+
+## V5.4.6E Gate 4D Deterministic Acceptance Harness Implementation
+
+### Outcome
+
+- Date: 2026-08-09 (America/Chicago). Implementation began from clean `feature/manager-intelligence` at local and remote commit `bcac286ed6b0320b59d204409a5e0159dde9edfa`.
+- Status: implementation checkpoint complete locally and stopped uncommitted/unpushed for architect review, as required. Gate 4 remains blocked and no synchronization authority was exercised.
+- The normal V5 roster-sync apply sequence now calls one shared production coordinator. The deterministic harness delegates its only possible player-write call to that same coordinator; it contains no raw Supabase query, alternate identity matcher, alternate manifest implementation, or copied grouped-write predicate.
+- The harness obtains authentication from the canonical authenticated repository and requires it to agree with canonical `appState`; it reads the active league from that same state, requires the exact Reddit Phanatics UUID/name, reads audit history through the authenticated audit repository, and fetches both previews through the existing public-preview service.
+- Checkpoints are fail-closed and expose versioned, timestamped, serializable evidence with prerequisite digests and `PASS`, `FAIL`, or `UNAVAILABLE` status. Audit query failure remains unavailable rather than becoming zero.
+
+### Implemented Boundaries
+
+- Implemented ordered checkpoints for authenticated identity, active league, audit baseline, Gate A, Preview A, exactly-ten candidate review, protected baseline, observed opt-in transition, explicit Preview A invalidation, Preview B, repeated Gate B, canonical manifest-v2/digest, immediate pre-write evidence, exact-digest human confirmation, one-call persistence, audit outcomes, protected comparison, replay rejection, and opt-in disablement verification.
+- Candidate eligibility is delegated to `fantraxRosterSyncService.js`; the harness rejects any count other than exactly ten and binds the Preview B projection to the exact Preview A-reviewed UUID set. There is no candidate discovery, substitution, smaller fallback, batch splitting, retry loop, release path, ownership write, or fuzzy matching path.
+- Preview A is removed from harness state at the release transition. Only Preview B can build the canonical manifest. Changed candidate projections, season/period failure, release signature drift, identity failure, stale preview evidence, or confirmation-digest mismatch stops before the coordinator.
+- Persistence defaults to disabled. Even with separately supplied future execution authority, it requires the exact human confirmation digest and consumes a one-call latch before entering the shared coordinator. The coordinator repeats the caller guard before any audit lookup/creation, again after durable preparation, and before every guarded write group.
+- Added a compact read-only acceptance-mode view, available only via explicit `?gate4Acceptance=1` entry. It uses canonical app state and displays the checkpoint chain, exact candidates, manifest digest, protected evidence, and human pause. This implementation checkpoint exposes no form or mutation control.
+- Existing manifest-v1 default-tier recovery remains in the shared coordinator. Expanded manifests remain v2/cap-10 and use the accepted audit repository/database boundaries. RLS, actor stamping, lifecycle, replay, cap, migration, and protected-field behavior were not changed.
+
+### Files Changed
+
+- `v5/js/services/fantraxSyncCoordinator.js` — shared canonical prepare/apply/audit coordinator used by the normal UI and harness.
+- `v5/js/services/fantraxGate4AcceptanceHarness.js` — deterministic fail-closed checkpoint state machine, evidence/digest handling, human latch, and disabled-by-default one-call boundary.
+- `v5/js/views/fantraxGate4AcceptanceView.js` — compact read-only human-review surface.
+- `v5/js/main.js` — normal sync now delegates to the coordinator; explicit acceptance-mode view entry added.
+- `v5/js/state/appState.js` — unavailable/default read-only Gate 4 acceptance artifact state.
+- `tests/v5FantraxGate4AcceptanceHarness.test.mjs` — focused harness/coordinator regression coverage.
+- `tests/v5FantraxSyncAudit.test.mjs` — existing audit static assertions follow the moved shared orchestration without changing their safety intent.
+- `docs/NEXT_TASK_RESULT.md` — this implementation and validation record.
+
+### Validation
+
+- Focused command covering Gate 4D, public preview, roster sync, season context, audit, team identity, Data Health, and authentication: 8 of 8 test files passed.
+- Complete sorted PowerShell loop executing every `tests/*.test.mjs` file with Node: 36 of 36 test files passed.
+- `git diff --check`: passed with no whitespace errors.
+- Focused coverage proves persistence is unavailable by default, cannot consume the latch while disabled, requires exact-digest human arming, can call the production coordinator only once, rejects an 11th candidate, invalidates Preview A, rejects changed Preview B projections, obtains preview/audit evidence from canonical dependencies, and runs the immediate guard before any audit lookup or creation.
+- Hosted read-only acceptance was not run because this implementation checkpoint explicitly prohibits deployment. The `docs/NEXT_TASK.md` final definition still requires a later separately authorized read-only hosted acceptance before Gate 4 can proceed; this is an outstanding acceptance step, not an implementation success claim.
+
+### Safety And Repository State
+
+- No GitHub Pages or other deployment change, migration creation/application, production Fantrax preview, expanded opt-in change, audit attempt/item creation, roster synchronization, import, ownership/identity repair, manual-override change, score recalculation, or unrelated cloud read/write was performed.
+- No files were staged, committed, or pushed. Historical Gate 4 failure and retry evidence above remains intact.
+- No repository/schema/authorization contradiction was found. The apparent hosted-acceptance item in the planned definition of done is intentionally deferred because the current architect instruction expressly prohibits deployment and requires stopping for review before commit/push.
+
+### Architect Checkpoint Review
+
+- Final review confirmed `fantraxSyncCoordinator.js` is the sole owner of durable attempt preparation/recovery, terminal replay filtering, applying transition, guarded grouped player write, item outcomes, and attempt finalization. Both normal `main.js` synchronization and the Gate 4 harness call `executeReviewedFantraxSync`; neither caller retains duplicate persistence orchestration.
+- The harness initializes with persistence disabled unless a later caller is constructed with explicit authority. State is in-memory only, so load/reload is unarmed. Arming now requires both the exact composite human-review digest and the exact current canonical manifest-v2 digest.
+- Every checkpoint recomputation invalidates downstream confirmation. Immediately before the one permitted coordinator invocation, the harness independently recomputes the canonical manifest digest, confirms manifest version 2, rechecks the authenticated repository user, and compares the armed live-context digest covering league, release/opt-in setting, period, external league, preview timestamp, season comparison, and exact candidate UUIDs. Any drift clears the arm before persistence.
+- The one-call latch is set before invoking the coordinator. It cannot retry or automatically re-arm after either success or failure; both outcomes clear the armed state, and a failed coordinator invocation consumes the latch. Rendering and acceptance navigation expose no form, submit control, mutation action, or persistence event.
+- Static review confirmed the harness contains no raw Supabase `.from` call, service-role path, token/cookie/localStorage input, identity fallback, or direct audit/player mutation. Normal V5 retains its existing release, season, Current-period, stale-preview, expected-owner, current-status, manual-provenance, recovery, summary, refresh, and Data Health behavior around the extracted coordinator.
+- Final checkpoint validation passed the focused Gate 4D test, all 8 focused Fantrax/audit/Data Health/auth files, the full 36-file standalone suite, and `git diff --check`. No deployment or production/cloud operation occurred.

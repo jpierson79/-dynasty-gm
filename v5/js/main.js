@@ -5,7 +5,7 @@ import { loadLeagueOverview } from "./services/cloudDataService.js?v5-4-6e-gate4
 import { runDataHealth } from "./services/dataHealthService.js?v5-4-6e-gate4a-audit-visibility";
 import { runWithDataHealthTimeout } from "./services/dataHealthExecutionService.js?v5-4-6b3-data-health";
 import { buildLiveScoreDiagnosticsForLeagueName } from "./services/liveScoreDiagnosticsService.js";
-import { allPlayers, applyFantraxRosterStatuses, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b2-reviewed-sync";
+import { allPlayers, clearRosterStatusOverrides, positionOptions, rosterByTeam, updateRosterStatuses } from "./repositories/playerRepository.js?v5-4-6b2-reviewed-sync";
 import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/playerIntelligenceRepository.js";
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
@@ -22,8 +22,8 @@ import { setPendingTeamMapping, teamMappingSaveRows, validatePendingTeamMappings
 import { saveFantraxTeamMappings } from "./repositories/teamRepository.js?v5-4-6a-team-identity";
 import { leagueById, memberships, saveFantraxSeasonContext } from "./repositories/leagueRepository.js?v5-4-6c-season";
 import { clearFantraxPendingReviews, fantraxSeasonWriteGuard, reviewedFantraxSeasonSettings, validateFantraxSeasonReview } from "./services/fantraxSeasonContextService.js?v5-4-6c-season";
-import { canonicalFantraxSyncManifest, canonicalFantraxSyncManifestV1, fantraxSyncAttemptStatus, fantraxSyncManifestDigest, fantraxSyncManifestDigestV1, fantraxSyncOutcomeRows, pendingFantraxSyncUpdates, validateFantraxSyncManifest, validatePreparedFantraxSyncAttempt } from "./services/fantraxSyncAuditService.js?v5-4-6e-opt-in";
-import { finalizeFantraxSyncAttempt, findFantraxSyncAttempt, listFantraxSyncAttempts, markFantraxSyncAttemptApplying, prepareFantraxSyncAttempt, recordFantraxSyncOutcomes } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6e-opt-in";
+import { listFantraxSyncAttempts } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6e-opt-in";
+import { executeReviewedFantraxSync } from "./services/fantraxSyncCoordinator.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
@@ -34,6 +34,7 @@ import { renderTeamsManagers } from "./views/teamsManagersView.js";
 import { renderImports } from "./views/importsView.js";
 import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4-6e-gate4a-audit-visibility";
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
+import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
 const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false};
 let dashboardOverview={dashboardStats:null};
@@ -212,28 +213,11 @@ async function persistReviewedFantraxRosterStatuses(){
   try{
     const leagueId=appState.activeLeague.id,seasonContext=preview.data?.seasonContextComparison?.observed,previewFetchedAt=preview.data?.fetchedAt,externalLeagueId=preview.externalLeagueId;
     const manifestInput={leagueId,period:preview.period,seasonContext,updates:validation.updates,releaseTier:releasePolicy.releaseTier,effectiveCap:releasePolicy.effectiveCap};
-    let manifest=canonicalFantraxSyncManifest(manifestInput),manifestValidation=validateFantraxSyncManifest(manifest);
-    if(!manifestValidation.valid)throw new Error(manifestValidation.errors.join(" "));
-    let digest=await fantraxSyncManifestDigest(manifestInput),attempt=await findFantraxSyncAttempt(leagueId,digest);
-    if(!attempt&&releasePolicy.releaseTier==="CONTROLLED_3"){
-      const legacyManifest=canonicalFantraxSyncManifestV1(manifestInput),legacyDigest=await fantraxSyncManifestDigestV1(manifestInput),legacyAttempt=await findFantraxSyncAttempt(leagueId,legacyDigest);
-      if(legacyAttempt){manifest=legacyManifest;digest=legacyDigest;attempt=legacyAttempt}
-    }
-    if(!attempt)attempt=await prepareFantraxSyncAttempt(leagueId,{digest,manifest,allowCreate:!releasePolicy.recoveryOnly});
-    const durableValidation=validatePreparedFantraxSyncAttempt(attempt,manifest,digest);
-    if(!durableValidation.valid)throw new Error(durableValidation.errors.join(" "));
-    const remaining=pendingFantraxSyncUpdates(manifest,attempt.fantrax_sync_attempt_items||[]);
-    if(!remaining.length)throw new Error("This reviewed Fantrax synchronization manifest already has terminal outcomes and cannot be replayed.");
-    await markFantraxSyncAttemptApplying(leagueId,attempt.id);
     const repeatGuard=()=>{
       const currentPreview=appState.fantraxPreview,currentRelease=fantraxRosterSyncReleasePolicy(appState.activeLeague),currentSeason=fantraxSeasonWriteGuard(currentPreview.data?.seasonContextComparison),currentPeriod=fantraxRosterSyncPeriodGuard(currentPreview.period),stale=currentPreview.data?.fetchedAt!==previewFetchedAt||currentPreview.externalLeagueId!==externalLeagueId||appState.activeLeague?.id!==leagueId;
       if(!currentRelease.valid||fantraxRosterSyncReleaseSignature(currentRelease)!==releaseSignature||!currentSeason.valid||!currentPeriod.valid||stale)throw new Error(currentRelease.error||currentSeason.error||currentPeriod.error||"The Fantrax preview or active league changed after review. Refresh and review again.");
     };
-    const result=await applyFantraxRosterStatuses(leagueId,remaining,{beforeGroup:repeatGuard});
-    const recorded=await recordFantraxSyncOutcomes(leagueId,attempt.id,fantraxSyncOutcomeRows(attempt.id,result));
-    const recordedByPlayer=new Map(recorded.map(item=>[item.player_id,item])),auditItems=(attempt.fantrax_sync_attempt_items||[]).map(item=>recordedByPlayer.get(item.player_id)||item);
-    await finalizeFantraxSyncAttempt(leagueId,attempt.id,fantraxSyncAttemptStatus(auditItems));
-    const summary=fantraxRosterSyncSummary(result);
+    const execution=await executeReviewedFantraxSync({manifestInput,allowCreate:!releasePolicy.recoveryOnly,beforeAttempt:repeatGuard,beforeGroup:repeatGuard}),attempt=execution.attempt,digest=execution.digest,summary=fantraxRosterSyncSummary(execution.result);
     await refreshLeagueData();
     const players=await allPlayers(appState.activeLeague.id),next=await fetchFantraxPublicPreview({externalLeagueId:preview.externalLeagueId,period:preview.period,players,teams:appState.teams,reviewedSeasonContext:appState.activeLeague?.settings?.fantraxSeasonContext});
     const fantraxSyncAttempts=await listFantraxSyncAttempts(leagueId);
@@ -392,7 +376,15 @@ async function renderView(){
     if(appState.fantraxPreview?.data&&appState.fantraxPreview?.selectedTab==="identity")root.querySelector(".panel")?.insertAdjacentHTML("beforeend",renderFantraxTeamIdentityManager(appState.fantraxPreview.data,appState));
   }
   if(appState.view==="settings")setHtml(root,renderSettingsDataHealth(appState));
+  if(appState.view==="gate4Acceptance")setHtml(root,renderFantraxGate4Acceptance(appState));
   bindViewEvents();
+}
+
+function enableAcceptanceModeEntry(){
+  if(new URLSearchParams(location.search).get("gate4Acceptance")!=="1")return;
+  const settingsButton=document.querySelector('[data-view="settings"]');
+  if(!settingsButton||document.querySelector('[data-view="gate4Acceptance"]'))return;
+  settingsButton.insertAdjacentHTML("afterend",'<button class="nav-link" data-view="gate4Acceptance">Gate 4 Acceptance</button>');
 }
 function render(){
   const badge=$("#modeBadge");
@@ -830,6 +822,7 @@ async function bootstrap(){
   }
 }
 subscribe(render);
+enableAcceptanceModeEntry();
 bindShellEvents();
 window.__DYNASTY_V5_SCORE_DIAGNOSTICS__={buildLiveScoreDiagnosticsForLeagueName};
 bootstrap();

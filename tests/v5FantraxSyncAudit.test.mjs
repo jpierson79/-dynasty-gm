@@ -51,6 +51,7 @@ const manifestV2Migration=fs.readFileSync(new URL("../supabase/migrations/011_fa
 const repository=fs.readFileSync(new URL("../v5/js/repositories/fantraxSyncAuditRepository.js",import.meta.url),"utf8");
 const playerRepository=fs.readFileSync(new URL("../v5/js/repositories/playerRepository.js",import.meta.url),"utf8");
 const main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8");
+const coordinator=fs.readFileSync(new URL("../v5/js/services/fantraxSyncCoordinator.js",import.meta.url),"utf8");
 assert.match(migration,/unique \(league_id, manifest_digest\)/i);
 assert.match(migration,/actor_user_id uuid not null[^\n]*default auth\.uid\(\)/i);
 assert.match(migration,/new\.started_at := null|new\.started_at:=null/i);
@@ -90,15 +91,15 @@ assert.match(repository,/\.eq\("manifest_digest",digest\)/,"same manifest resolv
 assert.match(repository,/release_tier:manifest\.releaseTier,batch_limit:manifest\.effectiveCap/);
 assert.match(repository,/manifest\?\.rows\?\.length>cap/,"repository refuses manifests above the recognized durable cap");
 assert.match(repository,/if\(!allowCreate\)throw new Error/,"disabled opt-in cannot create a new expanded attempt after lookup");
-assert.match(main,/releasePolicy\.releaseTier==="CONTROLLED_3"[\s\S]*fantraxSyncManifestDigestV1[\s\S]*if\(legacyAttempt\)/,"only the default tier may recover an exact manifest-v1 attempt");
+assert.match(coordinator,/manifestInput\?\.releaseTier==="CONTROLLED_3"[\s\S]*fantraxSyncManifestDigestV1[\s\S]*if\(legacyAttempt\)/,"only the default tier may recover an exact manifest-v1 attempt");
 assert.match(repository,/\.in\("outcome",\["PENDING","FAILED"\]\)/,"only pending or failed rows can receive a recovery outcome");
 assert.doesNotMatch(repository,/\.delete\(/,"audit evidence is not deleted by the browser repository");
 assert.match(playerRepository,/await beforeGroup\(group\)/,"every write group repeats caller guards");
-assert.match(main,/pendingFantraxSyncUpdates/);
+assert.match(coordinator,/pendingFantraxSyncUpdates/);
 assert.match(main,/await loadFantraxSyncAudit\(leagueId\)/,"league refresh loads durable audit history before Data Health renders");
 assert.doesNotMatch(main,/listFantraxSyncAttempts\([^\n]+\.catch\(\(\)=>\[\]\)/,"audit query failures are not converted to a literal zero");
 assert.match(main,/fantraxSeasonWriteGuard\(currentPreview\.data\?\.seasonContextComparison\)/);
 assert.match(main,/fantraxRosterSyncPeriodGuard\(currentPreview\.period\)/);
-assert.match(main,/recordFantraxSyncOutcomes/);
-assert.match(main,/finalizeFantraxSyncAttempt/);
+assert.match(coordinator,/recordFantraxSyncOutcomes/);
+assert.match(coordinator,/finalizeFantraxSyncAttempt/);
 console.log("V5 Fantrax synchronization audit tests passed");
