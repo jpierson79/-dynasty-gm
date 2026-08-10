@@ -1,6 +1,6 @@
 import { appState } from "../state/appState.js?v5-4-6e-gate4c1-auth-state";
 import { createGate4AcceptanceHarness, GATE4_CANDIDATE_COUNT, GATE4_EXPECTED_LEAGUE_ID } from "./fantraxGate4AcceptanceHarness.js";
-import { controlledFantraxRosterSelection, fantraxRosterSyncPeriodGuard, validateControlledFantraxStatusUpdates } from "./fantraxRosterSyncService.js?v5-4-6e-opt-in";
+import { controlledFantraxRosterSelection, fantraxRosterSyncPeriodGuard, fantraxStatusUpdateExclusionReason, validateControlledFantraxStatusUpdates } from "./fantraxRosterSyncService.js?v5-4-6e-gate4d3b-conflicts";
 import { fantraxSeasonWriteGuard } from "./fantraxSeasonContextService.js?v5-4-6c-season";
 import { allPlayers } from "../repositories/playerRepository.js?v5-4-6b2-reviewed-sync";
 import { captureFantraxProtectedBaseline } from "./fantraxProtectedBaselineService.js";
@@ -10,24 +10,20 @@ const clean=value=>String(value??"").trim();
 const initial=()=>({stage:"NOT_STARTED",status:"NOT_STARTED",error:"",harness:null,preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,artifact:null,persistenceEnabled:false,armed:false});
 function errorStatus(error){const message=String(error?.message||error||"Gate 4 review failed.");return {message,status:/permission|row.level security|not authorized|42501/i.test(message)?"PERMISSION_BLOCKED":/unavailable|network|timeout/i.test(message)?"UNAVAILABLE":"QUERY_FAILED"}}
 function exclusionReason(row){
-  if(row.playerIdentityResult!=="MATCHED")return "Player identity is not an exact authoritative match.";
-  if(row.teamIdentityResult!=="MATCHED")return "Team identity is not an exact persisted match.";
-  if(row.activeManualOverride)return "Manual roster-status override is active.";
-  if(row.ownershipDifference||row.fantraxConflict)return "Ownership or override conflict requires review.";
-  if(clean(row.normalizedRosterStatus).toUpperCase()==="UNCLASSIFIED")return "Fantrax status is unknown or unclassified.";
-  if(row.futureSyncRecommendation!=="APPLY_FANTRAX_STATUS")return row.futureSyncRecommendation==="RELEASE"?"Release/removal is prohibited.":"Row is not an eligible status-only update.";
-  return "";
+  return fantraxStatusUpdateExclusionReason(row);
 }
 export function classifyGate4PreviewCandidates(rows=[]){return rows.map(row=>({...row,gate4ExclusionReason:exclusionReason(row)}))}
 
 export function createFantraxGate4AcceptanceController({artifactCommit="",dependencies={}}={}){
   const d={appState,allPlayers,captureFantraxProtectedBaseline,controlledFantraxRosterSelection,createGate4AcceptanceHarness,fantraxRosterSyncPeriodGuard,fantraxSeasonWriteGuard,validateControlledFantraxStatusUpdates,...dependencies};
+  d.publishPreviewObservation=d.publishPreviewObservation||((preview)=>{d.appState.fantraxPreview=preview});
+  d.invalidatePreviewObservation=d.invalidatePreviewObservation||(()=>{d.appState.fantraxPreview={...(d.appState.fantraxPreview||{}),data:null,loading:false,error:""}});
   let state=initial();
   const publish=patch=>state={...state,...patch,persistenceEnabled:false,armed:false};
   const fail=error=>{const result=errorStatus(error);return publish({status:result.status,error:result.message,artifact:null})};
   return {
     get state(){return state},
-    reset(reason=""){state={...initial(),error:reason};return state},
+    reset(reason=""){d.invalidatePreviewObservation();state={...initial(),error:reason};return state},
     async start(){
       this.reset();publish({stage:"Gate A",status:"RUNNING"});
       try{
@@ -48,8 +44,11 @@ export function createFantraxGate4AcceptanceController({artifactCommit="",depend
         const reviewed=d.appState.activeLeague?.settings?.fantraxSeasonContext,externalLeagueId=clean(reviewed?.externalLeagueId),players=await d.allPlayers(GATE4_EXPECTED_LEAGUE_ID),teams=d.appState.teams||[];
         if(!/^[A-Za-z0-9]{16}$/.test(externalLeagueId))return publish({status:"BLOCKED",error:"The reviewed Fantrax external league ID is unavailable or invalid."});
         const checkpoint=await state.harness.fetchPreviewA({externalLeagueId,players,teams,reviewedSeasonContext:reviewed});if(checkpoint.status!=="PASS")return publish({status:"BLOCKED",error:checkpoint.reasons.join(" ")});
-        const preview=state.harness.state.previewA,period=d.fantraxRosterSyncPeriodGuard(preview.period),season=d.fantraxSeasonWriteGuard(preview.data?.seasonContextComparison);
+        const preview=state.harness.state.previewA;
+        if(clean(preview.error))return fail(preview.error);
+        const period=d.fantraxRosterSyncPeriodGuard(preview.period),season=d.fantraxSeasonWriteGuard(preview.data?.seasonContextComparison);
         if(!period.valid||!season.valid)return publish({status:"BLOCKED",error:period.error||season.error});
+        d.publishPreviewObservation(preview);
         const classified=classifyGate4PreviewCandidates(preview.data?.rosterItems||[]),eligibleRows=classified.filter(row=>!row.gate4ExclusionReason),excludedRows=classified.filter(row=>row.gate4ExclusionReason);
         return publish({stage:"Candidate Review",status:"PASS",preview,previewAGateB:{status:"PASS",period:period.period||"CURRENT",seasonStatus:preview.data?.seasonContextComparison?.status||"MATCH"},eligibleRows,excludedRows,artifact:state.harness.reviewArtifact()});
       }catch(error){return fail(error)}

@@ -32,6 +32,9 @@ assert.match(html,/Public API preview only/);assert.match(html,/writes are block
 const health=fantraxPreviewHealthChecks({data});
 assert.equal(health.find(row=>row.name==="Fantrax Season Context Review").status,"WARNING");
 assert.equal(health.find(row=>row.name==="Fantrax Team And Status Writes").status,"WARNING");
+const matchedHealth=fantraxPreviewHealthChecks({data:{...data,seasonContextComparison:{...compareFantraxSeasonContexts(observed,observed),status:"MATCH",writeAllowed:true}}});
+assert.equal(matchedHealth.find(row=>row.name==="Fantrax Season Context Review").status,"PASS","Data Health consumes the shared canonical Preview A season comparison");
+assert.equal(fantraxPreviewHealthChecks({data:null}).find(row=>row.name==="Fantrax Season Context Review").status,"FAIL","Data Health remains fail-closed after shared preview invalidation");
 
 const repository=fs.readFileSync(new URL("../v5/js/repositories/leagueRepository.js",import.meta.url),"utf8"),main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8"),view=fs.readFileSync(new URL("../v5/js/views/fantraxPreviewView.js",import.meta.url),"utf8");
 assert.match(repository,/update\(\{settings\}\)\.eq\("id",leagueId\)/,"reviewed settings write is league scoped and field limited");

@@ -29,6 +29,19 @@ export function fantraxRosterSyncPeriodGuard(period=""){
   return selectedPeriod?{valid:false,error:`Roster-status synchronization is blocked for historical scoring period ${selectedPeriod}. Refresh the Current preview before reviewing updates.`}:{valid:true,error:""};
 }
 
+export function fantraxStatusUpdateExclusionReason(row={}){
+  const name=row.matchedPlayer?.name||row.fantraxApiPlayerId||"Fantrax roster row";
+  if(row.playerIdentityResult!=="MATCHED")return `Player identity is not exact for ${name}.`;
+  if(row.teamIdentityResult!=="MATCHED")return `Team identity is not persisted for ${name}.`;
+  if(clean(row.currentOwnerTeamId)!==clean(row.matchedTeamUuid)||row.ownershipDifference)return `Cloud ownership differs from Fantrax for ${name}.`;
+  if(row.activeManualOverride||clean(row.currentStatusSource).toUpperCase()==="MANUAL"||row.futureSyncRecommendation==="PRESERVE_MANUAL_OVERRIDE")return `Manual override is active for ${name}.`;
+  if(!["ACTIVE","RESERVE","IL","MINORS"].includes(clean(row.normalizedRosterStatus).toUpperCase()))return `Unsupported Fantrax roster status for ${name}.`;
+  if(row.futureSyncRecommendation==="RELEASE")return `Release/removal is prohibited for ${name}.`;
+  if(row.futureSyncRecommendation==="REVIEW_CONFLICT")return `Fantrax status conflict requires review for ${name}.`;
+  if(row.futureSyncRecommendation!=="APPLY_FANTRAX_STATUS")return `${name} is not an eligible status-only update.`;
+  return "";
+}
+
 export function reviewedFantraxStatusUpdates(rosterItems=[]){
   return rosterItems.filter(row=>row.futureSyncRecommendation==="APPLY_FANTRAX_STATUS").map(row=>({
     id:clean(row.matchedPlayerUuid),

@@ -105,7 +105,8 @@ async function refreshLeagueData(){
   clearErrors();
   try{
     const refreshedLeague=await leagueById(leagueId),nextReleaseSignature=fantraxRosterSyncReleaseSignature(fantraxRosterSyncReleasePolicy(refreshedLeague));
-    setState({activeLeague:refreshedLeague,fantraxPreview:previousReleaseSignature===nextReleaseSignature?appState.fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({error:"Fantrax synchronization release configuration changed. Refresh the preview before reviewing updates."}))});
+    if(previousReleaseSignature!==nextReleaseSignature)resetGate4Acceptance("Fantrax synchronization release configuration changed.");
+    setState({activeLeague:refreshedLeague,fantraxPreview:previousReleaseSignature===nextReleaseSignature?appState.fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,error:"Fantrax synchronization release configuration changed. Refresh the preview before reviewing updates."}))});
     dashboardOverview=await loadLeagueOverview(leagueId);
     await loadFantraxSyncAudit(leagueId);
     const membershipRows=await memberships(leagueId).catch(()=>[]);
@@ -802,7 +803,7 @@ function bindShellEvents(){
     }
   });
   document.body.addEventListener("click",async event=>{
-    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline"});render()}
+    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
@@ -820,6 +821,7 @@ function bindShellEvents(){
   document.body.addEventListener("change",async event=>{
     if(event.target.id==="leagueSelect"){
       resetGate4Acceptance("Active league changed.");
+      setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});
       await selectLeague(event.target.value);
       await refreshLeagueData();
       render();

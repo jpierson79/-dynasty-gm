@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {controlledFantraxRosterSelection,fantraxRosterSyncPeriodGuard,fantraxRosterSyncReleasePolicy,fantraxRosterSyncReleaseSignature,fantraxRosterSyncSkipReason,fantraxRosterSyncSummary,reviewedFantraxStatusUpdates,validateControlledFantraxStatusUpdates,validateReviewedFantraxStatusUpdates} from "../v5/js/services/fantraxRosterSyncService.js";
+import {controlledFantraxRosterSelection,fantraxRosterSyncPeriodGuard,fantraxRosterSyncReleasePolicy,fantraxRosterSyncReleaseSignature,fantraxRosterSyncSkipReason,fantraxRosterSyncSummary,fantraxStatusUpdateExclusionReason,reviewedFantraxStatusUpdates,validateControlledFantraxStatusUpdates,validateReviewedFantraxStatusUpdates} from "../v5/js/services/fantraxRosterSyncService.js";
 import {renderFantraxPreview} from "../v5/js/views/fantraxPreviewView.js";
 
 const eligible={futureSyncRecommendation:"APPLY_FANTRAX_STATUS",matchedPlayerUuid:"p1",matchedPlayer:{name:"Alpha"},matchedTeamUuid:"team-1",currentOwnerTeamId:"team-1",currentRosterStatus:"RESERVE",normalizedRosterStatus:"ACTIVE",fantraxApiPlayerId:"F1",fantraxTeamId:"T1",playerIdentityResult:"MATCHED",teamIdentityResult:"MATCHED",activeManualOverride:false};
+assert.equal(fantraxStatusUpdateExclusionReason({...eligible,rosterStatusDifference:true,fantraxConflict:true}),"","an ordinary canonical APPLY status difference remains eligible despite the aggregate diagnostic flag");
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,futureSyncRecommendation:"REVIEW_CONFLICT"}),/conflict/i);
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,futureSyncRecommendation:"PRESERVE_MANUAL_OVERRIDE",activeManualOverride:true}),/manual override/i);
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,playerIdentityResult:"DUPLICATE"}),/identity/i);
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,normalizedRosterStatus:"UNCLASSIFIED",futureSyncRecommendation:"REVIEW_CONFLICT"}),/unsupported/i);
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,futureSyncRecommendation:"RELEASE"}),/release/i);
+assert.match(fantraxStatusUpdateExclusionReason({...eligible,ownershipDifference:true,futureSyncRecommendation:"REVIEW_CONFLICT"}),/ownership/i);
 const manual={...eligible,matchedPlayerUuid:"p2",matchedPlayer:{name:"Manual"},futureSyncRecommendation:"PRESERVE_MANUAL_OVERRIDE",activeManualOverride:true};
 const unknown={...eligible,matchedPlayerUuid:"p3",matchedPlayer:{name:"Unknown"},futureSyncRecommendation:"REVIEW_CONFLICT",normalizedRosterStatus:"UNCLASSIFIED"};
 assert.deepEqual(reviewedFantraxStatusUpdates([eligible,manual,unknown]),[{id:"p1",name:"Alpha",currentRosterStatus:"RESERVE",roster_status:"ACTIVE",expectedOwnerTeamId:"team-1",fantraxApiPlayerId:"F1",fantraxTeamId:"T1"}]);
