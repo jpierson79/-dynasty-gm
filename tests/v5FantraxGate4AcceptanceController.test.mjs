@@ -13,10 +13,11 @@ rosterItems.push({...eligible(12),matchedPlayer:{name:"Jared Jones"},playerIdent
 rosterItems.push({...eligible(13),activeManualOverride:true,futureSyncRecommendation:"PRESERVE_MANUAL_OVERRIDE"});
 rosterItems.push({...eligible(14),normalizedRosterStatus:"UNCLASSIFIED",futureSyncRecommendation:"REVIEW_CONFLICT"});
 const previewData={fetchedAt:"preview-a",seasonContextComparison:comparison,rosterItems};
+const canonicalPreviewState={data:previewData,loading:false,error:"",status:"READY"};
 const fakeState={authUser:{id:"user-1",email:"owner@example.com"},activeLeague:league,teams:[{id:teamUuid,name:"Exact Team",fantrax_team_id:"team000000000001"}],fantraxSyncAttempts:[]};
 let persistenceCalls=0,previewCalls=0,auditCalls=0;
 const baseline={players:{count:11,digest:"players"},teams:{count:1,digest:"teams"},managers:{count:1,digest:"managers"},metrics:{count:0,digest:"metrics"},scores:{count:0,digest:"scores"},auditAttempts:{count:0,digest:"attempts"},auditItems:{count:0,digest:"items"}};
-const controller=createFantraxGate4AcceptanceController({artifactCommit:"exact",dependencies:{appState:fakeState,allPlayers:async()=>rosterItems.map(row=>row.matchedPlayer),captureFantraxProtectedBaseline:async()=>baseline,harnessDependencies:{appState:fakeState,currentUser:async()=>fakeState.authUser,listFantraxSyncAttempts:async()=>{auditCalls++;return []},fetchFantraxPublicPreview:async()=>{previewCalls++;return previewData},executeReviewedFantraxSync:async()=>{persistenceCalls++;throw new Error("must remain unreachable")}}}});
+const controller=createFantraxGate4AcceptanceController({artifactCommit:"exact",dependencies:{appState:fakeState,allPlayers:async()=>rosterItems.map(row=>row.matchedPlayer),captureFantraxProtectedBaseline:async()=>baseline,harnessDependencies:{appState:fakeState,currentUser:async()=>fakeState.authUser,listFantraxSyncAttempts:async()=>{auditCalls++;return []},fetchFantraxPublicPreview:async()=>{previewCalls++;return canonicalPreviewState},executeReviewedFantraxSync:async()=>{persistenceCalls++;throw new Error("must remain unreachable")}}}});
 
 assert.deepEqual(controller.state.stage,"NOT_STARTED");
 assert.equal(controller.state.persistenceEnabled,false);

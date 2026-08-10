@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import {normalizeFantraxResponse,normalizeFantraxRosterStatus,validExternalLeagueId,FANTRAX_OPERATIONS} from "../supabase/functions/_shared/fantraxPreviewCore.js";
-import {buildPlayerIdentityIndex,buildTeamIdentityIndex,compareFantraxPreview,filterRosterPreview,playerIdentityResult,teamIdentityResult,unwrapStoredFantraxId} from "../v5/js/services/fantraxPublicPreviewService.js";
+import {buildPlayerIdentityIndex,buildTeamIdentityIndex,compareFantraxPreview,filterRosterPreview,normalizeFantraxPreviewState,playerIdentityResult,teamIdentityResult,unwrapStoredFantraxId} from "../v5/js/services/fantraxPublicPreviewService.js";
 
 const fetchedAt="2026-08-02T12:00:00.000Z";
 assert.deepEqual(Object.keys(FANTRAX_OPERATIONS).sort(),["draft-picks","draft-results","league-info","matchup-scores","standings","team-rosters"].sort());
@@ -70,6 +70,20 @@ const responses={
   "draft-results":{httpStatus:200,schemaValid:true,data:draftResults}
 };
 const preview=compareFantraxPreview(responses,{players:cloudPlayers,teams:cloudTeams});
+const canonicalPayload={...preview,seasonContextComparison:{status:"MATCH",writeAllowed:true,observed:{seasonYear:2026}}};
+const rawState=normalizeFantraxPreviewState(canonicalPayload);
+assert.equal(rawState.data,canonicalPayload,"a raw canonical payload is normalized to preview state");
+const wrappedState=normalizeFantraxPreviewState({...rawState,error:"transport warning",status:"PARTIAL"});
+assert.equal(wrappedState.data,canonicalPayload,"an accepted once-wrapped response retains one canonical payload");
+assert.equal(wrappedState.error,"transport warning","error metadata survives normalization");
+assert.equal(wrappedState.status,"PARTIAL","status metadata survives normalization");
+const doubleWrappedState=normalizeFantraxPreviewState({requestId:"request-1",data:wrappedState});
+assert.equal(doubleWrappedState.data,canonicalPayload,"the hosted double-wrapped defect is normalized exactly once to canonical state");
+assert.equal(doubleWrappedState.error,"transport warning","nested error metadata is not stripped");
+assert.equal(doubleWrappedState.requestId,"request-1","outer transport metadata is preserved");
+assert.equal(doubleWrappedState.data.seasonContextComparison.status,"MATCH","season context remains available after normalization");
+assert.throws(()=>normalizeFantraxPreviewState(null),/unavailable or malformed/);
+assert.throws(()=>normalizeFantraxPreviewState({data:{missing:"season context"},error:"query failed"}),/unavailable or malformed/);
 assert.equal(preview.rosterItems.length,2);
 assert.equal(preview.rosterItems[0].playerIdentityResult,"MATCHED");
 assert.equal(preview.rosterItems[0].teamIdentityResult,"MATCHED");

@@ -1237,3 +1237,54 @@
 - Protected evidence uses authenticated read-only repositories for players, teams, managers, metrics, scores, audit attempts, and audit items. Rendering, navigation, candidate selection, and capture always publish `persistenceEnabled:false` and `armed:false`; the controller cannot create a manifest eligible for execution or an audit attempt.
 - Existing normal Fantrax synchronization remains on its previously accepted `fantraxSyncCoordinator.js` path and was not changed by Gate 4D-2. Final validation passed both dedicated controller/harness tests, all 9 focused Gate 4D/Fantrax/audit/Data Health/auth files, the complete 37-file standalone suite, and `git diff --check`.
 - Gate 4D-2 implementation checkpoint commit: `b28b0f44622b0ed1594d9a01a7c0846cf86460e0` (`Add production Fantrax acceptance controller`). Push succeeded to `origin/feature/manager-intelligence` (`d901fd9..b28b0f4`).
+
+## V5.4.6E Gate 4D-3 Hosted Read-Only Controller Acceptance
+
+### Hosted Artifact And Gate A Evidence
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed a clean `feature/manager-intelligence` worktree with local HEAD and `origin/feature/manager-intelligence` both at exact commit `33bbc24fbae00723a8ecf8e3c8b75dc94b656d3b`.
+- GitHub Pages build `1142185569` published that exact commit successfully with status `built` in 64,342 ms. The hosted acceptance URL used the production `?gate4Acceptance=1` entry and an explicit commit marker.
+- V5 exited Loading and restored the normal authenticated session for `joshua.pierson@yahoo.com`. Reddit Phanatics was selected and displayed as `Cloud - Reddit Phanatics`. Browser inspection remained reliable and the console contained no errors or warnings throughout the inspected path.
+- After the normal authenticated league refresh, both the application audit surface and controller Gate A showed the authoritative 3 attempts / 8 items baseline: one completed expanded four-item attempt, one partial default attempt with two recoverable items, and one partial default attempt with two terminal items.
+- The production controller instantiated the real harness through the visible production UI. `Start Gate 4 Acceptance Review` advanced authenticated user, active league, audit baseline, and Gate A to `PASS` without an alternate or injected script path. The harness remained `DISABLED / UNARMED` and exposed no persistence control.
+
+### Preview A Fail-Closed Stop And Root Cause
+
+- Gate 4D-3 did **not** pass. The visible `Fetch Fresh Preview A` action reached the canonical preview dependency but stopped fail-closed with `Fantrax writes are blocked: season context is unavailable or unreviewed.` The controller entered `BLOCKED`; Gate B, eligible-candidate review, exact-ten selection, protected baseline capture, and the reviewed read-only artifact were therefore not reached.
+- Repository inspection identified the exact production integration defect. The canonical `fetchFantraxPublicPreview` service returns the preview state wrapper produced by `buildPreviewState(preview)`, whose canonical preview payload is in `.data`. The harness production dependency wraps that returned state again as the `data` supplied to `recordPreviewA`. `recordPreviewA` then searches one level too high for `seasonContextComparison`, so the hosted path effectively places the comparison at `preview.data.data.seasonContextComparison` and reports the reviewed context as unavailable.
+- The controller regression fixture returned raw preview payload rather than the canonical service's wrapped preview state, so the focused tests did not reproduce this hosted module-contract mismatch. This is a concrete application defect; no repair was made because this task authorized hosted read-only acceptance, not implementation.
+- No candidate identity was authorized or selected. Consequently no claim is made for hosted exact-ten selection, duplicate/11th blocking, ambiguous/manual/unknown/release filtering, or repository-backed protected baseline capture. Those required checkpoints remain unaccepted rather than weakened.
+
+### Read-Only Safety, Data Health, And Restoration
+
+- Preview A failure left the harness disabled and unarmed. No expanded opt-in, Preview B, executable manifest, human arm, audit attempt/item, coordinator persistence call, roster synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, or unrelated cloud write occurred.
+- Data Health completed through the normal authenticated UI with 1 failure and 31 warnings. Audit History Availability and Fantrax Release/Cap Consistency remained `PASS`; the single relevant failure was Fantrax Season Context Review, consistent with the controller's failed Preview A state. The Fantrax Sync Audit UI still showed the same 3 attempts / 8 items, confirming production audit history did not change during the run.
+- GitHub Pages was restored to `main` regardless of failure. Restoration build `1142191694` completed successfully with status `built` in 39,840 ms at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`; the Pages API verified source `main`, path `/`, and status `built`.
+
+### Tests And Outcome
+
+- The dedicated Gate 4D controller and harness tests plus focused Fantrax season-context, public-preview, roster-sync, audit, Data Health, authentication, and roster-status-manager tests passed 9 of 9 files.
+- The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed.
+- Status: **Gate 4D-3 failed and is blocked on the proven Preview A service-shape integration defect.** Historical Gate 4 failure evidence remains preserved. Per the task contract, no acceptance commit or push was performed; only this failure evidence record is intentionally dirty.
+
+## V5.4.6E Gate 4D-3A Preview A Canonical Response-Shape Repair
+
+### Repair
+
+- Date: 2026-08-10 (America/Chicago). Work resumed from clean application baseline `33bbc24fbae00723a8ecf8e3c8b75dc94b656d3b` while preserving the uncommitted Gate 4D-3 failure evidence above.
+- The canonical `fetchFantraxPublicPreview` contract is the preview-state object returned by `buildPreviewState`, with the normalized Fantrax payload in its single `.data` property and UI/transport metadata retained on the state object.
+- `normalizeFantraxPreviewState` now provides one shared boundary for raw canonical payloads and accepted wrapped transport states. It reduces the reproduced double-wrapped response to one stable preview-state shape, preserves wrapper error/status and other transport metadata, and rejects unavailable or malformed payloads.
+- Gate 4 Preview A and Preview B now normalize the service response once before recording it. Season/current-period validation continues to read only `preview.data.seasonContextComparison`; no controller or view gained ad hoc `.data.data` handling.
+- The harness service import uses a new response-shape cache token so a later exact hosted artifact cannot silently reuse the older preview-service module.
+
+### Regression Coverage And Safety Review
+
+- Regression coverage includes a raw canonical payload, an accepted once-wrapped preview state, the hosted double-wrap reproduction, retained error/status/outer metadata, available season context after normalization, malformed/missing payload rejection, and production-controller Preview A advancement from the canonical once-wrapped service contract.
+- Normal preview/UI callers retain the existing canonical preview-state contract. Unavailable, permission-blocked, query-failed, and malformed outcomes remain errors rather than genuine empty data. Stale-preview timestamps, Current-period enforcement, reviewed/observed season comparison, exact identity, manual overrides, audit/RLS, manifests, replay, batch caps, and persistence orchestration were not changed.
+- Preview remains read-only; paginated player repository behavior, batched guarded writes, internal player UUIDs, and null MLBAM serialization were not changed.
+- No deployment, production Fantrax preview, expanded opt-in change, Preview B, manifest, audit attempt, synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, or cloud write occurred.
+
+### Validation And Checkpoint
+
+- Dedicated Gate 4D controller/harness, season-context, public-preview, roster-sync, audit, Data Health, and authentication focused validation passed 8 of 8 files.
+- The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. Final `git diff --check` passed.

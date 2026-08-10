@@ -95,6 +95,17 @@ export async function fetchFantraxPublicPreview({externalLeagueId,period,players
 }
 function buildFantraxPreview(responses,context){return compareFantraxPreview(responses,context)}
 export function buildPreviewState(data){return {data,loading:false,error:"",selectedTab:"summary",page:1,pageSize:50,filters:{search:"",teamId:"",sourceStatus:"",normalizedStatus:"",matched:"",ownershipDifference:false,statusDifference:false}}}
+const previewPayload=value=>Boolean(value&&typeof value==="object"&&!Array.isArray(value)&&value.seasonContextComparison&&typeof value.seasonContextComparison==="object");
+export function normalizeFantraxPreviewState(response){
+  if(previewPayload(response))return buildPreviewState(response);
+  if(!response||typeof response!=="object"||Array.isArray(response))throw new Error("Fantrax preview response is unavailable or malformed.");
+  const layers=[];
+  let payload=response;
+  while(!previewPayload(payload)&&payload&&typeof payload==="object"&&!Array.isArray(payload)&&Object.hasOwn(payload,"data")&&layers.length<2){layers.push(payload);payload=payload.data}
+  if(!previewPayload(payload))throw new Error("Fantrax preview response is unavailable or malformed.");
+  const metadata=Object.assign({},...layers.slice().reverse());
+  return {...buildPreviewState(payload),...metadata,data:payload};
+}
 export function filterRosterPreview(rows=[],filters={}){
   const search=upper(filters.search);
   return rows.filter(row=>(!search||upper([row.matchedPlayer?.name,row.fantraxApiPlayerId,row.fantraxTeamName,row.sourcePosition].join(" ")).includes(search))&&(!filters.teamId||row.fantraxTeamId===filters.teamId)&&(!filters.sourceStatus||row.sourceStatus===filters.sourceStatus)&&(!filters.normalizedStatus||row.normalizedRosterStatus===filters.normalizedStatus)&&(!filters.matched||(filters.matched==="matched")===(row.playerIdentityResult==="MATCHED"))&&(!filters.ownershipDifference||row.ownershipDifference)&&(!filters.statusDifference||row.rosterStatusDifference));
