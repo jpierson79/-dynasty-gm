@@ -1288,3 +1288,4 @@
 
 - Dedicated Gate 4D controller/harness, season-context, public-preview, roster-sync, audit, Data Health, and authentication focused validation passed 8 of 8 files.
 - The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. Final `git diff --check` passed.
+- Implementation checkpoint commit: `8b0e8fd7180ed3716fea812fb13c95b110f5fea9` (`Normalize Fantrax preview response shape`). Push succeeded to `origin/feature/manager-intelligence` (`33bbc24..8b0e8fd`).
