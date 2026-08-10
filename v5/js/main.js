@@ -52,13 +52,13 @@ const gate4Controller=gate4AcceptanceMode?createFantraxGate4AcceptanceController
 function publishGate4ControllerState(){
   if(!gate4Controller)return;
   const {harness,...safeState}=gate4Controller.state;
-  setState({gate4Acceptance:{...safeState,persistenceEnabled:false,armed:false}});
+  setState({gate4Acceptance:safeState});
 }
 function resetGate4Acceptance(reason=""){
   if(!gate4Controller)return;
   gate4Controller.reset(reason);
   const {harness,...safeState}=gate4Controller.state;
-  setStateSilently({gate4Acceptance:{...safeState,persistenceEnabled:false,armed:false}});
+  setStateSilently({gate4Acceptance:safeState});
 }
 
 function modeLabel(){
@@ -488,6 +488,13 @@ function bindViewEvents(){
   $("#fetchGate4PreviewA")?.addEventListener("click",async()=>{await gate4Controller?.fetchPreviewA();publishGate4ControllerState()});
   $all("[data-gate4-candidate]").forEach(input=>input.addEventListener("change",event=>{gate4Controller?.toggleCandidate(event.target.dataset.gate4Candidate,event.target.checked);publishGate4ControllerState()}));
   $("#captureGate4ProtectedBaseline")?.addEventListener("click",async()=>{await gate4Controller?.captureProtectedBaseline();publishGate4ControllerState()});
+  $("#enableGate4ExpandedOptIn")?.addEventListener("click",async()=>{await gate4Controller?.enableExpandedOptIn();publishGate4ControllerState()});
+  $("#fetchGate4PreviewB")?.addEventListener("click",async()=>{await gate4Controller?.fetchPreviewB();publishGate4ControllerState()});
+  $("#buildGate4Manifest")?.addEventListener("click",async()=>{await gate4Controller?.buildManifestReview();publishGate4ControllerState()});
+  $("#armGate4ExactDigest")?.addEventListener("click",async()=>{await gate4Controller?.armExactDigest($("#gate4ExactDigest")?.value||"");publishGate4ControllerState()});
+  $("#persistGate4Once")?.addEventListener("click",async()=>{await gate4Controller?.persistOnce();publishGate4ControllerState()});
+  $("#fetchGate4PostWriteAgreement")?.addEventListener("click",async()=>{await gate4Controller?.fetchPostWriteAgreement();publishGate4ControllerState()});
+  $("#disableGate4ExpandedOptIn")?.addEventListener("click",async()=>{await gate4Controller?.disableExpandedOptIn();publishGate4ControllerState()});
   $("#fetchFantraxPreview")?.addEventListener("click",()=>{resetGate4Acceptance("A new Fantrax preview invalidated the Gate 4 review.");loadFantraxPreview()});
   $("#fantraxExternalLeagueId")?.addEventListener("change",event=>{resetGate4Acceptance("Fantrax league configuration changed.");setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:event.target.value.trim(),error:"",selectedTab:"summary",page:1}))})});
   $("#fantraxPeriod")?.addEventListener("change",event=>{resetGate4Acceptance("Fantrax period changed.");setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,period:event.target.value,error:"",selectedTab:"summary",page:1}))})});

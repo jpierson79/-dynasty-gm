@@ -23,6 +23,7 @@ async function prepareHarness({persistenceAuthority=false,execute}={}){
   const dependencies={appState:canonicalState,currentUser:async()=>canonicalState.authUser,liveContext:()=>structuredClone(live),...(execute?{executeReviewedFantraxSync:execute}:{})};
   const harness=createGate4AcceptanceHarness({artifactCommit:"exact-commit",persistenceAuthority,dependencies});
   harness.testLiveContext=live;
+  harness.testAppState=canonicalState;
   await harness.recordAuthenticatedUser();
   harness.recordActiveLeague();
   harness.recordAuditBaseline([{id:"attempt-1",fantrax_sync_attempt_items:[{id:"item-1"}]}]);
@@ -32,6 +33,8 @@ async function prepareHarness({persistenceAuthority=false,execute}={}){
   await harness.recordProtectedBaseline({players:"players-hash",teams:"teams-hash",scores:"scores-hash",metrics:"metrics-hash",audit:"audit-hash"});
   harness.recordOptInTransition(release(false),release(true));
   harness.recordPreviewB(preview("preview-b"));
+  canonicalState.activeLeague=release(true);
+  canonicalState.fantraxPreview={...preview("preview-b"),data:{...preview("preview-b").data,rosterItems},rosterSyncSelectedIds:[...tenIds]};
   harness.recordGateB(release(true),rosterItems);
   await harness.buildManifest(release(true));
   harness.recordPreWriteGuards({authUserId:"user-1",leagueId:GATE4_EXPECTED_LEAGUE_ID,previewFetchedAt:"preview-b",manifestDigest:harness.state.manifestDigest,releaseSignature:harness.state.checkpoints.gateB.evidence.releaseSignature,seasonValid:true,periodValid:true,identityValid:true,candidateSetValid:true});
@@ -46,6 +49,12 @@ assert.equal(disabled.state.previewA,null,"Preview A cannot survive the opt-in t
 assert.ok(disabled.state.checkpoints.previewB.digest,"every checkpoint exposes a deterministic evidence digest");
 assert.equal(disabled.state.manifest.version,"2");
 assert.equal(disabled.state.manifest.rows.length,10);
+const exactDigest=disabled.state.manifestDigest,confirmationDigest=await disabled.humanConfirmationDigest();
+const wrongArm=await disabled.armHumanConfirmation({confirmationDigest,manifestDigest:"wrong-digest"});
+assert.equal(wrongArm.status,"FAIL","the wrong exact manifest digest cannot arm persistence");
+assert.equal(disabled.state.armed,false);
+await disabled.armHumanConfirmation({confirmationDigest:await disabled.humanConfirmationDigest(),manifestDigest:exactDigest});
+assert.equal(disabled.state.armed,true,"the exact current manifest-v2 digest can arm the reviewed harness");
 await assert.rejects(()=>disabled.persist(),/persistence is disabled/);
 assert.equal(disabled.state.persistenceCalled,false,"disabled persistence cannot consume the one-call latch");
 
@@ -70,9 +79,19 @@ assert.equal(calls,1,"a second persistence call is impossible");
 
 const drifted=await prepareHarness({persistenceAuthority:true,execute:async()=>{throw new Error("must not execute")}});
 drifted.testLiveContext.period="139";
-await assert.rejects(()=>drifted.persist(),/invalidated by authentication, league, preview, candidate, release, season, period, manifest, or digest drift/);
+await assert.rejects(()=>drifted.persist(),/invalidated by authentication, league, preview, candidate, release, season, period, protected baseline, manifest, or digest drift/);
 assert.equal(drifted.state.armed,false,"live context drift clears the arm state before persistence");
 assert.equal(drifted.state.persistenceCalled,false,"drift before invocation does not consume or enter the persistence boundary");
+
+const previewDrifted=await prepareHarness({persistenceAuthority:true,execute:async()=>{throw new Error("must not execute")}});
+previewDrifted.testAppState.fantraxPreview.data.fetchedAt="new-preview";
+await assert.rejects(()=>previewDrifted.persist(),/invalidated/);
+assert.equal(previewDrifted.state.armed,false,"a changed preview disarms before persistence");
+
+const candidateDrifted=await prepareHarness({persistenceAuthority:true,execute:async()=>{throw new Error("must not execute")}});
+candidateDrifted.testLiveContext.candidateIds=[...candidateDrifted.testLiveContext.candidateIds.slice(0,9),id(11)].sort();
+await assert.rejects(()=>candidateDrifted.persist(),/invalidated/);
+assert.equal(candidateDrifted.state.persistenceCalled,false,"candidate drift cannot reach the coordinator");
 
 const failed=await prepareHarness({persistenceAuthority:true,execute:async()=>{throw new Error("guarded failure")}});
 await assert.rejects(()=>failed.persist(),/guarded failure/);
@@ -95,7 +114,7 @@ assert.match(harnessSource,/executeReviewedFantraxSync/,"the harness delegates i
 assert.match(harnessSource,/fetchFantraxPublicPreview/,"Preview A and B use the canonical production preview service");
 assert.match(harnessSource,/listFantraxSyncAttempts/,"the audit baseline uses the canonical authenticated audit repository");
 const reviewView=fs.readFileSync(new URL("../v5/js/views/fantraxGate4AcceptanceView.js",import.meta.url),"utf8");
-assert.doesNotMatch(reviewView,/data-action|<form|type="submit"/i,"the implementation-checkpoint review surface has no mutation control");
-assert.match(renderFantraxGate4Acceptance({gate4Acceptance:{artifact:disabled.reviewArtifact(),persistenceEnabled:false,armed:false}}),/DISABLED \/ UNARMED/i,"the hosted review surface makes the non-writable human pause explicit");
+assert.doesNotMatch(reviewView,/applyFantraxRosterStatuses|service[_-]?role|document\.cookie/i,"the production view has no raw repository, privileged, cookie, or token path");
+assert.match(renderFantraxGate4Acceptance({gate4Acceptance:{artifact:disabled.reviewArtifact(),persistenceEnabled:false,armed:false}}),/DISABLED \/ UNARMED/i,"a non-authorized harness remains visibly non-writable");
 
 console.log("v5FantraxGate4AcceptanceHarness tests passed");

@@ -40,7 +40,7 @@ export const appState={
   fantraxSyncAttempts:null,
   fantraxSyncAuditStatus:"UNAVAILABLE",
   fantraxSyncAuditError:"Fantrax synchronization audit has not been loaded.",
-  gate4Acceptance:{stage:"NOT_STARTED",status:"NOT_STARTED",artifact:null,error:"",preview:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,persistenceEnabled:false,armed:false},
+  gate4Acceptance:{stage:"NOT_STARTED",status:"NOT_STARTED",artifact:null,error:"",preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,postProtectedBaseline:null,manifest:null,manifestDigest:"",confirmationDigest:"",persistenceResult:null,reviewStale:false,persistenceEnabled:false,armed:false},
   userTeamResolution:null,
   rosterRecommendations:null,
   rosterRecommendationsLoading:false,

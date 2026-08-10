@@ -1401,3 +1401,53 @@
 - Focused Gate 4D controller/harness, public-preview, preview-accounting/UI, roster-sync, season-context, Data Health, audit, and authentication validation passed all 10 actual repository test files. An initial command named nonexistent `tests/v5FantraxPreview.test.mjs`; it stopped before execution and was corrected to the repository's actual preview test files. This was a command-name correction, not a product failure.
 - The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed before this documentation update.
 - Status: **Gate 4D-3 hosted read-only controller acceptance passed completely.** The historical failed attempts above remain preserved. This acceptance does not authorize expanded opt-in, Preview B, persistence controls, audit creation, Gate 4 synchronization, or routine synchronization; further work remains subject to separate architect review and authorization.
+
+## V5.4.6E Gate 4E Final Persistence Bridge — Local Implementation
+
+### Baseline And Architecture
+
+- Date: 2026-08-10 (America/Chicago). Preflight confirmed a clean `feature/manager-intelligence` worktree with local HEAD and `origin/feature/manager-intelligence` both at `f5a6d22759b0d234923ab7344c5f28cefb10df48`.
+- The final bridge extends the accepted production Gate 4 controller and the existing deterministic harness. `fantraxSyncCoordinator.js` remains the sole persistence orchestration boundary; neither `main.js`, the controller, the harness, nor the view performs raw player or audit repository writes.
+- The production sequence is now explicit and fail-closed: accepted read-only artifact, explicit league-scoped expanded opt-in, immediate Preview A invalidation, fresh Preview B, repeated Gate B, unchanged exact-ten UUID review, canonical manifest-v2 construction and digest, final human review, exact-digest arming, immediate write-time guards, one coordinator invocation, durable/post-write evidence, and explicit opt-in disablement.
+
+### Controller Stages And Opt-in Boundary
+
+- The controller exposes the required visible stages: `Ready for Next Gate`, `EXPANDED OPT-IN REQUIRED`, `PREVIEW B REQUIRED`, `PREVIEW B PASSED`, `MANIFEST REVIEW`, `UNARMED`, `ARMED FOR EXACT DIGEST`, `PERSISTENCE USED`, and terminal `COMPLETED` or `FAILED`.
+- Expanded opt-in is never automatic. Its explicit controller action uses the authenticated, league-scoped existing settings repository operation and writes only the reviewed `fantraxRosterSyncRelease` setting for Reddit Phanatics. Preview A is cleared immediately; candidate/protected review is visibly stale and cannot authorize a manifest or persistence.
+- Preview B is fetched through the canonical production preview service. Current-period and season-context guards run again, and the harness requires the same ten UUID-backed candidate projections. Any changed or ineligible candidate stops the workflow; no substitution is possible.
+- Opt-in cleanup is a separate explicit action. The post-write surface reports whether cleanup remains required or has been verified disabled.
+
+### Manifest, Arming, And One-call Persistence
+
+- Manifest construction delegates to the canonical synchronization audit service. The resulting version-2 manifest binds the active league, Current period, observed season context, exact ten UUIDs and statuses, release tier `V5.4.6E_OPT_IN_10`, effective cap 10, and the existing deterministic fields. Preview A cannot reach manifest creation.
+- Final review displays all ten players, UUID identity, persisted team identity, cloud/Fantrax statuses, manual-override state, no-release status, protected baseline, audit baseline, Preview B time and period, season status, manifest version, release tier, cap, and exact digest.
+- Arming requires the exact current manifest digest. The harness additionally binds the human-review digest, authenticated user, league, release setting, Preview B identity/time, season context, candidate IDs, and protected-baseline digest. Wrong digest remains blocked.
+- Authentication, league, period, season context, preview, candidate set, opt-in/release setting, manifest/digest, or protected-baseline drift invalidates the arm. Reload, logout, active-league change, ordinary preview refresh/clear, period/configuration change, and release-signature change return to the safe unarmed session path.
+- Immediately before persistence, and again through the coordinator's `beforeAttempt` and `beforeGroup` callbacks, the harness re-reads the authenticated user and revalidates release tier/cap, Current period, season context, Preview B freshness, exact ten UUIDs, exact player/team/owner identity, known statuses, manual-override exclusion, unchanged candidate projection, manifest-v2 digest, and the armed authorization context.
+- The latch is consumed immediately before the coordinator call. Success and failure both disarm permanently; neither can retry or re-arm automatically. Rendering and navigation have no persistence side effect, and a second controller/harness invocation cannot reach the coordinator.
+
+### Post-write Evidence And Protected Fields
+
+- The terminal surface displays attempt ID, lifecycle, database actor, manifest digest, all ten item outcomes, terminal/recoverable counts, replay eligibility, protected comparison state, explicit post-write Fantrax agreement status, and opt-in cleanup state.
+- A later post-write agreement check is explicit rather than automatic and reuses the canonical preview service. It requires Current period, matching season context, exact UUID identity, and cloud/Fantrax status agreement for all ten manifest rows.
+- Protected baseline comparison ignores only the already-approved roster-status/provenance timestamps and verifies players outside those fields, teams, managers, metrics, and scores. Audit rows are displayed as expected durable evidence rather than treated as protected data that must remain unchanged.
+- Manifest regression coverage proves forbidden ownership, player identity, free-agent, manual-override, team/manager, HKB/import, Statcast, and calculated-score fields never enter the persistence payload. Releases and ownership operations are not exposed.
+
+### Regression Coverage And Validation
+
+- Controller/harness regression coverage proves persistence unavailable before read-only completion; explicit opt-in and Preview A invalidation; mandatory Preview B and repeated Gate B; unchanged exact ten UUIDs; 11th/duplicate/substitution blocking; canonical manifest-v2, release-tier/cap binding, and displayed digest; wrong/exact digest arming; preview/period/candidate/context drift invalidation; reload/logout/league/configuration invalidation; immediate guards; coordinator-only persistence; success/failure one-call behavior; no automatic retry/re-arm; protected payload restrictions; explicit post-write agreement; evidence rendering; and explicit opt-in cleanup.
+- Focused validation passed all 11 files: Gate 4 controller, Gate 4 harness, roster sync, synchronization audit, public preview, preview accounting, preview UI, season context, Data Health execution, authentication, and V5 architecture.
+- The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. Final `git diff --check` passed.
+
+### Files And Safety Outcome
+
+- Intended changes are `v5/js/services/fantraxGate4AcceptanceController.js`, `v5/js/services/fantraxGate4AcceptanceHarness.js`, `v5/js/views/fantraxGate4AcceptanceView.js`, `v5/js/state/appState.js`, `v5/js/main.js`, `tests/v5FantraxGate4AcceptanceController.test.mjs`, `tests/v5FantraxGate4AcceptanceHarness.test.mjs`, and this result record.
+- Preview remains read-only; player preloads remain paginated; the coordinator retains batched guarded writes; internal player UUIDs remain permanent; missing MLBAM values remain nullable; normal non-Gate-4 synchronization remains on the same coordinator and is functionally unchanged.
+- No deployment, production Preview A/B, expanded opt-in change, harness arming, manifest/audit creation, roster synchronization, migration, import, ownership/identity repair, release, score recalculation, or other cloud/data write occurred.
+- Status: **implemented and locally validated; intentionally unstaged and uncommitted for architect review.**
+
+### Final Architect Checkpoint Review
+
+- The checkpoint review reconfirmed the sole coordinator boundary, Preview A non-authority, mandatory fresh Preview B, unchanged exact-ten UUID projection, canonical manifest-v2/digest, exact-digest arming, comprehensive drift invalidation, pre-invocation latch consumption, repeated immediate guards, status-only field restrictions, read-only evidence, and unchanged normal synchronization behavior.
+- One narrow evidence/cleanup defect was found and repaired: coordinator failure already consumed the latch and disarmed safely, but the controller discarded its terminal result surface, which hid the explicit expanded opt-in cleanup control. Failure now retains non-writable failure evidence and exposes cleanup while withholding persistence retry and success-only post-write preview controls. Cleanup failure remains visible and cannot re-arm or retry synchronization.
+- Regression coverage now explicitly proves the failed terminal surface retains opt-in cleanup and exposes neither persistence retry nor post-write agreement fetch.
