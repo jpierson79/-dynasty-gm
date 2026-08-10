@@ -1360,3 +1360,44 @@
 - A final review defect was repaired within the approved scope: preserved transport error metadata now blocks shared publication even when the normalized payload is structurally valid. Focused and full validation remained clean after the repair.
 - Implementation checkpoint commit: `af75a74c209fea38dac071e4c29ebeea3a8acc64` (`Fix Fantrax acceptance conflict semantics`). Push succeeded to `origin/feature/manager-intelligence` (`ef3ea21..af75a74`).
 - Checkpoint validation: 8 of 8 focused files passed, all 37 standalone test files passed, and `git diff --check` plus cached diff checks passed. Exactly the seven architect-approved files were included; no unrelated file was committed.
+
+## V5.4.6E Gate 4D-3 Hosted Read-Only Controller Acceptance — Successful Retry
+
+### Exact Hosted Artifact And Canonical Controller Path
+
+- Date: 2026-08-10 (America/Chicago). Preflight confirmed a clean `feature/manager-intelligence` worktree with local HEAD and `origin/feature/manager-intelligence` both at exact commit `e0c6674fab2a5524e846ee504a84004c6f10d815`.
+- GitHub Pages build `1143826276` published that exact commit successfully with status `built` in 37,886 ms. Acceptance used the production V5 UI/controller path with `?gate4Acceptance=1`; no injected script, alternate controller, privileged client, copied session, or persistence bypass was used.
+- V5 exited Loading, restored the normal authenticated session for `joshua.pierson@yahoo.com`, selected Reddit Phanatics, and remained reliably inspectable. The browser console contained no warnings or errors.
+- The production controller instantiated the real deterministic harness. Gate A reached `PASS` with the authenticated user, active Reddit Phanatics league, and authoritative audit baseline of exactly 3 attempts / 8 items.
+
+### Preview A, Candidate Review, And Protected Baseline
+
+- The visible production control fetched one fresh Preview A through the canonical Fantrax preview service. Normalization occurred at the shared boundary, Preview A reached `PASS`, period displayed `Current`, season context displayed `MATCH`, and Gate B reached `PASS`. Data Health subsequently consumed that same shared observation; it did not fetch a second preview.
+- Candidate review displayed 533 eligible UUID-backed status-only candidates. Ambiguous/unmatched identity, manual overrides and conflicts, ownership contradictions, unknown-status targets, and release/removal operations remained excluded by the canonical recommendation and eligibility rules. Jared Jones was deliberately not selected; name matching was not used to authorize any row.
+- Exactly ten distinct UUID-backed candidates were selected through the production UI:
+  1. Jacob Wilson — `b1056f45-a842-4140-8141-0a0330190852` — `RESERVE` to `ACTIVE`.
+  2. Kevin McGonigle — `7feaf4e1-599e-4cc8-b93e-d894171dd14d` — `UNCLASSIFIED` to `RESERVE`.
+  3. Daylen Lile — `17eff9c7-62c5-4111-bc59-31913d8d50d6` — `UNCLASSIFIED` to `RESERVE`.
+  4. Eli Willits — `cf5bae52-2548-438a-9eb6-9be518933c68` — `UNCLASSIFIED` to `MINORS`.
+  5. Nico Hoerner — `4709bfaf-22c0-40fc-bf8b-369d93bcbcd3` — `UNCLASSIFIED` to `ACTIVE`.
+  6. Cam Cannarella — `289ce5fa-039a-4feb-93d1-0a31f7f1b532` — `UNCLASSIFIED` to `MINORS`.
+  7. Miguel Vargas — `6a4ecaff-0775-472a-bc04-cd437f1e565d` — `UNCLASSIFIED` to `ACTIVE`.
+  8. Emil Morales — `e4c7a94d-7523-480b-8454-7dd9b70624e5` — `UNCLASSIFIED` to `MINORS`.
+  9. Landen Roupp — `79d79522-608f-4b5f-84f2-f9ec84650a9c` — `UNCLASSIFIED` to `ACTIVE`.
+  10. Braxton Garrett — `63eec270-117d-4c7b-a0ef-00084d36781f` — `UNCLASSIFIED` to `MINORS`.
+- An attempted 11th UUID-backed selection (Carlos Rodon, `796afe18-025c-4849-b234-a459c5c50017`) was rejected: the selected count remained 10/10 and the UI displayed `Controlled acceptance is limited to 10 players.` No candidate was substituted. Duplicate authorization remained structurally UUID-based and regression-covered.
+- Repository-backed protected baseline capture completed read-only and advanced the controller to `Ready for Next Gate`: players 10,199 / `ef82fa9cf0ef`; teams 12 / `bc80c955ab91`; managers 0 / `4f53cda18c2b`; metrics 209 / `640bd4cf776e`; scores 20,020 / `c6e9b8aa95ec`; audit attempts 3 / `e66424528c4b`; audit items 8 / `2d5108cdfbf9`. Checkpoint digests were Preview A `3522b285`, candidates `c6aa493d`, and protected baseline `0ad2f356`.
+
+### Read-Only Safety, Health, And Restoration
+
+- The harness remained visibly `DISABLED / UNARMED` through loading, navigation, candidate selection, baseline capture, Data Health, and Audit UI inspection. No persistence control, Preview B control, executable manifest, audit-creation action, or sync action was exposed; the only button matching the broad sync/manifest/arm scan was the ordinary `Fantrax Sync Preview` navigation control.
+- No expanded opt-in change, Preview B, manifest eligible for execution, arm state, audit attempt/item, coordinator persistence call, roster synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, or unrelated cloud write occurred.
+- Data Health completed with 0 failures and 23 warnings. Audit Availability, Release/Cap Consistency, Fantrax Public API Reachability, League Metadata, Fantrax Season Context Review, reviewed/observed league ID, reviewed/observed season year, league history identity, team/status write readiness, team identity, roster preview, and unknown-status diagnostics all passed. Expected informational reconciliation counts remained warnings rather than authorization bypasses.
+- Fantrax Sync Audit UI remained exactly 3 attempts / 8 items. Production audit history was therefore unchanged before and after the read-only run, and Data Health and Audit UI agreed with the authoritative application repository baseline.
+- GitHub Pages was restored to `main` regardless of outcome. Restoration completed successfully with status `built` in 33,648 ms at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`; the Pages API verified source `main`, path `/`, and status `built`.
+
+### Validation And Outcome
+
+- Focused Gate 4D controller/harness, public-preview, preview-accounting/UI, roster-sync, season-context, Data Health, audit, and authentication validation passed all 10 actual repository test files. An initial command named nonexistent `tests/v5FantraxPreview.test.mjs`; it stopped before execution and was corrected to the repository's actual preview test files. This was a command-name correction, not a product failure.
+- The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed before this documentation update.
+- Status: **Gate 4D-3 hosted read-only controller acceptance passed completely.** The historical failed attempts above remain preserved. This acceptance does not authorize expanded opt-in, Preview B, persistence controls, audit creation, Gate 4 synchronization, or routine synchronization; further work remains subject to separate architect review and authorization.
