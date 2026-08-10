@@ -1353,3 +1353,10 @@
 - Preview remains read-only. Player repository pagination, batched guarded writes, permanent internal UUIDs, nullable MLBAM serialization, RLS, audit lifecycle, manifest-v2, replay, actor stamping, batch caps, protected fields, and persistence authority were not changed.
 - No deployment, production preview, expanded opt-in change, Preview B, executable manifest, human arm, audit attempt/item, synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, staging, commit, push, or cloud write occurred.
 - Status: **implemented and locally validated; intentionally left unstaged and uncommitted for architect review.**
+
+### Architect Checkpoint
+
+- Final architectural review confirmed canonical recommendation-based eligibility, independent exact identity/team/owner/known-status/manual-override checks, aggregate `fantraxConflict` neutrality for ordinary status differences, all blocking exclusions, exact-ten selection, duplicate/11th blocking, guarded shared Preview A publication, complete invalidation, Data Health fail-closed behavior, and unchanged coordinator/persistence architecture.
+- A final review defect was repaired within the approved scope: preserved transport error metadata now blocks shared publication even when the normalized payload is structurally valid. Focused and full validation remained clean after the repair.
+- Implementation checkpoint commit: `af75a74c209fea38dac071e4c29ebeea3a8acc64` (`Fix Fantrax acceptance conflict semantics`). Push succeeded to `origin/feature/manager-intelligence` (`ef3ea21..af75a74`).
+- Checkpoint validation: 8 of 8 focused files passed, all 37 standalone test files passed, and `git diff --check` plus cached diff checks passed. Exactly the seven architect-approved files were included; no unrelated file was committed.
