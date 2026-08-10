@@ -24,6 +24,7 @@ import { leagueById, memberships, saveFantraxSeasonContext } from "./repositorie
 import { clearFantraxPendingReviews, fantraxSeasonWriteGuard, reviewedFantraxSeasonSettings, validateFantraxSeasonReview } from "./services/fantraxSeasonContextService.js?v5-4-6c-season";
 import { listFantraxSyncAttempts } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6e-opt-in";
 import { executeReviewedFantraxSync } from "./services/fantraxSyncCoordinator.js";
+import { createFantraxGate4AcceptanceController } from "./services/fantraxGate4AcceptanceController.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
@@ -45,6 +46,20 @@ let playerRequestId=0;
 let waiverRequestId=0;
 const tradeRequestIds={outgoing:0,incoming:0};
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
+const gate4AcceptanceMode=new URLSearchParams(location.search).get("gate4Acceptance")==="1";
+const gate4Controller=gate4AcceptanceMode?createFantraxGate4AcceptanceController({artifactCommit:new URLSearchParams(location.search).get("commit")||"CURRENT_HOSTED_ARTIFACT"}):null;
+
+function publishGate4ControllerState(){
+  if(!gate4Controller)return;
+  const {harness,...safeState}=gate4Controller.state;
+  setState({gate4Acceptance:{...safeState,persistenceEnabled:false,armed:false}});
+}
+function resetGate4Acceptance(reason=""){
+  if(!gate4Controller)return;
+  gate4Controller.reset(reason);
+  const {harness,...safeState}=gate4Controller.state;
+  setStateSilently({gate4Acceptance:{...safeState,persistenceEnabled:false,armed:false}});
+}
 
 function modeLabel(){
   if(!appState.authUser)return"Signed out";
@@ -381,7 +396,7 @@ async function renderView(){
 }
 
 function enableAcceptanceModeEntry(){
-  if(new URLSearchParams(location.search).get("gate4Acceptance")!=="1")return;
+  if(!gate4AcceptanceMode)return;
   const settingsButton=document.querySelector('[data-view="settings"]');
   if(!settingsButton||document.querySelector('[data-view="gate4Acceptance"]'))return;
   settingsButton.insertAdjacentHTML("afterend",'<button class="nav-link" data-view="gate4Acceptance">Gate 4 Acceptance</button>');
@@ -468,10 +483,14 @@ async function updateWaiverPage(query){
   render();
 }
 function bindViewEvents(){
-  $("#fetchFantraxPreview")?.addEventListener("click",loadFantraxPreview);
-  $("#fantraxExternalLeagueId")?.addEventListener("change",event=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:event.target.value.trim(),error:"",selectedTab:"summary",page:1}))}));
-  $("#fantraxPeriod")?.addEventListener("change",event=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,period:event.target.value,error:"",selectedTab:"summary",page:1}))}));
-  $("#clearFantraxPreview")?.addEventListener("click",()=>setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,error:"",selectedTab:"summary",page:1}))}));
+  $("#startGate4Acceptance")?.addEventListener("click",async()=>{await gate4Controller?.start();publishGate4ControllerState()});
+  $("#fetchGate4PreviewA")?.addEventListener("click",async()=>{await gate4Controller?.fetchPreviewA();publishGate4ControllerState()});
+  $all("[data-gate4-candidate]").forEach(input=>input.addEventListener("change",event=>{gate4Controller?.toggleCandidate(event.target.dataset.gate4Candidate,event.target.checked);publishGate4ControllerState()}));
+  $("#captureGate4ProtectedBaseline")?.addEventListener("click",async()=>{await gate4Controller?.captureProtectedBaseline();publishGate4ControllerState()});
+  $("#fetchFantraxPreview")?.addEventListener("click",()=>{resetGate4Acceptance("A new Fantrax preview invalidated the Gate 4 review.");loadFantraxPreview()});
+  $("#fantraxExternalLeagueId")?.addEventListener("change",event=>{resetGate4Acceptance("Fantrax league configuration changed.");setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:event.target.value.trim(),error:"",selectedTab:"summary",page:1}))})});
+  $("#fantraxPeriod")?.addEventListener("change",event=>{resetGate4Acceptance("Fantrax period changed.");setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,period:event.target.value,error:"",selectedTab:"summary",page:1}))})});
+  $("#clearFantraxPreview")?.addEventListener("click",()=>{resetGate4Acceptance("Fantrax preview was cleared.");setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,error:"",selectedTab:"summary",page:1}))})});
   $all("[data-fantrax-tab]").forEach(button=>button.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({selectedTab:button.dataset.fantraxTab,page:1})})));
   $("#applyFantraxRosterFilters")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({filters:fantraxFiltersFromControls(),page:1})}));
   $("#fantraxPrevPage")?.addEventListener("click",()=>setState({fantraxPreview:fantraxPreviewState({page:Math.max(1,(appState.fantraxPreview.page||1)-1)})}));
@@ -783,7 +802,7 @@ function bindShellEvents(){
     }
   });
   document.body.addEventListener("click",async event=>{
-    if(event.target.id==="signOut"){await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline"});render()}
+    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline"});render()}
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
@@ -800,6 +819,7 @@ function bindShellEvents(){
   });
   document.body.addEventListener("change",async event=>{
     if(event.target.id==="leagueSelect"){
+      resetGate4Acceptance("Active league changed.");
       await selectLeague(event.target.value);
       await refreshLeagueData();
       render();

@@ -1169,3 +1169,70 @@
 - Static review confirmed the harness contains no raw Supabase `.from` call, service-role path, token/cookie/localStorage input, identity fallback, or direct audit/player mutation. Normal V5 retains its existing release, season, Current-period, stale-preview, expected-owner, current-status, manual-provenance, recovery, summary, refresh, and Data Health behavior around the extracted coordinator.
 - Final checkpoint validation passed the focused Gate 4D test, all 8 focused Fantrax/audit/Data Health/auth files, the full 36-file standalone suite, and `git diff --check`. No deployment or production/cloud operation occurred.
 - Implementation checkpoint commit: `cf4b6f1dec93b9a87d716a274e95b88f89447d0b` (`Add deterministic Fantrax sync acceptance harness`). Push succeeded to `origin/feature/manager-intelligence` (`bcac286..cf4b6f1`).
+
+## V5.4.6E Gate 4D-1 Read-Only Hosted Harness Acceptance
+
+### Hosted Artifact And Read-Only Baseline
+
+- Date: 2026-08-09 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local HEAD and `origin/feature/manager-intelligence` both at exact commit `d901fd9f3773624698bd10418de131a9e1c1b79e`.
+- GitHub Pages build `1142134381` published that exact commit successfully with status `built` in 37,240 ms. The hosted artifact exposed the explicit `?gate4Acceptance=1` navigation entry and the new Gate 4 review module.
+- The hosted V5 application exited Loading, restored the normal authenticated session for `joshua.pierson@yahoo.com`, selected Reddit Phanatics, and displayed `Cloud · Reddit Phanatics`. The browser console contained no errors or warnings during artifact, authentication, league, harness, and audit inspection.
+- The authenticated Fantrax Sync Audit UI remained authoritative at 3 attempts / 8 items: one completed expanded 4-item attempt, one partial default attempt with 2 recoverable items, and one partial default attempt with 2 terminal items. Navigation from the harness to Settings/Data Health did not change authentication, league, or these audit rows.
+
+### Fail-Closed Hosted Harness Stop
+
+- Gate 4D-1 did **not** pass. The hosted Gate 4 surface rendered only: `No reviewed acceptance artifact is loaded. Persistence is disabled.` It exposed no read-only controller or event path that instantiates the harness, obtains the canonical authenticated user/league/audit evidence, advances Gate A, fetches Preview A through the production service, accepts the exact reviewed UUID set, captures protected hashes, or publishes the resulting artifact into canonical app state.
+- The surface therefore could not drive even the first required deterministic checkpoint through the hosted application. Authentication and the active league were visibly healthy, but they were not recorded as harness checkpoint evidence; the audit baseline was visible in the existing Audit UI but was not loaded into a harness checkpoint.
+- This is an integration/hosted-surface gap rather than a persistence-boundary failure. The service-level harness and tests exist, but the hosted acceptance entry is display-only and cannot exercise its read-only preparation API. Using developer-console imports, injected page state, guessed browser actions, or an alternate script would have created a non-production acceptance path and was not used.
+- The harness remained disabled and unarmed throughout. No persistence control, form, submit action, opt-in transition, Preview B action, manifest construction, human arm, audit creation, or synchronization control was available. Rendering and navigation caused no roster/audit write.
+- Because Preview A and candidate review were unreachable through the harness, hosted exact-identity/manual-override candidate filtering, the exact ten-player list, Jared Jones exclusion, and protected-field baseline capture could not be accepted. No criteria were weakened and no candidate was selected or substituted.
+- Read-only Data Health was started from the normal Settings view, but browser inspection timed out while it remained visibly in its bounded running state. The existing audit rows remained visible and the console remained clean before control reset. No Data Health completion result is claimed for this failed acceptance.
+
+### Restoration, Tests, And Safety
+
+- GitHub Pages was restored to `main` regardless of failure. Restoration build `1142138111` completed successfully with status `built` in 35,823 ms at main commit `df89840de0ea8563968b99b7acc75b528e02983f`; the Pages API verified source `main`, path `/`, and status `built`.
+- Focused Gate 4D/Fantrax/audit/Data Health/auth validation passed 8 of 8 test files. The complete sorted standalone suite passed 36 of 36 `tests/*.test.mjs` files. `git diff --check` passed before this documentation update.
+- No expanded opt-in change, intentional Preview A invalidation, Preview B fetch, production Fantrax preview, manifest, arm, audit attempt/item, roster synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, or unrelated cloud write occurred.
+- Status: **Gate 4D-1 failed and remains blocked for architect review.** Per the task contract, no acceptance commit or push is permitted. The only working-tree change is this preserved failure record.
+
+## V5.4.6E Gate 4D-2 Production Harness Controller And Review Workflow
+
+### Outcome
+
+- Date: 2026-08-09 (America/Chicago). Implementation began from `feature/manager-intelligence` at local and remote commit `d901fd9f3773624698bd10418de131a9e1c1b79e`, preserving the uncommitted Gate 4D-1 hosted failure record above.
+- Status: implemented and validated locally; stopped uncommitted/unpushed for architect review as required. No deployment or production acceptance was attempted.
+- The proven Gate 4D-1 gap is repaired by a production controller that instantiates the existing harness and advances only the approved read-only path: authenticated user, exact Reddit Phanatics league, authoritative audit baseline, Gate A, fresh Current Preview A, canonical season/period Gate B checks, explicit candidate review, protected baseline, and a reviewed artifact.
+- `fantraxSyncCoordinator.js` remains the only persistence orchestration boundary. The new controller does not import it, does not call `persist()`, and exposes no opt-in, Preview B, manifest, arm, audit-create, or player-write method.
+
+### Controller, State, And UI
+
+- `fantraxGate4AcceptanceController.js` owns session-scoped, league-scoped review state and the explicit `NOT_STARTED`, `RUNNING`, `PASS`, `BLOCKED`, `UNAVAILABLE`, `PERMISSION_BLOCKED`, and `QUERY_FAILED` outcomes. Audit/repository errors are displayed and never converted into an empty successful result; an authenticated genuine zero remains distinguishable.
+- Start Review uses the canonical auth repository through the actual harness, requires canonical `appState` to agree, requires the exact Reddit Phanatics UUID/name, loads the audit baseline through the existing audit repository, and evaluates Gate A using loaded authoritative team identity and the accepted audit/manual/current-period/cap boundaries.
+- Preview A uses the harness production preview dependency with the reviewed external league/season context, authenticated player repository rows, and loaded authoritative teams. The controller repeats the production season-context and Current-period guards before exposing candidate review.
+- Candidate classification uses the production preview's exact player/team identity results, manual-override/conflict signals, normalized status, and canonical status-only recommendation. Ambiguous/unmatched identity, unmapped team, manual override, ownership conflict, unknown/`UNCLASSIFIED` status, non-status update, and release/removal rows are displayed with exclusion reasons and cannot be selected.
+- Selection is explicit by permanent cloud UUID, begins empty, prevents duplicate UUID insertion, enforces exactly ten for protected capture, blocks the 11th selection, and never substitutes a player. Jared Jones is excluded in regression coverage when his identity result is ambiguous; no name is treated as authoritative.
+- The hosted review surface now renders progression, authenticated user, active league, audit counts, Current period, season status, Preview A Gate B, eligible/selected counts, exact UUID/player/status/manual/exclusion rows, protected counts/hashes, checkpoint evidence, and the permanent `DISABLED / UNARMED` state. Rendering and navigation contain no persistence control.
+- Gate 4 state resets on logout and active-league change and is invalidated on ordinary Fantrax league configuration, period, preview refresh, or preview clear. Candidate changes clear later review evidence. Reload starts from the non-persisted `NOT_STARTED`, disabled, unarmed default.
+
+### Protected Baseline And Safety
+
+- `fantraxProtectedBaselineService.js` reads through the existing authenticated player, team, manager, metric, score, and audit repositories. It hashes deterministic complete row projections for teams, managers, metrics, scores, attempts, and items. The player protected hash excludes only the already-authorized future write fields (`roster_status`, `roster_status_source`, synchronization/update timestamp) while retaining ownership, UUIDs, Fantrax/MLBAM identity, free-agent state, manual-override metadata, HKB/import values, and all other fields.
+- Protected capture first reruns canonical exact-ten validation, records the harness candidate checkpoint, then records the protected evidence checkpoint. The resulting artifact has no manifest, human digest, persistence authority, or persistence call.
+- No migration, RLS, authentication, audit lifecycle, manifest, replay, batch-cap, release, coordinator, repository write predicate, ownership, identity, import, metric, or scoring behavior changed.
+
+### Files And Validation
+
+- Added `v5/js/services/fantraxGate4AcceptanceController.js`, `v5/js/services/fantraxProtectedBaselineService.js`, and `tests/v5FantraxGate4AcceptanceController.test.mjs`.
+- Updated `v5/js/main.js`, `v5/js/state/appState.js`, `v5/js/views/fantraxGate4AcceptanceView.js`, `tests/v5FantraxGate4AcceptanceHarness.test.mjs`, `tests/v5FantraxSeasonContext.test.mjs`, and this result record.
+- Focused Gate 4D-2 plus existing Gate 4D/Fantrax/audit/Data Health/auth validation passed 9 of 9 test files. The complete sorted standalone suite passed 37 of 37 `tests/*.test.mjs` files. `git diff --check` passed.
+- Regression coverage proves actual harness instantiation, canonical auth/audit/preview flow, deterministic Gate A and Preview A Gate B, exact filtering, ambiguous/manual/unknown exclusions, exact-ten selection, 11th/duplicate blocking, protected capture, artifact rendering, unavailable/permission semantics, safe reset, disabled/unarmed state, absence of manifest/audit/sync calls, and no persistence controller event.
+- No deployment, production Fantrax preview, expanded opt-in change, Preview B, manifest, arm, audit record, roster synchronization, migration, import, ownership/identity repair, manual-override change, score recalculation, staging, commit, push, or unrelated cloud write occurred.
+
+### Gate 4D-2 Architect Checkpoint Review
+
+- Final static review confirmed `fantraxGate4AcceptanceController.js` is the only Gate 4 production controller and `main.js` creates exactly one acceptance-mode instance. The controller instantiates `createGate4AcceptanceHarness` with `persistenceAuthority:false` and advances its authenticated-user, active-league, audit, Gate A, Preview A, candidates, and protected-baseline checkpoints rather than reproducing manifest, audit lifecycle, or persistence rules.
+- Production preview, season-context, roster-selection, audit repository, and protected-baseline repository paths remain canonical. The controller contains no raw Supabase query, coordinator import, player/audit mutation, manifest builder, opt-in transition, Preview B, human arm, or persistence method.
+- Authorization uses `matchedPlayerUuid` and the canonical `MATCHED` player/team identity results. Player names are display-only; no normalized-name, fuzzy-name, MLBAM, or name-based fallback can authorize selection. Exact-ten selection, duplicate UUID prevention, 11th-player rejection, and ambiguous/manual/conflict/unknown/release exclusions were reconfirmed in focused tests.
+- Logout, league selection, Fantrax league configuration, period selection, preview refresh, and preview clear reset or invalidate the session-only controller state. Reload recreates the default `NOT_STARTED`, disabled, unarmed app state; no armed or reviewed state is persisted.
+- Protected evidence uses authenticated read-only repositories for players, teams, managers, metrics, scores, audit attempts, and audit items. Rendering, navigation, candidate selection, and capture always publish `persistenceEnabled:false` and `armed:false`; the controller cannot create a manifest eligible for execution or an audit attempt.
+- Existing normal Fantrax synchronization remains on its previously accepted `fantraxSyncCoordinator.js` path and was not changed by Gate 4D-2. Final validation passed both dedicated controller/harness tests, all 9 focused Gate 4D/Fantrax/audit/Data Health/auth files, the complete 37-file standalone suite, and `git diff --check`.

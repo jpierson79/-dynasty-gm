@@ -96,6 +96,6 @@ assert.match(harnessSource,/fetchFantraxPublicPreview/,"Preview A and B use the 
 assert.match(harnessSource,/listFantraxSyncAttempts/,"the audit baseline uses the canonical authenticated audit repository");
 const reviewView=fs.readFileSync(new URL("../v5/js/views/fantraxGate4AcceptanceView.js",import.meta.url),"utf8");
 assert.doesNotMatch(reviewView,/data-action|<form|type="submit"/i,"the implementation-checkpoint review surface has no mutation control");
-assert.match(renderFantraxGate4Acceptance({gate4Acceptance:{artifact:disabled.reviewArtifact(),persistenceEnabled:false}}),/Persistence is disabled/i,"the hosted review surface makes the human pause explicit");
+assert.match(renderFantraxGate4Acceptance({gate4Acceptance:{artifact:disabled.reviewArtifact(),persistenceEnabled:false,armed:false}}),/DISABLED \/ UNARMED/i,"the hosted review surface makes the non-writable human pause explicit");
 
 console.log("v5FantraxGate4AcceptanceHarness tests passed");

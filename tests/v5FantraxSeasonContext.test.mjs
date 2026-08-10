@@ -38,7 +38,7 @@ assert.match(repository,/update\(\{settings\}\)\.eq\("id",leagueId\)/,"reviewed 
 assert.doesNotMatch(repository,/fantrax.*cookie|userSecretId/i);
 assert.match(main,/fantraxSeasonWriteGuard\(preview\.data\?\.seasonContextComparison\)/,"final roster apply repeats the season guard");
 assert.match(main,/clearFantraxPendingReviews/);
-assert.match(main,/fantraxExternalLeagueId"\)\?\.addEventListener\("change",event=>setState\(\{fantraxPreview:clearFantraxPendingReviews\(fantraxPreviewState\(\{data:null/,"league configuration changes invalidate the preview and pending review state");
-assert.match(main,/fantraxPeriod"\)\?\.addEventListener\("change",event=>setState\(\{fantraxPreview:clearFantraxPendingReviews\(fantraxPreviewState\(\{data:null/,"period changes invalidate the preview and pending review state");
+assert.match(main,/fantraxExternalLeagueId"\)\?\.addEventListener\("change",event=>\{[\s\S]{0,250}setState\(\{fantraxPreview:clearFantraxPendingReviews\(fantraxPreviewState\(\{data:null/,"league configuration changes invalidate both Gate 4 and the preview review state");
+assert.match(main,/fantraxPeriod"\)\?\.addEventListener\("change",event=>\{[\s\S]{0,250}setState\(\{fantraxPreview:clearFantraxPendingReviews\(fantraxPreviewState\(\{data:null/,"period changes invalidate both Gate 4 and the preview review state");
 assert.match(view,/Names, managers, roster overlap, and prior mappings are suggestions only/i);
 console.log("V5 Fantrax season context tests passed");
