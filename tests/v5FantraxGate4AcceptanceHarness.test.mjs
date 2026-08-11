@@ -72,6 +72,22 @@ const changed=structuredClone(rosterItems);changed[0].normalizedRosterStatus="MI
 substitution.recordPreviewB(preview("preview-b-2"));
 assert.equal(substitution.recordGateB(release(true),changed).status,"FAIL","Preview B cannot silently substitute or change a bound candidate");
 
+let cancelledCalls=0;
+const cancelled=await prepareHarness({persistenceAuthority:true,execute:async()=>{cancelledCalls+=1;throw new Error("cancelled persistence must not execute")}});
+assert.equal(cancelled.state.armed,true);
+assert.equal(cancelled.state.persistenceAvailable,true);
+cancelled.cancelBeforePersistence();
+assert.equal(cancelled.state.persistenceAuthority,false,"pre-persistence cancellation ends session authority");
+assert.equal(cancelled.state.persistenceAvailable,false,"pre-persistence cancellation invalidates availability");
+assert.equal(cancelled.state.persistenceExecutable,false,"pre-persistence cancellation invalidates executability");
+assert.equal(cancelled.state.armed,false,"pre-persistence cancellation disarms an exact digest");
+assert.equal(cancelled.state.persistenceCalled,false,"pre-persistence cancellation leaves the one-call latch unused");
+assert.equal(cancelled.state.previewB,null);
+assert.equal(cancelled.state.manifest,null);
+assert.equal(cancelled.state.manifestDigest,"");
+await assert.rejects(()=>cancelled.persist(),/persistence is disabled/);
+assert.equal(cancelledCalls,0,"a cancelled session cannot reach the coordinator");
+
 let calls=0,armed;
 armed=await prepareHarness({persistenceAuthority:true,execute:async({beforeAttempt})=>{assert.equal(armed.state.persistenceAvailable,false,"the latch removes availability before coordinator invocation");assert.equal(armed.state.armed,false,"the harness disarms before coordinator invocation");await beforeAttempt();calls+=1;return {attempt:{id:"attempt-2"},digest:"durable",result:{reviewed:10,updated:[],skipped:[],failures:[]}}}});
 assert.equal(armed.state.persistenceAuthority,true);
@@ -108,6 +124,8 @@ await assert.rejects(()=>failed.persist(),/guarded failure/);
 assert.equal(failed.state.persistenceCalled,true,"a failed coordinator invocation consumes the one-call latch");
 assert.equal(failed.state.armed,false,"a failed coordinator invocation cannot remain armed");
 assert.equal(failed.state.persistenceAvailable,false,"a failed consumed invocation cannot remain available");
+assert.throws(()=>failed.cancelBeforePersistence(),/consumed Gate 4 persistence session cannot be reset or reused/,"post-persistence cleanup cannot reset the latch");
+assert.equal(failed.state.persistenceCalled,true);
 await assert.rejects(()=>failed.persist(),/already been used/);
 
 const manifestInput={leagueId:GATE4_EXPECTED_LEAGUE_ID,period:"",seasonContext:season,releaseTier:"V5.4.6E_OPT_IN_10",effectiveCap:10,updates:rosterItems.slice(0,10).map(row=>({id:row.matchedPlayerUuid,expectedOwnerTeamId:row.currentOwnerTeamId,currentRosterStatus:row.currentRosterStatus,roster_status:row.normalizedRosterStatus,fantraxApiPlayerId:row.fantraxApiPlayerId,fantraxTeamId:row.fantraxTeamId}))};

@@ -72,7 +72,7 @@ export function createGate4AcceptanceHarness({artifactCommit="",persistenceAutho
     async humanConfirmationDigest(){requirePass(state.checkpoints,["preWriteGuards"]);const review={artifactCommit:state.artifactCommit,user:state.checkpoints.authenticatedUser.evidence.id,league:GATE4_EXPECTED_LEAGUE_ID,manifestDigest:state.manifestDigest,protectedDigest:state.checkpoints.protectedBaseline.evidence.digest,preWrite:state.checkpoints.preWriteGuards.evidence};state.humanDigest=await gate4EvidenceDigest(review);return state.humanDigest},
     async armHumanConfirmation({confirmationDigest="",manifestDigest=""}={}){requirePass(state.checkpoints,["preWriteGuards"]);invalidateFrom("humanConfirmation");const expected=await this.humanConfirmationDigest(),valid=state.persistenceAvailable&&clean(confirmationDigest)===expected&&clean(manifestDigest)===state.manifestDigest&&state.manifest?.version==="2";state.armed=valid;state.armedContextDigest=valid?await gate4EvidenceDigest(authorizationContext()):"";return set("humanConfirmation",valid?"PASS":"FAIL",valid?[]:["Persistence must be available and the human confirmation and current manifest-v2 digests must exactly match the review artifact."],{expectedDigest:expected,manifestDigest:state.manifestDigest})},
     async persist(){
-      if(!persistenceAuthority)throw new Error("Gate 4 persistence is disabled for this implementation checkpoint.");
+      if(!state.persistenceAuthority)throw new Error("Gate 4 persistence is disabled for this implementation checkpoint.");
       requirePass(state.checkpoints,["humanConfirmation"]);
       if(state.persistenceCalled)throw new Error("The Gate 4 one-call persistence boundary has already been used.");
       if(!state.armed)throw new Error("Explicit exact-digest human confirmation is required.");
@@ -96,6 +96,20 @@ export function createGate4AcceptanceHarness({artifactCommit="",persistenceAutho
         state.armedContextDigest="";
         refreshPersistenceState();
       }
+    },
+    cancelBeforePersistence(){
+      if(state.persistenceCalled)throw new Error("A consumed Gate 4 persistence session cannot be reset or reused.");
+      invalidateFrom("optInTransition");
+      state.persistenceAuthority=false;
+      state.previewB=null;
+      state.manifest=null;
+      state.manifestInput=null;
+      state.manifestDigest="";
+      state.humanDigest="";
+      state.armedContextDigest="";
+      state.armed=false;
+      refreshPersistenceState();
+      return this.reviewArtifact();
     },
     recordAuditOutcomes(evidence){requirePass(state.checkpoints,["persistence"]);const valid=evidence?.manifestVersion==="2"&&evidence?.digest===state.manifestDigest&&evidence?.reviewedCount===10&&evidence?.terminalCount===10&&evidence?.recoverableCount===0&&evidence?.status==="COMPLETED"&&evidence?.outcomes?.every(value=>value==="APPLIED");return set("auditOutcomes",valid?"PASS":"FAIL",valid?[]:["Durable audit outcomes are not the exact completed ten-item manifest."],evidence||{})},
     recordProtectedComparison(evidence){requirePass(state.checkpoints,["auditOutcomes"]);return set("protectedComparison",evidence?.matches===true?"PASS":"FAIL",evidence?.matches===true?[]:["Protected fields changed outside the authorized status fields."],evidence||{})},
