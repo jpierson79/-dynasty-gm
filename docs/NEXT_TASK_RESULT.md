@@ -1575,3 +1575,27 @@
 - Architect review approved Gate 4E-1C0 for checkpointing only. Implementation commit `65ef496fd02cf8a33d0035058fb3396ff7e51f1c` (`Expose pre-persistence Fantrax opt-in cleanup`) contains exactly the seven approved implementation, regression-test, state, view, and evidence files.
 - Push succeeded to `origin/feature/manager-intelligence` (`fbc1ee4..65ef496`). The focused 11-file validation, complete 37-file standalone suite, staged diff check, and post-commit working-tree check all passed.
 - No deployment or production/data operation accompanied the checkpoint. In particular, the production expanded opt-in remains enabled pending separately authorized deployment and canonical cleanup acceptance.
+
+## V5.4.6E Gate 4E-1C0-1 Production Expanded Opt-In Cleanup — Accepted
+
+### Exact Artifact And Authenticated Cleanup
+
+- Date: 2026-08-11 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local and remote HEAD exactly `83833c5169b1ede57670a8e6e7e893f56c0513d8`; `git diff --check` passed.
+- GitHub Pages temporarily published that exact commit through the approved legacy Pages workflow. Build `1145769566` completed successfully with status `built` in 41,769 ms and reported the exact commit `83833c5169b1ede57670a8e6e7e893f56c0513d8`.
+- The hosted V5 application exited Loading in the normal Chrome session, authenticated as `joshua.pierson@yahoo.com`, selected Reddit Phanatics, and exposed reliable semantic inspection with no console warnings or errors.
+- Starting only the read-only Gate A session loaded the authoritative 3-attempt / 8-item audit baseline. The active-league `settings.fantraxRosterSyncRelease` policy, interpreted through the canonical `fantraxRosterSyncReleasePolicy()`, reported the expanded opt-in enabled and exposed `Cancel Acceptance and Disable Expanded Opt-in` without any persistence result. No preview was fetched and rendering/navigation caused no write.
+- The cleanup control was invoked exactly once. It used the existing production controller path `disableExpandedOptIn()` to the authenticated, league-scoped `saveFantraxSeasonContext()` repository operation; no SQL, service role, injected script, direct repository call, or alternate mutation path was used.
+
+### Post-Cleanup State And Protected Boundaries
+
+- Cleanup completed visibly as `CANCELLED / PASS`. The controller rendered Authority `NOT AUTHORIZED`, Persistence `DISABLED`, Arming `UNARMED`, and Latch `UNUSED`; `persistenceAuthority`, `persistenceAvailable`, `persistenceExecutable`, `armed`, and `persistenceCalled` were all false. Preview B, manifest, and digest authorization were absent, the cleanup control disappeared, and the cancelled session exposed no persistence control.
+- The post-cleanup authoritative Data Health detail reported `{"releaseTier":"V5.4.6E_OPT_IN_10","effectiveCap":10,"optedIn":false,"recoveryOnly":true,"error":""}`. This proves the league is no longer expanded-opted-in while retaining recovery-only semantics for existing exact manifests.
+- Audit history was exactly 3 attempts / 8 items before and after cleanup. The Audit UI continued to render the same three durable attempts, and Fantrax Synchronization Audit Availability and Release/Cap Consistency both passed.
+- The first read-only Data Health execution timed out after 60 seconds and explicitly reported that no data changed. One permitted read-only retry completed. Its only failure was the expected preview-dependent Fantrax Season Context Review because this cleanup task intentionally fetched no Fantrax preview; audit availability and release/cap consistency remained authoritative, and the active release diagnostic confirmed `optedIn:false`.
+- The browser console remained clean. No coordinator call, audit attempt/item, player status/provenance write, ownership or identity change, protected-field change, import, migration, release, score recalculation, Preview A/B fetch, manifest construction, harness arming, or synchronization occurred.
+
+### Restoration, Tests, And Status
+
+- GitHub Pages was restored to source `main`, path `/`, regardless of outcome. Restoration build `1145777246` completed successfully with status `built` in 51,866 ms at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`; repository Pages settings reported `main`.
+- Focused Gate 4 controller, Gate 4 harness, roster-sync, audit, and auth tests passed. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files, and `git diff --check` passed.
+- Status: **Gate 4E-1C0-1 production expanded opt-in cleanup passed completely.** Gate 4 was not resumed, and the ten-player synchronization remains unauthorized and unexecuted pending architect review.
