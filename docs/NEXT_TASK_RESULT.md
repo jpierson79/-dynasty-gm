@@ -1497,3 +1497,8 @@
 - Focused validation passed the Gate 4 controller and harness, roster synchronization, audit, public preview, season context, Data Health, authentication, roster-manager, and team-identity test files. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files.
 - The repair does not change persistence authority, timing, coordinator orchestration, batch size, opt-in policy, Preview A/B rules, Gate B, manifest semantics, digest rules, RLS, audit lifecycle, replay, actor stamping, manual overrides, identity, protected fields, or normal Fantrax synchronization behavior.
 - No deployment, production preview, opt-in change, manifest/audit creation, synchronization, migration, import, release, ownership/identity repair, score recalculation, or other cloud/data operation occurred. The work remains intentionally unstaged, uncommitted, and unpushed for architect review.
+
+### Architect-approved Checkpoint
+
+- Architect review approved the seven-file Gate 4E-1B repair for checkpointing only. Implementation commit `660c34d9493a37306027bd66be4fe6f623f8f474` (`Fix Gate 4 persistence availability state`) contains exactly the approved implementation, test, state, view, and preserved evidence files.
+- Push succeeded to `origin/feature/manager-intelligence` (`893b454..660c34d`). No deployment or production/data operation accompanied the checkpoint.
