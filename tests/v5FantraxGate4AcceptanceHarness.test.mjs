@@ -44,6 +44,9 @@ async function prepareHarness({persistenceAuthority=false,execute}={}){
 }
 
 const disabled=await prepareHarness();
+assert.equal(disabled.state.persistenceAuthority,false,"an implementation-checkpoint harness has no persistence authority");
+assert.equal(disabled.state.persistenceAvailable,false,"authority is required before persistence can become available");
+assert.equal(disabled.state.persistenceExecutable,false);
 assert.equal(disabled.state.checkpoints.previewAInvalidated.status,"PASS","opt-in transition explicitly invalidates Preview A");
 assert.equal(disabled.state.previewA,null,"Preview A cannot survive the opt-in transition");
 assert.ok(disabled.state.checkpoints.previewB.digest,"every checkpoint exposes a deterministic evidence digest");
@@ -54,7 +57,7 @@ const wrongArm=await disabled.armHumanConfirmation({confirmationDigest,manifestD
 assert.equal(wrongArm.status,"FAIL","the wrong exact manifest digest cannot arm persistence");
 assert.equal(disabled.state.armed,false);
 await disabled.armHumanConfirmation({confirmationDigest:await disabled.humanConfirmationDigest(),manifestDigest:exactDigest});
-assert.equal(disabled.state.armed,true,"the exact current manifest-v2 digest can arm the reviewed harness");
+assert.equal(disabled.state.armed,false,"an exact digest cannot arm a session without persistence authority");
 await assert.rejects(()=>disabled.persist(),/persistence is disabled/);
 assert.equal(disabled.state.persistenceCalled,false,"disabled persistence cannot consume the one-call latch");
 
@@ -69,11 +72,17 @@ const changed=structuredClone(rosterItems);changed[0].normalizedRosterStatus="MI
 substitution.recordPreviewB(preview("preview-b-2"));
 assert.equal(substitution.recordGateB(release(true),changed).status,"FAIL","Preview B cannot silently substitute or change a bound candidate");
 
-let calls=0;
-const armed=await prepareHarness({persistenceAuthority:true,execute:async({beforeAttempt})=>{await beforeAttempt();calls+=1;return {attempt:{id:"attempt-2"},digest:"durable",result:{reviewed:10,updated:[],skipped:[],failures:[]}}}});
+let calls=0,armed;
+armed=await prepareHarness({persistenceAuthority:true,execute:async({beforeAttempt})=>{assert.equal(armed.state.persistenceAvailable,false,"the latch removes availability before coordinator invocation");assert.equal(armed.state.armed,false,"the harness disarms before coordinator invocation");await beforeAttempt();calls+=1;return {attempt:{id:"attempt-2"},digest:"durable",result:{reviewed:10,updated:[],skipped:[],failures:[]}}}});
+assert.equal(armed.state.persistenceAuthority,true);
+assert.equal(armed.state.persistenceAvailable,true,"all pre-write checkpoints make authority available without conflating it with arming");
+assert.equal(armed.state.armed,true);
+assert.equal(armed.state.persistenceExecutable,true,"availability plus exact-digest arming makes the one call executable");
 await armed.persist();
 assert.equal(calls,1,"the armed harness makes exactly one production-coordinator call");
 assert.equal(armed.state.armed,false,"success leaves the harness disarmed");
+assert.equal(armed.state.persistenceAvailable,false,"latch consumption removes persistence availability");
+assert.equal(armed.state.persistenceExecutable,false);
 await assert.rejects(()=>armed.persist(),/already been used/);
 assert.equal(calls,1,"a second persistence call is impossible");
 
@@ -81,6 +90,7 @@ const drifted=await prepareHarness({persistenceAuthority:true,execute:async()=>{
 drifted.testLiveContext.period="139";
 await assert.rejects(()=>drifted.persist(),/invalidated by authentication, league, preview, candidate, release, season, period, protected baseline, manifest, or digest drift/);
 assert.equal(drifted.state.armed,false,"live context drift clears the arm state before persistence");
+assert.equal(drifted.state.persistenceAvailable,false,"live context drift invalidates pre-write readiness");
 assert.equal(drifted.state.persistenceCalled,false,"drift before invocation does not consume or enter the persistence boundary");
 
 const previewDrifted=await prepareHarness({persistenceAuthority:true,execute:async()=>{throw new Error("must not execute")}});
@@ -97,6 +107,7 @@ const failed=await prepareHarness({persistenceAuthority:true,execute:async()=>{t
 await assert.rejects(()=>failed.persist(),/guarded failure/);
 assert.equal(failed.state.persistenceCalled,true,"a failed coordinator invocation consumes the one-call latch");
 assert.equal(failed.state.armed,false,"a failed coordinator invocation cannot remain armed");
+assert.equal(failed.state.persistenceAvailable,false,"a failed consumed invocation cannot remain available");
 await assert.rejects(()=>failed.persist(),/already been used/);
 
 const manifestInput={leagueId:GATE4_EXPECTED_LEAGUE_ID,period:"",seasonContext:season,releaseTier:"V5.4.6E_OPT_IN_10",effectiveCap:10,updates:rosterItems.slice(0,10).map(row=>({id:row.matchedPlayerUuid,expectedOwnerTeamId:row.currentOwnerTeamId,currentRosterStatus:row.currentRosterStatus,roster_status:row.normalizedRosterStatus,fantraxApiPlayerId:row.fantraxApiPlayerId,fantraxTeamId:row.fantraxTeamId}))};
@@ -115,6 +126,23 @@ assert.match(harnessSource,/fetchFantraxPublicPreview/,"Preview A and B use the 
 assert.match(harnessSource,/listFantraxSyncAttempts/,"the audit baseline uses the canonical authenticated audit repository");
 const reviewView=fs.readFileSync(new URL("../v5/js/views/fantraxGate4AcceptanceView.js",import.meta.url),"utf8");
 assert.doesNotMatch(reviewView,/applyFantraxRosterStatuses|service[_-]?role|document\.cookie/i,"the production view has no raw repository, privileged, cookie, or token path");
-assert.match(renderFantraxGate4Acceptance({gate4Acceptance:{artifact:disabled.reviewArtifact(),persistenceEnabled:false,armed:false}}),/DISABLED \/ UNARMED/i,"a non-authorized harness remains visibly non-writable");
+const disabledView=renderFantraxGate4Acceptance({gate4Acceptance:{...disabled.reviewArtifact(),artifact:disabled.reviewArtifact()}});
+assert.match(disabledView,/Authority<\/span><b>NOT AUTHORIZED/i);
+assert.match(disabledView,/Persistence<\/span><b>DISABLED/i);
+assert.match(disabledView,/Arming<\/span><b>UNARMED/i);
+assert.match(disabledView,/Latch<\/span><b>UNUSED/i,"a non-authorized harness renders each canonical state independently");
+const readyArtifact={...armed.reviewArtifact(),persistenceCalled:false,persistenceAvailable:true,persistenceExecutable:false,armed:false};
+const readyView=renderFantraxGate4Acceptance({gate4Acceptance:{...readyArtifact,stage:"UNARMED",artifact:readyArtifact,manifest:armed.state.manifest}});
+assert.match(readyView,/Persistence<\/span><b>ENABLED/i);
+assert.match(readyView,/Arming<\/span><b>UNARMED/i,"enabled-but-unarmed state is explicit");
+const armedArtifact={...readyArtifact,persistenceExecutable:true,armed:true};
+const armedView=renderFantraxGate4Acceptance({gate4Acceptance:{...armedArtifact,stage:"ARMED FOR EXACT DIGEST",artifact:armedArtifact,manifest:armed.state.manifest}});
+assert.match(armedView,/Arming<\/span><b>ARMED/i);
+assert.match(armedView,/persistGate4Once/i,"only the canonical executable state exposes persistence");
+const usedArtifact={...armedArtifact,persistenceAvailable:false,persistenceExecutable:false,armed:false,persistenceCalled:true};
+const usedView=renderFantraxGate4Acceptance({gate4Acceptance:{...usedArtifact,artifact:usedArtifact}});
+assert.match(usedView,/Persistence<\/span><b>USED/i);
+assert.match(usedView,/Latch<\/span><b>USED/i);
+assert.doesNotMatch(usedView,/persistGate4Once/i,"a consumed latch cannot render persistence controls");
 
 console.log("v5FantraxGate4AcceptanceHarness tests passed");

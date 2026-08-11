@@ -8,7 +8,7 @@ import { saveFantraxSeasonContext } from "../repositories/leagueRepository.js?v5
 
 export const GATE4_CONTROLLER_STATES=["NOT_STARTED","RUNNING","PASS","BLOCKED","UNAVAILABLE","PERMISSION_BLOCKED","QUERY_FAILED"];
 const clean=value=>String(value??"").trim();
-const initial=()=>({stage:"NOT_STARTED",status:"NOT_STARTED",error:"",harness:null,preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,postProtectedBaseline:null,artifact:null,manifest:null,manifestDigest:"",confirmationDigest:"",persistenceResult:null,reviewStale:false,persistenceEnabled:false,armed:false});
+const initial=()=>({stage:"NOT_STARTED",status:"NOT_STARTED",error:"",harness:null,preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,postProtectedBaseline:null,artifact:null,manifest:null,manifestDigest:"",confirmationDigest:"",persistenceResult:null,reviewStale:false,persistenceAuthority:false,persistenceAvailable:false,persistenceExecutable:false,armed:false,persistenceCalled:false});
 function errorStatus(error){const message=String(error?.message||error||"Gate 4 review failed.");return {message,status:/permission|row.level security|not authorized|42501/i.test(message)?"PERMISSION_BLOCKED":/unavailable|network|timeout/i.test(message)?"UNAVAILABLE":"QUERY_FAILED"}}
 function exclusionReason(row){
   return fantraxStatusUpdateExclusionReason(row);
@@ -20,7 +20,7 @@ export function createFantraxGate4AcceptanceController({artifactCommit="",depend
   d.publishPreviewObservation=d.publishPreviewObservation||((preview)=>{d.appState.fantraxPreview=preview});
   d.invalidatePreviewObservation=d.invalidatePreviewObservation||(()=>{d.appState.fantraxPreview={...(d.appState.fantraxPreview||{}),data:null,loading:false,error:""}});
   let state=initial();
-  const publish=patch=>state={...state,...patch,persistenceEnabled:Boolean(state.harness?.reviewArtifact().persistenceEnabled),armed:Boolean(state.harness?.state.armed)};
+  const publish=patch=>{const artifact=state.harness?.reviewArtifact();return state={...state,...patch,persistenceAuthority:Boolean(artifact?.persistenceAuthority),persistenceAvailable:Boolean(artifact?.persistenceAvailable),persistenceExecutable:Boolean(artifact?.persistenceExecutable),armed:Boolean(artifact?.armed),persistenceCalled:Boolean(artifact?.persistenceCalled)}};
   const fail=error=>{const result=errorStatus(error);return publish({status:result.status,error:result.message,artifact:null})};
   const reviewedInput=async()=>({externalLeagueId:clean(d.appState.activeLeague?.settings?.fantraxSeasonContext?.externalLeagueId),players:await d.allPlayers(GATE4_EXPECTED_LEAGUE_ID),teams:d.appState.teams||[],reviewedSeasonContext:d.appState.activeLeague?.settings?.fantraxSeasonContext});
   const guardEvidence=()=>{

@@ -1453,3 +1453,47 @@
 - Regression coverage now explicitly proves the failed terminal surface retains opt-in cleanup and exposes neither persistence retry nor post-write agreement fetch.
 - Implementation checkpoint commit: `9001726e06615ce4272be904afe42d5160ba4cac` (`Add final Fantrax Gate 4 persistence bridge`). Push succeeded to `origin/feature/manager-intelligence` (`f5a6d22..9001726`).
 - The checkpoint contains exactly the eight architect-approved files. No deployment or production/data operation accompanied the commit or push.
+
+## V5.4.6E Gate 4E-1 Hosted Pre-Write Bridge Acceptance — Fail-Closed Stop
+
+### Exact Artifact And Passing Initial Evidence
+
+- Date: 2026-08-10 (America/Chicago). Preflight confirmed clean `feature/manager-intelligence` with local and remote HEAD both exactly `893b454ed84a313f8e65097b03de5fb405392cf7`; `git diff --check` passed.
+- GitHub Pages published that exact commit successfully with status `built` in 41,570 ms. The hosted URL used the production `?gate4Acceptance=1` controller entry and exact commit marker; no script injection or alternate path was used.
+- The normal authenticated Chrome session restored `joshua.pierson@yahoo.com`, selected Reddit Phanatics, and exited Loading. The production Gate 4 controller reached Gate A `PASS` with authoritative audit baseline 3 attempts / 8 items. The browser console had zero warnings or errors, and no persistence control was present.
+
+### Mandatory Pre-opt-in Contradiction
+
+- Gate 4E-1 **failed and stopped before Preview A** because the required read-only pre-opt-in state was not visibly satisfied. The contract requires the harness to remain `DISABLED / UNARMED` while re-establishing the read-only artifact. At Gate A, the exact hosted artifact displayed `Persistence: UNARMED`; the exact `DISABLED / UNARMED` label was absent.
+- Browser evidence found one `3 attempts / 8 items` baseline, zero `DISABLED / UNARMED` labels, two visible `UNARMED` occurrences, one enabled `Fetch Fresh Preview A` control, and zero persistence controls. Although no persistence button was exposed, the task makes the disabled state an explicit prerequisite and directs stopping on contradiction; it was not reinterpreted or weakened.
+- Because the contradiction occurred at Gate A, Preview A, candidate selection, protected baseline capture, expanded opt-in, Preview A invalidation, Preview B, repeated Gate B, manifest-v2, digest review, wrong/exact digest arming, and immediate pre-write guard acceptance were not attempted and remain unaccepted for Gate 4E-1.
+
+### Safety, Restoration, And Validation
+
+- No Fantrax preview was fetched. Expanded opt-in remained unchanged and did not require cleanup. No manifest, arm state, one-call latch consumption, coordinator invocation, audit attempt/item, player write, roster synchronization, migration, import, release, ownership/identity repair, manual-override change, score recalculation, or unrelated cloud/data write occurred. Audit history remained 3 attempts / 8 items.
+- GitHub Pages was restored to `main` regardless of failure. Restoration completed successfully with status `built` in 40,721 ms at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`; the Pages API verified source `main`, path `/`, and status `built`.
+- Focused Gate 4 controller/harness, coordinator-through-harness, roster-sync, audit, public-preview, preview-accounting/UI, season-context, Data Health, authentication, and architecture validation passed all 11 files. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed before this documentation update.
+- Status: **Gate 4E-1 failed at the mandatory pre-opt-in disabled-state checkpoint.** Per the task contract, this failure record is intentionally left unstaged and uncommitted for architect review; no push was performed.
+
+## V5.4.6E Gate 4E-1B Persistence Authority vs Availability State-Model Repair
+
+### Proven Contradiction And Canonical Model
+
+- The preserved Gate 4E-1/Gate 4E-1A evidence identified a real semantic defect: `persistenceEnabled` represented eventual session authority after Gate A even though the write remained unavailable until Preview B, repeated Gate B, exact-ten validation, protected baseline, manifest-v2, and immediate guards had all passed. The UI therefore rendered authority as `UNARMED` instead of truthfully reporting an authorized but presently disabled session.
+- The ambiguous field was removed from the Gate 4 harness, controller, application state, view, and regression tests. The canonical harness-owned fields are now independent: `persistenceAuthority` means the reviewed session may eventually make its one approved call; `persistenceAvailable` means every pre-write prerequisite is currently complete; `armed` means the human confirmed the exact current manifest-v2 digest; `persistenceCalled` is the consumed one-call latch. Derived `persistenceExecutable` is true only when availability and arming are both true and the latch is unused.
+- The controller only publishes the canonical harness state. The view performs no readiness inference and renders four separate dimensions: Authority (`AUTHORIZED` / `NOT AUTHORIZED`), Persistence (`DISABLED` / `ENABLED` / `USED`), Arming (`UNARMED` / `ARMED`), and Latch (`UNUSED` / `USED`). Persistence controls require canonical `persistenceAvailable` for arming and canonical `persistenceExecutable` for the one-call button; rendering and navigation remain side-effect free.
+
+### Transition And Invalidation Evidence
+
+- Initial/reset state is not authorized, disabled, unarmed, and latch-unused. Gate A, Preview A, exact-ten review, protected-baseline capture, and opt-in without Preview B legitimately retain session authority but remain disabled and unarmed.
+- Availability becomes true only after the canonical authenticated-user, league, audit, Gate A, candidate, protected-baseline, opt-in transition, Preview A invalidation, fresh Preview B, repeated Gate B, manifest-v2, exact digest, and immediate pre-write checkpoints all remain `PASS`. Human arming remains a separate exact-digest transition; a wrong digest or a session without authority cannot arm.
+- Authentication, league, release/configuration, period, season, preview, identity, candidate, protected-baseline, manifest, or digest drift invalidates the immediate pre-write checkpoint chain, availability, and arming. Reset/reload creates a new non-authorized, disabled, unarmed, unused in-memory session; it does not make a previously consumed session reusable.
+- The one-call latch is consumed and availability/arming are cleared before coordinator invocation. The already-reviewed authorization-context digest remains available only for the coordinator's repeated immediate guard callbacks, then is cleared after success or failure. Both outcomes remain disabled, unarmed, latch-used, with no retry or automatic re-arm.
+
+### Files, Validation, And Safety
+
+- Changed implementation files: `v5/js/services/fantraxGate4AcceptanceHarness.js`, `v5/js/services/fantraxGate4AcceptanceController.js`, `v5/js/state/appState.js`, and `v5/js/views/fantraxGate4AcceptanceView.js`.
+- Changed regression files: `tests/v5FantraxGate4AcceptanceHarness.test.mjs` and `tests/v5FantraxGate4AcceptanceController.test.mjs`. Coverage now proves all required authority/availability/arming/latch transitions, Gate A and pre-opt-in `AUTHORIZED + DISABLED + UNARMED + UNUSED`, enabled-but-unarmed and armed rendering, wrong-digest rejection, drift invalidation, pre-coordinator latch consumption, success/failure terminal safety, reset safety, no rendering-triggered persistence, and the unchanged coordinator-only normal synchronization boundary.
+- Focused validation passed the Gate 4 controller and harness, roster synchronization, audit, public preview, season context, Data Health, authentication, roster-manager, and team-identity test files. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files.
+- The repair does not change persistence authority, timing, coordinator orchestration, batch size, opt-in policy, Preview A/B rules, Gate B, manifest semantics, digest rules, RLS, audit lifecycle, replay, actor stamping, manual overrides, identity, protected fields, or normal Fantrax synchronization behavior.
+- No deployment, production preview, opt-in change, manifest/audit creation, synchronization, migration, import, release, ownership/identity repair, score recalculation, or other cloud/data operation occurred. The work remains intentionally unstaged, uncommitted, and unpushed for architect review.
