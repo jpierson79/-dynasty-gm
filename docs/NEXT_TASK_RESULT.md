@@ -1568,4 +1568,10 @@
 - Focused Gate 4 controller/harness, roster-sync/coordinator, audit, public-preview, preview-accounting/UI, season-context, Data Health, authentication, and architecture tests passed. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed before this documentation update.
 - Wrong-digest behavior was intentionally not changed. Preview A/B, Gate A/B, candidate selection, manifest-v2, exact-digest requirements, audit/replay, RLS, identity, manual overrides, protected fields, caps, coordinator orchestration, and normal Fantrax synchronization remain unchanged.
 - No deployment, production opt-in change, Fantrax preview, production manifest, harness arm, audit attempt, synchronization, player/protected-field write, migration, import, release, repair, score recalculation, or other cloud/data operation occurred. The production opt-in therefore remains enabled pending a separately authorized checkpoint/deployment and cleanup task.
-- Status: **implemented and locally validated; intentionally unstaged, uncommitted, and unpushed for architect review.**
+- Status: **implemented, validated, checkpointed, and pushed for architect review.**
+
+### Architect-Approved Checkpoint
+
+- Architect review approved Gate 4E-1C0 for checkpointing only. Implementation commit `65ef496fd02cf8a33d0035058fb3396ff7e51f1c` (`Expose pre-persistence Fantrax opt-in cleanup`) contains exactly the seven approved implementation, regression-test, state, view, and evidence files.
+- Push succeeded to `origin/feature/manager-intelligence` (`fbc1ee4..65ef496`). The focused 11-file validation, complete 37-file standalone suite, staged diff check, and post-commit working-tree check all passed.
+- No deployment or production/data operation accompanied the checkpoint. In particular, the production expanded opt-in remains enabled pending separately authorized deployment and canonical cleanup acceptance.
