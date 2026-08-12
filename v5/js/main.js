@@ -11,7 +11,7 @@ import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
 import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
-import { applyMlbamIdentityBackfill, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
+import { applyMlbamIdentityBackfill, buildMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -39,7 +39,7 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:""},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
 let waiverPage={recommendations:[],count:0,page:1,pageSize:50};
@@ -486,11 +486,18 @@ async function updateWaiverPage(query){
   render();
 }
 function bindViewEvents(){
+  const updateMlbamReview=changes=>{const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,review:{...current.review,...changes}};render()};
   $("#mlbamBackfillSeason")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
+  $("#mlbamEvidenceClass")?.addEventListener("change",event=>updateMlbamReview({matchClass:event.target.value,page:1}));
+  $("#mlbamEvidenceReason")?.addEventListener("change",event=>updateMlbamReview({reasonCode:event.target.value,page:1}));
+  $("#mlbamEvidenceSearch")?.addEventListener("change",event=>updateMlbamReview({search:event.target.value,page:1}));
+  $("#mlbamEvidencePrevious")?.addEventListener("click",()=>updateMlbamReview({page:Math.max(1,(importUiState.mlbamBackfill.review?.page||1)-1)}));
+  $("#mlbamEvidenceNext")?.addEventListener("click",()=>updateMlbamReview({page:(importUiState.mlbamBackfill.review?.page||1)+1}));
+  $("#downloadMlbamEvidence")?.addEventListener("click",()=>{const csv=buildMlbamReviewCsv(importUiState.mlbamBackfill.preview),url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),link=document.createElement("a");link.href=url;link.download=`mlbam-identity-review-${importUiState.mlbamBackfill.season}.csv`;link.click();URL.revokeObjectURL(url)});
   $("#reviewMlbamBackfill")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,reviewed:event.target.checked};render()});
   $("#previewMlbamBackfill")?.addEventListener("click",async()=>{
     const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
-    try{const preview=await previewMlbamIdentityBackfill({leagueId:appState.activeLeague.id,season:current.season});importUiState.mlbamBackfill={...current,running:false,preview,reviewed:false,result:null,error:""}}
+    try{const preview=await previewMlbamIdentityBackfill({leagueId:appState.activeLeague.id,season:current.season});importUiState.mlbamBackfill={...current,running:false,preview,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,result:null,error:""}}
     catch(error){const message=String(error?.message||error);importUiState.mlbamBackfill={...current,running:false,preview:{status:"UNAVAILABLE",createdAt:new Date().toISOString(),error:message,summary:{}},reviewed:false,result:null,error:message}}render();
   });
   $("#applyMlbamBackfill")?.addEventListener("click",async()=>{
@@ -508,6 +515,10 @@ function bindViewEvents(){
     try{
       const preview=await previewAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType:current.playerType,season:current.season});
       importUiState.statcast={...current,running:false,preview,reviewed:false,result:null,error:""};
+      if(importUiState.mlbamBackfill.preview?.status==="READY"){
+        const coverage=hypotheticalStatcastCoverage(importUiState.mlbamBackfill.preview,preview);
+        importUiState.mlbamBackfill.preview={...importUiState.mlbamBackfill.preview,hypotheticalStatcast:{...(importUiState.mlbamBackfill.preview.hypotheticalStatcast||{}),[current.playerType]:coverage,...coverage}};
+      }
     }catch(error){importUiState.statcast={...current,running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error)}}
     render();
   });

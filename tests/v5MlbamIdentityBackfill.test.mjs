@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fetchMlbIdentityCatalog } from "../v5/js/providers/mlbStatsApiProvider.js";
-import { applyMlbamIdentityBackfill, mlbamBackfillHealth, previewMlbamIdentityBackfill, resolveMlbamBackfill } from "../v5/js/services/mlbamIdentityBackfillService.js";
+import { applyMlbamIdentityBackfill, buildMlbamReviewCsv, hypotheticalStatcastCoverage, mlbamBackfillHealth, previewMlbamIdentityBackfill, queryMlbamPreviewRows, resolveMlbamBackfill } from "../v5/js/services/mlbamIdentityBackfillService.js";
 import { renderImports } from "../v5/js/views/importsView.js";
 
 function response(payload,type="application/json; charset=utf-8"){return {ok:true,status:200,headers:{get:name=>name.toLowerCase()==="content-type"?type:""},json:async()=>payload}}
@@ -41,6 +41,10 @@ const nameOnlyCatalog={...catalog,people:[{mlbamId:"707",fullName:"Name Only",ac
 assert.equal(resolveMlbamBackfill([players[4]],nameOnlyCatalog).rows[0].matchClass,"REVIEW","name-only result cannot write");
 const duplicateProposed=resolveMlbamBackfill([{...players[0],id:"a"},{...players[0],id:"b"}],catalog);
 assert.ok(duplicateProposed.rows.every(row=>row.matchClass==="AMBIGUOUS"));assert.equal(duplicateProposed.summary.duplicateProposed,1);
+assert.ok(duplicateProposed.rows.every(row=>row.reasonCode==="DUPLICATE_PROPOSED_MLBAM"&&!row.writeRecommended));
+assert.ok(duplicateProposed.rows.every(row=>row.conflictingPlayers.length===2),"all colliding UUIDs and names remain visible");
+const mixedCollision=resolveMlbamBackfill([{...players[0],id:"exact"},{...players[0],id:"review",mlb_team:""}],catalog);
+assert.ok(mixedCollision.rows.every(row=>row.matchClass==="AMBIGUOUS"&&!row.writeRecommended),"an exact/review collision blocks every participant without choosing a winner");
 const existingConflictCatalog={...catalog,people:[...catalog.people,{mlbamId:"606",fullName:"Conflict Person",active:true,primaryPosition:"C",currentTeam:{id:111,name:"Boston Red Sox"}}]};
 const existingConflict=resolveMlbamBackfill([...players,{id:"p7",name:"Conflict Person",mlbam_id:null,mlb_team:"BOS",positions:["C"]}],existingConflictCatalog).rows.find(row=>row.playerId==="p7");
 assert.equal(existingConflict.matchClass,"AMBIGUOUS");assert.equal(existingConflict.writeRecommended,false);assert.equal(existingConflict.ambiguityReason,"CONFLICTING_EXISTING_MLBAM");assert.deepEqual(existingConflict.conflictingPlayerIds,["p6"]);
@@ -56,6 +60,18 @@ const stale={...preview,createdAt:"2000-01-01T00:00:00.000Z"};
 await assert.rejects(applyMlbamIdentityBackfill({leagueId:"league-1",reviewedPreview:stale,reviewed:true,repositories:{apply:async()=>[]}}),/stale/);
 assert.equal(mlbamBackfillHealth(null).status,"NEVER_RUN");assert.equal(mlbamBackfillHealth(preview).exact,2);
 assert.equal(mlbamBackfillHealth({status:"UNAVAILABLE",error:"provider failed"}).status,"UNAVAILABLE");
+assert.equal(Object.values(preview.summary.reasonCounts).reduce((sum,count)=>sum+count,0),preview.summary.total,"reason accounting reconciles to every preview row");
+assert.equal(preview.summary.exact+preview.summary.review+preview.summary.ambiguous+preview.summary.unmatched+preview.summary.existing,preview.summary.total,"class accounting reconciles");
+assert.equal(preview.summary.classPercentages.exact,33.33);assert.equal(preview.summary.missingClassPercentages.exact,40,"Data Health receives deterministic total and missing-population percentages");
+const pageOne=queryMlbamPreviewRows(preview,{page:1,pageSize:2});assert.equal(pageOne.rows.length,2);assert.equal(pageOne.pageCount,3);
+assert.ok(queryMlbamPreviewRows(preview,{matchClass:"EXACT"}).rows.every(row=>row.matchClass==="EXACT"));
+assert.ok(queryMlbamPreviewRows(preview,{reasonCode:"NO_MLB_STATS_RESULT"}).rows.every(row=>row.reasonCode==="NO_MLB_STATS_RESULT"));
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"p4"}).rows.map(row=>row.playerId),["p4"],"search retains stable UUID identity");
+const csvReview=buildMlbamReviewCsv({...preview,rows:duplicateProposed.rows});assert.match(csvReview,/player_uuid/);assert.match(csvReview,/DUPLICATE_PROPOSED_MLBAM/);assert.match(csvReview,/"a"/);assert.match(csvReview,/"b"/);
+const statcastPreview={playerType:"hitter",snapshot:{rows:[{mlbamId:"101"},{mlbamId:"404"},{mlbamId:"999"}]},resolution:{matched:[]}};
+const hypothetical=hypotheticalStatcastCoverage(preview,statcastPreview);assert.equal(hypothetical.fetched,3);assert.equal(hypothetical.hypotheticallyMatchable,2);assert.equal(hypothetical.remainingUnmatched,1);
+assert.equal(hypotheticalStatcastCoverage(null,statcastPreview).status,"UNAVAILABLE");
+const collisionCoverage=hypotheticalStatcastCoverage({...preview,rows:duplicateProposed.rows},statcastPreview);assert.equal(collisionCoverage.hypotheticallyMatchable,0,"ambiguous proposals never count as hypothetical coverage");
 
 const root=new URL("../",import.meta.url);
 const migration=await readFile(new URL("supabase/migrations/013_mlbam_identity_backfill_boundary.sql",root),"utf8");
@@ -70,7 +86,9 @@ assert.doesNotMatch(service,/calculated_player_scores|owner_team_id|roster_statu
 const ui=renderImports({}, {mlbamBackfill:{season:2026,preview,reviewed:false,running:false},statcast:{season:2026}});
 assert.match(ui,/MLBAM Identity Backfill/);assert.match(ui,/Apply 2 Exact MLBAM IDs/);assert.match(ui,/p1/);assert.match(ui,/AMBIGUOUS/);
 assert.match(ui,/Existing MLBAM/);assert.match(ui,/Candidate org \/ position/);assert.match(ui,/NO WRITE/);
+assert.match(ui,/Download review CSV/);assert.match(ui,/Reason-code breakdown/);assert.match(ui,/page 1 of/);assert.match(ui,/Player, UUID, Fantrax or MLBAM/);
 assert.doesNotMatch(await readFile(new URL("v5/js/views/importsView.js",root),"utf8"),/statsapi\.mlb\.com|fetch\(/);
 assert.match(main,/previewMlbamIdentityBackfill/);assert.match(main,/reviewMlbamBackfill/);assert.match(dataHealth,/MLBAM Backfill Provider Preview/);
+assert.match(main,/hypotheticalStatcastCoverage/);assert.match(main,/buildMlbamReviewCsv/);assert.match(dataHealth,/MLBAM Backfill Reason Accounting/);assert.match(dataHealth,/MLBAM Hypothetical Statcast Coverage/);
 
 console.log("v5MlbamIdentityBackfill tests passed");
