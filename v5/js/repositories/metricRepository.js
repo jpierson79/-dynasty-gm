@@ -1,4 +1,4 @@
-import { selectAllLeagueRows } from "./baseRepository.js";
+import { selectAllLeagueRows, upsertLeagueRows } from "./baseRepository.js";
 
 export async function listMetrics(leagueId){
   return selectAllLeagueRows("player_metrics",leagueId,{order:"imported_at",ascending:false});
@@ -8,4 +8,20 @@ export async function metricCoverageRows(leagueId){
 }
 export function coverageByType(metrics,type){
   return new Set((metrics||[]).filter(metric=>String(metric.metric_type||"").includes(type)).map(metric=>metric.player_id)).size;
+}
+
+export async function upsertStatcastMetricRows(leagueId,rows,{batchSize=250}={}){
+  if(!leagueId)throw new Error("Active league is required.");
+  if(!Array.isArray(rows)||!rows.length)return [];
+  const saved=[];
+  for(let index=0;index<rows.length;index+=batchSize){
+    const batch=rows.slice(index,index+batchSize).map(row=>({...row,league_id:leagueId}));
+    try{
+      saved.push(...await upsertLeagueRows("player_metrics",batch,"player_id,source,season,metric_type"));
+    }catch(error){
+      error.statcastBatchResult={savedCount:saved.length,failedBatchSize:batch.length,remainingCount:rows.length-saved.length,batchStart:index};
+      throw error;
+    }
+  }
+  return saved;
 }

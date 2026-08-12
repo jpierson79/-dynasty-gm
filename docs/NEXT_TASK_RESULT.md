@@ -1663,3 +1663,51 @@
 - Active product direction is now **V5.5 Baseball Intelligence**: V5.5A Automated Statcast Data Provider; V5.5B Player Intelligence Engine 2.0; V5.5C Waiver vs. Roster Decision Engine; V5.5D Roster Churn / Protected-Investment-Churn Classification; and V5.5E Consolidation and Trade Target Intelligence.
 - `docs/NEXT_TASK.md` now defines V5.5A. Repository inspection selected a provider/service/repository pipeline that preserves raw snapshots, validates source data, resolves existing players only by authoritative MLBAM ID, writes normalized metrics through authenticated league-scoped repositories, and reports Data Health/audit evidence. It explicitly defers production ingestion, scoring, waiver logic, and view coupling.
 - This checkpoint changes documentation only. No V5.5 application code, tests, migrations, deployment configuration, Supabase state, player metrics, calculated scores, or cloud data were changed.
+
+## V5.5A Automated Statcast Data Provider — Local Implementation
+
+### Verified Public Interfaces
+
+- Date: 2026-08-11 (America/Chicago). Baseline preflight confirmed clean `feature/manager-intelligence` with local and remote HEAD exactly `24121940765cac955054db293f54c620fabb3531`; `git diff --check` passed.
+- MLB's public Baseball Savant Expected Statistics leaderboard exposes credential-free CSV downloads at `https://baseballsavant.mlb.com/leaderboard/expected_statistics` with `type`, `year`, `min`, and `csv=true`. Read-only live inspection returned HTTP 200, `text/csv; charset=utf-8`, `Access-Control-Allow-Origin: *`, and downloadable aggregate rows keyed by MLBAM `player_id`. Batter rows expose PA, BIP, BA/xBA, SLG/xSLG, and wOBA/xwOBA; pitcher rows additionally expose ERA/xERA.
+- The public Statcast leaderboard at `https://baseballsavant.mlb.com/leaderboard/statcast` returned the same credential-free/CORS-safe CSV behavior for batters and pitchers. Verified fields include MLBAM `player_id`, batted-ball events, average launch angle, sweet-spot rate, maximum and average exit velocity, hard-hit count/rate, barrels, barrel rate, and barrels per PA. Pitcher values are contact allowed.
+- Sprint speed is a separate public CSV source at `https://baseballsavant.mlb.com/leaderboard/sprint_speed`; it returned MLBAM `player_id`, competitive-run context, and `sprint_speed`. It is collected only for hitters.
+- MLB's primary Statcast Search CSV documentation (`https://baseballsavant.mlb.com/csv-docs`) confirms pitch/game-level batter and pitcher MLB IDs, dates, release speed, launch speed/angle, expected batted-ball values, pitch identity, and other event fields. V5.5A intentionally uses bounded season aggregates rather than downloading the much larger pitch-level dataset.
+- The inspected responses required no cookies, credentials, or browser session. Public cache headers were `max-age=1200`, `s-maxage=3600`; no published numeric rate limit was observed. One refresh uses three hitter requests or two pitcher requests, so the implementation is suitable for deliberate daily/periodic use rather than high-frequency polling.
+- Chase, whiff, strikeout, walk, pitch velocity/usage, and innings/batters-faced beyond Expected Statistics PA context were not verified together in the chosen bounded aggregate feeds. They remain explicitly deferred instead of being fabricated or inferred. Pitch-level/custom-leaderboard expansion requires a later reviewed source contract.
+
+### Provider, Snapshot, And Identity Architecture
+
+- `baseballSavantStatcastProvider.js` is the only endpoint-aware collector. It uses credential omission, bounded timeouts, HTTP/content-type checks, a quote-aware CSV parser, required-header/schema validation, supported-season validation, and SHA-256 source/schema checksums. Views and repositories contain no Baseball Savant endpoint knowledge.
+- The provider returns source-separated raw snapshot envelopes containing provider, source type, endpoint, season, fetched time, row count, exact headers, schema digest, payload checksum, warnings, and parsed raw rows. Persistence strips raw rows and retains the non-secret reproducibility metadata and deterministic combined snapshot identity.
+- `statcastProviderService.js` owns MLBAM-only resolution, preview construction, stale-preview rejection, normalized metric planning, blank-value preservation, idempotency, partial-result accounting, and the explicit apply boundary. It resolves only against paginated existing league players. Names are display-only; unmatched/invalid MLBAM rows are reported; duplicate cloud MLBAM mappings block the preview.
+- Existing `players.id` UUIDs are the metric foreign keys. The provider creates no players and never writes player identity, Fantrax identity, ownership, roster status/provenance, manual overrides, teams, HKB values, metrics from other providers, or calculated scores.
+
+### Normalized Metrics And Persistence
+
+- Hitter support: PA, BIP, BA, xBA, SLG, xSLG, wOBA, xwOBA, batted-ball events, average launch angle, sweet-spot rate, maximum/average exit velocity, hard-hit count/rate, barrels, barrel rate, barrels per PA, and sprint speed.
+- Pitcher support: PA/BIP contact context, BA/xBA allowed, SLG/xSLG allowed, wOBA/xwOBA allowed, ERA/xERA, batted-ball events allowed, average launch angle allowed, sweet-spot rate allowed, maximum/average exit velocity allowed, hard-hit count/rate allowed, barrels allowed, barrel rate allowed, and barrels per PA allowed.
+- Automated rows reuse the existing `player_metrics` table, canonical `source = 'Statcast'`, season, and `statcast_hitting`/`statcast_pitching` uniqueness boundary. Existing CSV rows are updated rather than duplicated. Normalized values stay at the existing flat metric-object level; `_statcast` holds provider, MLBAM, season/source date, fetched time, freshness, snapshot identity, and contributing source types.
+- Blank source values are omitted and cannot erase prior populated metric values. An identical snapshot with identical normalized values produces no metric upsert. Changed rows are written through `metricRepository.js` in batches of 250, with active-league UUID applied to every row.
+- Import-job creation and completion use the normal authenticated Supabase client and league-scoped RLS path. Additive, unapplied migration `012_statcast_refresh_metadata.sql` adds only JSON source metadata and nonnegative inserted/updated/failed counters to `import_jobs`; it performs no backfill, destructive rewrite, policy change, or RLS change.
+
+### Data Health And User Flow
+
+- The Cloud Imports view now exposes season and hitter/pitcher selection, a read-only `Preview Statcast` action, fetched/matched/unmatched/conflict and insert/update/unchanged counts, snapshot identity, explicit review acknowledgement, and a separate refresh action. Changing season or player type invalidates the preview and acknowledgement. Errors are visible and no score recalculation is chained to refresh.
+- Data Health reads automated import history independently and distinguishes `UNAVAILABLE`, `FAILED`, `PARTIAL`, `NEVER_RUN`, and available states. It reports last successful refresh, season/provider, rows fetched/matched/unmatched/inserted/updated/failed, metric-row count, staleness after 36 hours, warnings, errors, and snapshot freshness. A failed history query is not rendered as zero success.
+- One unmatched row does not prevent exact matched rows from being planned and persisted; the job is `partial` and visible. Malformed response type, missing required headers/schema drift, unsupported season, duplicate authoritative cloud MLBAM mapping, and stale or changed preview fail closed.
+
+### Files, Validation, And Deferred Work
+
+- Provider/service/repository/UI files: `v5/js/providers/baseballSavantStatcastProvider.js`, `v5/js/services/statcastProviderService.js`, `v5/js/repositories/metricRepository.js`, `v5/js/repositories/importJobRepository.js`, `v5/js/services/dataHealthService.js`, `v5/js/views/importsView.js`, and `v5/js/main.js`.
+- Schema checkpoint: `supabase/migrations/012_statcast_refresh_metadata.sql`, created but **not applied**.
+- Regression coverage: `tests/v5StatcastProvider.test.mjs` covers hitter/pitcher normalization, exact MLBAM matching, unmatched and duplicate handling, schema/content failures, idempotency, partial isolation, blank-field preservation, metadata/checksums, Data Health availability/freshness, protected write shape, migration additivity, and view/provider separation.
+- Focused provider, Data Health, player identity, serialization, CSV import, and Fantrax roster-sync tests passed. The complete sorted standalone suite passed all 38 `tests/*.test.mjs` files before the final documentation update. `git diff --check` passed before the final documentation update.
+- V5.5B remains deferred: no Player Intelligence scoring, score recalculation, waiver logic, churn classification, trade targeting, or elaborate visualization was added.
+- No deployment, migration application, production Statcast fetch/import, cloud metric write, player creation, ownership/roster/identity change, score recalculation, Fantrax Gate 4 action, or other production/data operation occurred. Status: **implemented and validated locally; intentionally uncommitted for architect review.**
+
+### Final Checkpoint Review
+
+- Source payload checksums now serialize parsed rows in deterministic order, so equivalent Baseball Savant data produces the same snapshot identity even when feed row order changes. Schema identity remains separately bound to the reviewed header order.
+- Batched metric writes retain a visible partial-failure boundary: if a later batch fails, the repository reports the number already saved and the service records a partial job with saved inserted/updated counts and the remaining failed count. Retrying remains idempotent through the existing metric uniqueness key.
+- The review reconfirmed MLBAM-only matching, stable player UUID foreign keys, no player creation or identity backfill, blank-value preservation, explicit preview/review before persistence, 250-row maximum batches, manual CSV fallback compatibility, and no score-recalculation side effect.

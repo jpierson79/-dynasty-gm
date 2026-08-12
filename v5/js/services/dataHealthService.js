@@ -4,6 +4,7 @@ import * as teams from "../repositories/teamRepository.js";
 import * as managers from "../repositories/managerRepository.js";
 import * as metrics from "../repositories/metricRepository.js";
 import * as scores from "../repositories/scoreRepository.js";
+import * as importJobs from "../repositories/importJobRepository.js";
 import { NORMALIZED_ROSTER_STATUSES, normalizeRosterStatus } from "../domain/rosterStatus.js";
 import { validFantasyTeamsForPlayers } from "../domain/teamRules.js";
 import { ENGINE_VERSION } from "../engine/dynastyEngine.js";
@@ -13,6 +14,7 @@ import { USER_TEAM_RESOLUTION_VERSION, resolveUserFantasyTeam } from "./userTeam
 import { buildScoreDiagnosticsFromRows } from "./liveScoreDiagnosticsService.js";
 import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6e-opt-in";
 import { fantraxRosterSyncReleasePolicy } from "./fantraxRosterSyncService.js?v5-4-6e-opt-in";
+import { statcastRefreshHealth } from "./statcastProviderService.js";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -88,15 +90,17 @@ export function fantraxPreviewHealthChecks(preview=null){
   ];
 }
 export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null,fantraxSyncAttempts=null,fantraxSyncAuditStatus="UNAVAILABLE",fantraxSyncAuditError=""}={}){
-  const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows]=await Promise.all([
+  const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows,statcastJobsResult]=await Promise.all([
     leagues.memberships(leagueId),
     players.allPlayers(leagueId),
     teams.allTeams(leagueId),
     managers.listManagers(leagueId),
     metrics.listMetrics(leagueId),
     scores.listScores(leagueId),
-    leagues.leagueById(leagueId).then(row=>row?[row]:[]).catch(()=>[])
+    leagues.leagueById(leagueId).then(row=>row?[row]:[]).catch(()=>[]),
+    importJobs.latestImportJobs(leagueId).then(rows=>({available:true,rows,error:""})).catch(error=>({available:false,rows:[],error:String(error?.message||error)}))
   ]);
+  const statcastHealth=statcastRefreshHealth({metricRows,importJobs:statcastJobsResult.rows,available:statcastJobsResult.available,error:statcastJobsResult.error});
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
   const fantraxAuditAvailable=fantraxSyncAuditStatus==="AVAILABLE"&&Array.isArray(fantraxSyncAttempts);
   const fantraxAudit=fantraxSyncAuditHealth(fantraxAuditAvailable?fantraxSyncAttempts:[]);
@@ -223,6 +227,10 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const staleTradeVersion=tradeState.analysis&&tradeState.analysis.tradeAnalysisVersion!==TRADE_ANALYSIS_VERSION?[tradeState.analysis]:[];
   const tradeScoreVersion=tradeState.analysis?.scoreVersion||tradeState.scoreVersion||"";
   const checks=[
+    {name:"Automated Statcast Provider Availability",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":["FAILED","PARTIAL"].includes(statcastHealth.status)?"WARNING":"PASS",details:detail("Automated Statcast Provider Availability",[statcastHealth])},
+    {name:"Last Successful Automated Statcast Refresh",status:statcastHealth.lastSuccessfulAt?"PASS":statcastHealth.status==="UNAVAILABLE"?"FAIL":"WARNING",details:detail("Last Successful Automated Statcast Refresh",[statcastHealth])},
+    {name:"Automated Statcast Freshness",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":statcastHealth.stale?"WARNING":"PASS",details:detail("Automated Statcast Freshness",[statcastHealth])},
+    {name:"Automated Statcast Identity And Row Outcomes",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":Number(statcastHealth.failed)>0?"WARNING":"PASS",details:detail("Automated Statcast Identity And Row Outcomes",[statcastHealth])},
     {name:"Fantrax Synchronization Audit Availability",status:fantraxAuditAvailable?"PASS":"FAIL",details:detail("Fantrax Synchronization Audit Availability",fantraxAuditAvailability)},
     {name:"Fantrax Synchronization Audit Integrity",status:fantraxAuditAvailable?fantraxAudit.status:"FAIL",details:detail("Fantrax Synchronization Audit Integrity",fantraxAuditAvailable?fantraxAudit.invalid:fantraxAuditAvailability)},
     {name:"Fantrax Synchronization Release And Cap Consistency",status:fantraxAuditAvailable?(fantraxAudit.releaseIssues.length?"FAIL":"PASS"):"FAIL",details:detail("Fantrax Synchronization Release And Cap Consistency",fantraxAuditAvailable?fantraxAudit.releaseIssues:fantraxAuditAvailability)},

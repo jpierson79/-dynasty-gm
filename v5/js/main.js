@@ -10,6 +10,7 @@ import { listPlayerIntelligence, playerIntelligenceByIds } from "./repositories/
 import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
+import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -37,7 +38,7 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
 let waiverPage={recommendations:[],count:0,page:1,pageSize:50};
@@ -484,6 +485,29 @@ async function updateWaiverPage(query){
   render();
 }
 function bindViewEvents(){
+  $("#statcastSeason")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
+  $("#statcastPlayerType")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,playerType:event.target.value,preview:null,reviewed:false,result:null,error:""};render()});
+  $("#reviewAutomatedStatcast")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,reviewed:event.target.checked};render()});
+  $("#previewAutomatedStatcast")?.addEventListener("click",async()=>{
+    const current=importUiState.statcast;
+    importUiState.statcast={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
+    try{
+      const preview=await previewAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType:current.playerType,season:current.season});
+      importUiState.statcast={...current,running:false,preview,reviewed:false,result:null,error:""};
+    }catch(error){importUiState.statcast={...current,running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error)}}
+    render();
+  });
+  $("#applyAutomatedStatcast")?.addEventListener("click",async()=>{
+    const current=importUiState.statcast;
+    if(!current.preview||!current.reviewed){setError("Preview and review the automated Statcast refresh first.");return}
+    importUiState.statcast={...current,running:true,result:null,error:""};render();
+    try{
+      const result=await applyAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType:current.playerType,reviewedPreview:current.preview});
+      importUiState.statcast={...current,running:false,preview:null,reviewed:false,result,error:""};
+      await refreshLeagueData();
+    }catch(error){importUiState.statcast={...current,running:false,result:null,error:String(error?.message||error)}}
+    render();
+  });
   $("#startGate4Acceptance")?.addEventListener("click",async()=>{await gate4Controller?.start();publishGate4ControllerState()});
   $("#fetchGate4PreviewA")?.addEventListener("click",async()=>{await gate4Controller?.fetchPreviewA();publishGate4ControllerState()});
   $all("[data-gate4-candidate]").forEach(input=>input.addEventListener("change",event=>{gate4Controller?.toggleCandidate(event.target.dataset.gate4Candidate,event.target.checked);publishGate4ControllerState()}));
