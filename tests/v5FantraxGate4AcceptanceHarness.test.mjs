@@ -61,6 +61,31 @@ assert.equal(disabled.state.armed,false,"an exact digest cannot arm a session wi
 await assert.rejects(()=>disabled.persist(),/persistence is disabled/);
 assert.equal(disabled.state.persistenceCalled,false,"disabled persistence cannot consume the one-call latch");
 
+let recoverableCalls=0;
+const recoverable=await prepareHarness({persistenceAuthority:true,execute:async()=>{recoverableCalls+=1;throw new Error("wrong digest must not execute")}});
+const recoverableCandidates=structuredClone(recoverable.state.checkpoints.candidates),recoverableBaseline=structuredClone(recoverable.state.checkpoints.protectedBaseline),recoverablePreviewB=recoverable.state.previewB,recoverableManifest=structuredClone(recoverable.state.manifest),recoverableExactDigest=recoverable.state.manifestDigest;
+const recoverableWrong=await recoverable.armHumanConfirmation({confirmationDigest:await recoverable.humanConfirmationDigest(),manifestDigest:"wrong-digest"});
+assert.equal(recoverableWrong.status,"FAIL","wrong digest remains a hard failure for that arming attempt");
+assert.equal(recoverable.state.armingError,"DIGEST_MISMATCH");
+assert.equal(recoverable.state.armed,false);
+assert.equal(recoverable.state.persistenceAvailable,true,"wrong digest preserves otherwise valid readiness");
+assert.equal(recoverable.state.persistenceExecutable,false);
+assert.equal(recoverable.state.persistenceCalled,false,"wrong digest leaves the latch unused");
+assert.equal(recoverableCalls,0,"wrong digest cannot reach the coordinator, audit creation, or player persistence");
+assert.deepEqual(recoverable.state.checkpoints.candidates,recoverableCandidates);
+assert.deepEqual(recoverable.state.checkpoints.protectedBaseline,recoverableBaseline);
+assert.equal(recoverable.state.previewB,recoverablePreviewB);
+assert.deepEqual(recoverable.state.manifest,recoverableManifest);
+const recoverableExact=await recoverable.armHumanConfirmation({confirmationDigest:await recoverable.humanConfirmationDigest(),manifestDigest:recoverableExactDigest});
+assert.equal(recoverableExact.status,"PASS","the exact current digest can arm without rebuilding review");
+assert.equal(recoverable.state.armingError,"");
+assert.equal(recoverable.state.armed,true);
+assert.equal(recoverable.state.persistenceExecutable,true);
+recoverable.recordPreWriteGuards({...recoverable.state.checkpoints.preWriteGuards.evidence,previewFetchedAt:"stale-preview"});
+assert.equal(recoverable.state.armingError,"","review drift clears stale recoverable arming errors");
+assert.equal(recoverable.state.armed,false,"genuine Preview B drift still disarms");
+assert.equal(recoverable.state.persistenceAvailable,false,"genuine Preview B drift remains blocking");
+
 const elevenState={authUser:{id:"user-1"},activeLeague:release(false)};
 const eleven=createGate4AcceptanceHarness({artifactCommit:"exact-commit",dependencies:{appState:elevenState,currentUser:async()=>elevenState.authUser}});
 await eleven.recordAuthenticatedUser();eleven.recordActiveLeague();eleven.recordAuditBaseline([]);eleven.recordGateA({ready:true});eleven.recordPreviewA(preview("preview-a"));

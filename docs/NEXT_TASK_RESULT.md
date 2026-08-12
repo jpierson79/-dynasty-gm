@@ -1599,3 +1599,27 @@
 - GitHub Pages was restored to source `main`, path `/`, regardless of outcome. Restoration build `1145777246` completed successfully with status `built` in 51,866 ms at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`; repository Pages settings reported `main`.
 - Focused Gate 4 controller, Gate 4 harness, roster-sync, audit, and auth tests passed. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files, and `git diff --check` passed.
 - Status: **Gate 4E-1C0-1 production expanded opt-in cleanup passed completely.** Gate 4 was not resumed, and the ten-player synchronization remains unauthorized and unexecuted pending architect review.
+
+## V5.4.6E Gate 4E-1C1 Recoverable Wrong-Digest Arming Repair — Local Implementation
+
+### Root Cause And Recoverable Semantics
+
+- Baseline preflight confirmed clean `feature/manager-intelligence` at local and remote HEAD `f94adaeb65c2ea0b3393a55df6b3657b5d8c7f71`; the accepted production expanded opt-in remains disabled/recovery-only.
+- The harness already kept every readiness checkpoint outside `humanConfirmation` intact after a failed digest comparison. The destructive behavior was in `fantraxGate4AcceptanceController.armExactDigest()`: its early typed-digest check published top-level `status: BLOCKED`, so the next exact entry failed the controller's own `UNARMED / PASS` prerequisite even though Preview B, candidates, protected baseline, manifest-v2, and immediate guards were still valid.
+- The harness and controller now expose the narrow canonical field `armingError`. An incorrect operator-entered digest produces `DIGEST_MISMATCH`, leaves the controller at `UNARMED / PASS`, and preserves Authority `AUTHORIZED`, Persistence `ENABLED`, Arming `UNARMED`, Latch `UNUSED`, `persistenceAvailable = true`, `persistenceExecutable = false`, and `persistenceCalled = false`.
+- The mismatch remains a hard failure for that arming attempt. It cannot invoke the coordinator, create an audit attempt, or write player data. The UI visibly distinguishes the recoverable arming error from a blocked acceptance and retains the exact-digest retry input without exposing the persistence control.
+- Supplying the exact current manifest digest with no intervening drift clears `armingError`, reuses the still-valid reviewed checkpoint chain, and reaches `ARMED FOR EXACT DIGEST / PASS` with Authority `AUTHORIZED`, Persistence `ENABLED`, Arming `ARMED`, Latch `UNUSED`, and `persistenceExecutable = true`. No preview refetch, candidate substitution, protected-baseline recapture, or manifest rebuild is required solely because of the prior mistype.
+
+### Genuine Blockers And Error Clearing
+
+- Canonical invalidation still clears arming and any stale recoverable error when authentication, league, release/configuration, period, season context, Preview B, candidate identity/set, ownership/team identity, manual override, status, protected baseline, manifest, or digest context changes. A failing re-run of immediate guards still removes persistence availability and remains blocking.
+- Reset, cancellation, manifest rebuild, and all upstream checkpoint invalidations clear `armingError`. A new manifest cannot inherit `DIGEST_MISMATCH`. The one-call latch remains unchanged and is still consumed only immediately before the shared coordinator invocation.
+- `fantraxSyncCoordinator.js` remains the sole persistence orchestration path for both normal V5 synchronization and Gate 4. No RLS, audit, replay, release-tier, batch-cap, identity, override, protected-field, Preview A/B, Gate A/B, manifest-v2, or normal roster-sync behavior changed.
+
+### Files, Tests, And Safety
+
+- Changed implementation files: `v5/js/services/fantraxGate4AcceptanceHarness.js`, `v5/js/services/fantraxGate4AcceptanceController.js`, `v5/js/state/appState.js`, and `v5/js/views/fantraxGate4AcceptanceView.js`.
+- Changed regression files: `tests/v5FantraxGate4AcceptanceHarness.test.mjs` and `tests/v5FantraxGate4AcceptanceController.test.mjs`. Coverage proves wrong-digest non-arming, retained availability and exact-ten review evidence, unused latch, zero coordinator/audit/player-write calls, visible retry state, exact-digest recovery, error clearing, and continued fail-closed drift invalidation.
+- Focused Gate 4 harness/controller, coordinator/roster-sync, audit, public-preview, preview accounting/UI, season-context, Data Health, auth, and architecture tests passed. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed.
+- No deployment, production preview, production opt-in change, harness arm, manifest/audit creation, synchronization, migration, import, release, ownership/identity repair, protected-field write, score recalculation, or other cloud/data operation occurred.
+- Status: **implemented and locally validated; intentionally unstaged, uncommitted, and unpushed for architect review.**

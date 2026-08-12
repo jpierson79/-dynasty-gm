@@ -8,7 +8,7 @@ import { saveFantraxSeasonContext } from "../repositories/leagueRepository.js?v5
 
 export const GATE4_CONTROLLER_STATES=["NOT_STARTED","RUNNING","PASS","BLOCKED","UNAVAILABLE","PERMISSION_BLOCKED","QUERY_FAILED"];
 const clean=value=>String(value??"").trim();
-const initial=()=>({stage:"NOT_STARTED",status:"NOT_STARTED",error:"",harness:null,preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,postProtectedBaseline:null,artifact:null,manifest:null,manifestDigest:"",confirmationDigest:"",persistenceResult:null,reviewStale:false,expandedOptInEnabled:false,persistenceAuthority:false,persistenceAvailable:false,persistenceExecutable:false,armed:false,persistenceCalled:false});
+const initial=()=>({stage:"NOT_STARTED",status:"NOT_STARTED",error:"",armingError:"",harness:null,preview:null,previewAGateB:null,eligibleRows:[],excludedRows:[],selectedIds:[],protectedBaseline:null,postProtectedBaseline:null,artifact:null,manifest:null,manifestDigest:"",confirmationDigest:"",persistenceResult:null,reviewStale:false,expandedOptInEnabled:false,persistenceAuthority:false,persistenceAvailable:false,persistenceExecutable:false,armed:false,persistenceCalled:false});
 function errorStatus(error){const message=String(error?.message||error||"Gate 4 review failed.");return {message,status:/permission|row.level security|not authorized|42501/i.test(message)?"PERMISSION_BLOCKED":/unavailable|network|timeout/i.test(message)?"UNAVAILABLE":"QUERY_FAILED"}}
 function exclusionReason(row){
   return fantraxStatusUpdateExclusionReason(row);
@@ -20,7 +20,7 @@ export function createFantraxGate4AcceptanceController({artifactCommit="",depend
   d.publishPreviewObservation=d.publishPreviewObservation||((preview)=>{d.appState.fantraxPreview=preview});
   d.invalidatePreviewObservation=d.invalidatePreviewObservation||(()=>{d.appState.fantraxPreview={...(d.appState.fantraxPreview||{}),data:null,loading:false,error:""}});
   let state=initial();
-  const publish=patch=>{const artifact=state.harness?.reviewArtifact(),policy=d.fantraxRosterSyncReleasePolicy(d.appState.activeLeague);return state={...state,...patch,expandedOptInEnabled:Boolean(state.harness&&d.appState.activeLeague?.id===GATE4_EXPECTED_LEAGUE_ID&&policy.valid&&policy.optedIn),persistenceAuthority:Boolean(artifact?.persistenceAuthority),persistenceAvailable:Boolean(artifact?.persistenceAvailable),persistenceExecutable:Boolean(artifact?.persistenceExecutable),armed:Boolean(artifact?.armed),persistenceCalled:Boolean(artifact?.persistenceCalled)}};
+  const publish=patch=>{const artifact=state.harness?.reviewArtifact(),policy=d.fantraxRosterSyncReleasePolicy(d.appState.activeLeague);return state={...state,...patch,armingError:patch.armingError??artifact?.armingError??state.armingError,expandedOptInEnabled:Boolean(state.harness&&d.appState.activeLeague?.id===GATE4_EXPECTED_LEAGUE_ID&&policy.valid&&policy.optedIn),persistenceAuthority:Boolean(artifact?.persistenceAuthority),persistenceAvailable:Boolean(artifact?.persistenceAvailable),persistenceExecutable:Boolean(artifact?.persistenceExecutable),armed:Boolean(artifact?.armed),persistenceCalled:Boolean(artifact?.persistenceCalled)}};
   const fail=error=>{const result=errorStatus(error);return publish({status:result.status,error:result.message,artifact:null})};
   const reviewedInput=async()=>({externalLeagueId:clean(d.appState.activeLeague?.settings?.fantraxSeasonContext?.externalLeagueId),players:await d.allPlayers(GATE4_EXPECTED_LEAGUE_ID),teams:d.appState.teams||[],reviewedSeasonContext:d.appState.activeLeague?.settings?.fantraxSeasonContext});
   const guardEvidence=()=>{
@@ -122,13 +122,13 @@ export function createFantraxGate4AcceptanceController({artifactCommit="",depend
     },
     async armExactDigest(typedDigest=""){
       if(state.stage!=="UNARMED"||state.status!=="PASS")return publish({status:"BLOCKED",error:"The final manifest review must be complete before arming."});
-      if(clean(typedDigest)!==state.manifestDigest)return publish({status:"BLOCKED",error:"The typed digest does not exactly match the current manifest-v2 digest."});
       try{
         const guards=state.harness.recordPreWriteGuards(guardEvidence());
         if(guards.status!=="PASS")return publish({status:"BLOCKED",error:guards.reasons.join(" ")});
         const confirmationDigest=await state.harness.humanConfirmationDigest(),armed=await state.harness.armHumanConfirmation({confirmationDigest,manifestDigest:clean(typedDigest)});
-        if(armed.status!=="PASS")return publish({status:"BLOCKED",error:armed.reasons.join(" ")});
-        return publish({stage:"ARMED FOR EXACT DIGEST",status:"PASS",confirmationDigest,artifact:state.harness.reviewArtifact(),error:""});
+        if(armed.status!=="PASS"&&state.harness.state.armingError==="DIGEST_MISMATCH")return publish({stage:"UNARMED",status:"PASS",armingError:"DIGEST_MISMATCH",error:"",confirmationDigest,artifact:state.harness.reviewArtifact()});
+        if(armed.status!=="PASS")return publish({status:"BLOCKED",armingError:"",error:armed.reasons.join(" ")});
+        return publish({stage:"ARMED FOR EXACT DIGEST",status:"PASS",armingError:"",confirmationDigest,artifact:state.harness.reviewArtifact(),error:""});
       }catch(error){return fail(error)}
     },
     async persistOnce(){
