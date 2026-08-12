@@ -1704,10 +1704,11 @@
 - Regression coverage: `tests/v5StatcastProvider.test.mjs` covers hitter/pitcher normalization, exact MLBAM matching, unmatched and duplicate handling, schema/content failures, idempotency, partial isolation, blank-field preservation, metadata/checksums, Data Health availability/freshness, protected write shape, migration additivity, and view/provider separation.
 - Focused provider, Data Health, player identity, serialization, CSV import, and Fantrax roster-sync tests passed. The complete sorted standalone suite passed all 38 `tests/*.test.mjs` files before the final documentation update. `git diff --check` passed before the final documentation update.
 - V5.5B remains deferred: no Player Intelligence scoring, score recalculation, waiver logic, churn classification, trade targeting, or elaborate visualization was added.
-- No deployment, migration application, production Statcast fetch/import, cloud metric write, player creation, ownership/roster/identity change, score recalculation, Fantrax Gate 4 action, or other production/data operation occurred. Status: **implemented and validated locally; intentionally uncommitted for architect review.**
+- No deployment, migration application, production Statcast fetch/import, cloud metric write, player creation, ownership/roster/identity change, score recalculation, Fantrax Gate 4 action, or other production/data operation occurred. Status: **implemented, validated, and checkpointed after architect approval.**
 
 ### Final Checkpoint Review
 
 - Source payload checksums now serialize parsed rows in deterministic order, so equivalent Baseball Savant data produces the same snapshot identity even when feed row order changes. Schema identity remains separately bound to the reviewed header order.
 - Batched metric writes retain a visible partial-failure boundary: if a later batch fails, the repository reports the number already saved and the service records a partial job with saved inserted/updated counts and the remaining failed count. Retrying remains idempotent through the existing metric uniqueness key.
 - The review reconfirmed MLBAM-only matching, stable player UUID foreign keys, no player creation or identity backfill, blank-value preservation, explicit preview/review before persistence, 250-row maximum batches, manual CSV fallback compatibility, and no score-recalculation side effect.
+- Implementation commit: `6b56f34` (`Add automated Baseball Savant Statcast provider`). Push to `origin/feature/manager-intelligence` succeeded (`2412194..6b56f34`).
