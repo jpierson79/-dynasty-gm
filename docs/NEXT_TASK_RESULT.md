@@ -1622,4 +1622,10 @@
 - Changed regression files: `tests/v5FantraxGate4AcceptanceHarness.test.mjs` and `tests/v5FantraxGate4AcceptanceController.test.mjs`. Coverage proves wrong-digest non-arming, retained availability and exact-ten review evidence, unused latch, zero coordinator/audit/player-write calls, visible retry state, exact-digest recovery, error clearing, and continued fail-closed drift invalidation.
 - Focused Gate 4 harness/controller, coordinator/roster-sync, audit, public-preview, preview accounting/UI, season-context, Data Health, auth, and architecture tests passed. The complete sorted standalone suite passed all 37 `tests/*.test.mjs` files. `git diff --check` passed.
 - No deployment, production preview, production opt-in change, harness arm, manifest/audit creation, synchronization, migration, import, release, ownership/identity repair, protected-field write, score recalculation, or other cloud/data operation occurred.
-- Status: **implemented and locally validated; intentionally unstaged, uncommitted, and unpushed for architect review.**
+- Status: **implemented, validated, checkpointed, and pushed for architect review.**
+
+### Architect-Approved Checkpoint
+
+- Architect review approved Gate 4E-1C1 for checkpointing only. Implementation commit `94538d4b8cd7b2858d66def4e736c2340f80ee43` (`Fix recoverable Fantrax digest arming`) contains exactly the seven approved implementation, regression-test, state, view, and evidence files.
+- Push succeeded to `origin/feature/manager-intelligence` (`f94adae..94538d4`). The focused 11-file validation, complete 37-file standalone suite, staged diff check, and post-commit working-tree check all passed.
+- No deployment or production/data operation accompanied the checkpoint. Production expanded opt-in remains disabled/recovery-only, and hosted Gate 4E-1 acceptance was not resumed.
