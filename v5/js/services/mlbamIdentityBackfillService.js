@@ -59,15 +59,22 @@ export function resolveMlbamBackfill(playerRows,catalog){
 
 export function queryMlbamPreviewRows(preview,{matchClass="ALL",reasonCode="ALL",search="",page=1,pageSize=50}={}){
   const needle=normalizedName(search),size=Math.max(1,Math.min(250,Number(pageSize)||50));
-  const filtered=(preview?.rows||[]).filter(row=>(matchClass==="ALL"||row.matchClass===matchClass)&&(reasonCode==="ALL"||row.reasonCode===reasonCode)&&(!needle||normalizedName(`${row.playerName} ${row.playerId} ${row.fantraxId} ${row.fantraxApiPlayerId} ${row.proposedMlbamId}`).includes(needle)));
+  const filtered=(preview?.rows||[]).filter(row=>(matchClass==="ALL"||row.matchClass===matchClass)&&(reasonCode==="ALL"||row.reasonCode===reasonCode)&&(!needle||normalizedName(`${row.playerName} ${row.playerId} ${row.fantraxId} ${row.fantraxApiPlayerId} ${row.currentMlbamId} ${row.proposedMlbamId}`).includes(needle)));
   const pageCount=Math.max(1,Math.ceil(filtered.length/size)),currentPage=Math.max(1,Math.min(pageCount,Number(page)||1)),start=(currentPage-1)*size;
   return {rows:filtered.slice(start,start+size),total:filtered.length,page:currentPage,pageSize:size,pageCount};
 }
 function csvCell(value){const text=Array.isArray(value)?value.join("|"):typeof value==="object"&&value?JSON.stringify(value):String(value??"");return `"${text.replaceAll('"','""')}"`}
 export function buildMlbamReviewCsv(preview){
-  const headers=["player_uuid","player_name","fantrax_id","fantrax_api_id","stored_organization","stored_positions","existing_mlbam","proposed_mlbam","candidate_team","candidate_parent_organization","candidate_position","active_person","classification","writable","reason_code","human_reason","evidence","conflicting_players"];
-  const rows=(preview?.rows||[]).map(row=>[row.playerId,row.playerName,row.fantraxId,row.fantraxApiPlayerId,row.mlbTeam,row.positions,row.currentMlbamId,row.proposedMlbamId,row.candidate?.currentTeam?.name,row.candidate?.currentTeam?.parentOrgName,row.candidate?.primaryPosition,row.candidate?.active,row.matchClass,row.writeRecommended?"YES":"NO",row.reasonCode,row.humanReason,row.evidence,row.conflictingPlayers||row.conflictingPlayerIds]);
+  const headers=["player_uuid","player_name","fantrax_id","fantrax_api_id","stored_organization","stored_positions","existing_mlbam","proposed_mlbam","candidate_team","candidate_parent_organization","candidate_position","active_person","classification","writable","reason_code","human_reason","evidence","conflicting_mlbam","conflicting_player_uuids","conflicting_player_names"];
+  const rows=(preview?.rows||[]).map(row=>{const conflicts=row.conflictingPlayers||[];return [row.playerId,row.playerName,row.fantraxId,row.fantraxApiPlayerId,row.mlbTeam,row.positions,row.currentMlbamId,row.proposedMlbamId,row.candidate?.currentTeam?.name,row.candidate?.currentTeam?.parentOrgName,row.candidate?.primaryPosition,row.candidate?.active,row.matchClass,row.writeRecommended?"YES":"NO",row.reasonCode,row.humanReason,row.evidence,row.conflictingProposedMlbamId||"",conflicts.length?conflicts.map(item=>item.playerId):row.conflictingPlayerIds||[],conflicts.map(item=>item.playerName)];});
   return [headers,...rows].map(row=>row.map(csvCell).join(",")).join("\r\n");
+}
+export function downloadMlbamReviewCsv(preview,{season,documentRef=globalThis.document,urlApi=globalThis.URL,BlobCtor=globalThis.Blob,defer=globalThis.setTimeout}={}){
+  if(!documentRef?.createElement||!urlApi?.createObjectURL||!BlobCtor||!defer)throw new Error("Browser download support is unavailable.");
+  const csv=buildMlbamReviewCsv(preview),url=urlApi.createObjectURL(new BlobCtor([csv],{type:"text/csv;charset=utf-8"})),link=documentRef.createElement("a");
+  link.href=url;link.download=`mlbam-identity-full-evidence-${season||preview?.season||"unknown"}.csv`;link.style.display="none";documentRef.body?.appendChild(link);link.click();
+  defer(()=>{link.remove?.();urlApi.revokeObjectURL(url)},0);
+  return {filename:link.download,rowCount:preview?.rows?.length||0};
 }
 export function hypotheticalStatcastCoverage(mlbamPreview,statcastPreview){
   if(!mlbamPreview||mlbamPreview.status!=="READY"||!statcastPreview?.snapshot?.rows)return {status:"UNAVAILABLE",error:"Both ready MLBAM and Statcast previews are required."};

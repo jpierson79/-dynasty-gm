@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fetchMlbIdentityCatalog } from "../v5/js/providers/mlbStatsApiProvider.js";
-import { applyMlbamIdentityBackfill, buildMlbamReviewCsv, hypotheticalStatcastCoverage, mlbamBackfillHealth, previewMlbamIdentityBackfill, queryMlbamPreviewRows, resolveMlbamBackfill } from "../v5/js/services/mlbamIdentityBackfillService.js";
+import { applyMlbamIdentityBackfill, buildMlbamReviewCsv, downloadMlbamReviewCsv, hypotheticalStatcastCoverage, mlbamBackfillHealth, previewMlbamIdentityBackfill, queryMlbamPreviewRows, resolveMlbamBackfill } from "../v5/js/services/mlbamIdentityBackfillService.js";
 import { renderImports } from "../v5/js/views/importsView.js";
 
 function response(payload,type="application/json; charset=utf-8"){return {ok:true,status:200,headers:{get:name=>name.toLowerCase()==="content-type"?type:""},json:async()=>payload}}
@@ -21,7 +21,7 @@ await assert.rejects(fetchMlbIdentityCatalog({season:2026,sportIds:[1],fetchImpl
 await assert.rejects(fetchMlbIdentityCatalog({season:2026,sportIds:[1],fetchImpl:()=>response({},"text/html")}),/content type/);
 
 const players=[
-  {id:"p1",name:"Jose Example",fantrax_id:"*fx1*",mlbam_id:null,mlb_team:"NYY",positions:["SS"]},
+  {id:"p1",name:"Jose Example",fantrax_id:"*fx1*",fantrax_api_player_id:"api101",mlbam_id:null,mlb_team:"NYY",positions:["SS"]},
   {id:"p2",name:"Duplicate Name",mlbam_id:null,mlb_team:"NYY",positions:["SP"]},
   {id:"p3",name:"Retired Player",mlbam_id:null,mlb_team:"NYY",positions:["OF"]},
   {id:"p4",name:"Prospect One",mlbam_id:null,mlb_team:"NYY",positions:["OF"]},
@@ -67,7 +67,22 @@ const pageOne=queryMlbamPreviewRows(preview,{page:1,pageSize:2});assert.equal(pa
 assert.ok(queryMlbamPreviewRows(preview,{matchClass:"EXACT"}).rows.every(row=>row.matchClass==="EXACT"));
 assert.ok(queryMlbamPreviewRows(preview,{reasonCode:"NO_MLB_STATS_RESULT"}).rows.every(row=>row.reasonCode==="NO_MLB_STATS_RESULT"));
 assert.deepEqual(queryMlbamPreviewRows(preview,{search:"p4"}).rows.map(row=>row.playerId),["p4"],"search retains stable UUID identity");
-const csvReview=buildMlbamReviewCsv({...preview,rows:duplicateProposed.rows});assert.match(csvReview,/player_uuid/);assert.match(csvReview,/DUPLICATE_PROPOSED_MLBAM/);assert.match(csvReview,/"a"/);assert.match(csvReview,/"b"/);
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"jose example"}).rows.map(row=>row.playerId),["p1"],"player-name search is case-insensitive");
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"FX1"}).rows.map(row=>row.playerId),["p1"],"Fantrax identity search is case-insensitive");
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"api101"}).rows.map(row=>row.playerId),["p1"],"Fantrax API identity search uses the canonical preview row");
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"404"}).rows.map(row=>row.playerId),["p4"],"proposed MLBAM search filters canonical preview rows");
+assert.deepEqual(queryMlbamPreviewRows(preview,{search:"606"}).rows.map(row=>row.playerId),["p6"],"existing MLBAM search filters canonical preview rows");
+assert.deepEqual(queryMlbamPreviewRows(preview,{matchClass:"EXACT",search:"prospect"}).rows.map(row=>row.playerId),["p4"],"classification and search compose before pagination");
+assert.deepEqual(queryMlbamPreviewRows(preview,{reasonCode:"EXACT_ORG_POSITION_ACTIVE",search:"jose"}).rows.map(row=>row.playerId),["p1"],"reason and search compose before pagination");
+assert.equal(queryMlbamPreviewRows(preview,{search:"retired",page:99,pageSize:1}).page,1,"pagination clamps after filtering rather than before it");
+assert.equal(queryMlbamPreviewRows(preview,{search:"",pageSize:50}).total,preview.rows.length,"clearing search restores the complete preview");
+const immutableBefore=preview.rows.map(row=>({matchClass:row.matchClass,writeRecommended:row.writeRecommended}));queryMlbamPreviewRows(preview,{search:"jose"});assert.deepEqual(preview.rows.map(row=>({matchClass:row.matchClass,writeRecommended:row.writeRecommended})),immutableBefore,"search never mutates identity classification or writability");
+const csvRows=[...duplicateProposed.rows,{...preview.rows[0],playerId:'csv-row',playerName:'Comma, "Quote"\nLine',fantraxApiPlayerId:'api-1'}];
+const csvReview=buildMlbamReviewCsv({...preview,rows:csvRows});assert.match(csvReview,/player_uuid/);assert.match(csvReview,/DUPLICATE_PROPOSED_MLBAM/);assert.match(csvReview,/conflicting_mlbam/);assert.match(csvReview,/conflicting_player_uuids/);assert.match(csvReview,/conflicting_player_names/);assert.match(csvReview,/"a"/);assert.match(csvReview,/"b"/);assert.match(csvReview,/"Comma, ""Quote""\nLine"/);assert.equal(csvReview.split("\r\n").length,csvRows.length+1,"full export contains one header plus every canonical row");
+let clicked=0,appended=0,removed=0,revoked="",createdBlob=null,deferred=null;
+const fakeLink={style:{},click(){clicked++},remove(){removed++}};
+const downloadResult=downloadMlbamReviewCsv({...preview,rows:csvRows},{season:2026,documentRef:{createElement:tag=>{assert.equal(tag,"a");return fakeLink},body:{appendChild:link=>{assert.equal(link,fakeLink);appended++}}},urlApi:{createObjectURL:blob=>{createdBlob=blob;return "blob:evidence"},revokeObjectURL:url=>{revoked=url}},BlobCtor:class{constructor(parts,options){this.parts=parts;this.options=options}},defer:callback=>{deferred=callback}});
+assert.equal(downloadResult.rowCount,csvRows.length);assert.match(downloadResult.filename,/full-evidence-2026\.csv$/);assert.equal(clicked,1);assert.equal(appended,1);assert.equal(fakeLink.href,"blob:evidence");assert.equal(createdBlob.options.type,"text/csv;charset=utf-8");assert.equal(revoked,"","object URL remains valid through the browser click");deferred();assert.equal(removed,1);assert.equal(revoked,"blob:evidence","temporary object URL is cleaned up after the click task");
 const statcastPreview={playerType:"hitter",snapshot:{rows:[{mlbamId:"101"},{mlbamId:"404"},{mlbamId:"999"}]},resolution:{matched:[]}};
 const hypothetical=hypotheticalStatcastCoverage(preview,statcastPreview);assert.equal(hypothetical.fetched,3);assert.equal(hypothetical.hypotheticallyMatchable,2);assert.equal(hypothetical.remainingUnmatched,1);
 assert.equal(hypotheticalStatcastCoverage(null,statcastPreview).status,"UNAVAILABLE");
@@ -89,6 +104,6 @@ assert.match(ui,/Existing MLBAM/);assert.match(ui,/Candidate org \/ position/);a
 assert.match(ui,/Download review CSV/);assert.match(ui,/Reason-code breakdown/);assert.match(ui,/page 1 of/);assert.match(ui,/Player, UUID, Fantrax or MLBAM/);
 assert.doesNotMatch(await readFile(new URL("v5/js/views/importsView.js",root),"utf8"),/statsapi\.mlb\.com|fetch\(/);
 assert.match(main,/previewMlbamIdentityBackfill/);assert.match(main,/reviewMlbamBackfill/);assert.match(dataHealth,/MLBAM Backfill Provider Preview/);
-assert.match(main,/hypotheticalStatcastCoverage/);assert.match(main,/buildMlbamReviewCsv/);assert.match(dataHealth,/MLBAM Backfill Reason Accounting/);assert.match(dataHealth,/MLBAM Hypothetical Statcast Coverage/);
+assert.match(main,/hypotheticalStatcastCoverage/);assert.match(main,/downloadMlbamReviewCsv/);assert.match(main,/addEventListener\("input"/);assert.match(main,/search,page:1/);assert.match(dataHealth,/MLBAM Backfill Reason Accounting/);assert.match(dataHealth,/MLBAM Hypothetical Statcast Coverage/);
 
 console.log("v5MlbamIdentityBackfill tests passed");

@@ -11,7 +11,7 @@ import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
 import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
-import { applyMlbamIdentityBackfill, buildMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
+import { applyMlbamIdentityBackfill, downloadMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -40,6 +40,7 @@ import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
 const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:""},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
+let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
 let waiverPage={recommendations:[],count:0,page:1,pageSize:50};
@@ -490,10 +491,10 @@ function bindViewEvents(){
   $("#mlbamBackfillSeason")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
   $("#mlbamEvidenceClass")?.addEventListener("change",event=>updateMlbamReview({matchClass:event.target.value,page:1}));
   $("#mlbamEvidenceReason")?.addEventListener("change",event=>updateMlbamReview({reasonCode:event.target.value,page:1}));
-  $("#mlbamEvidenceSearch")?.addEventListener("change",event=>updateMlbamReview({search:event.target.value,page:1}));
+  $("#mlbamEvidenceSearch")?.addEventListener("input",event=>{const search=event.target.value;clearTimeout(mlbamEvidenceSearchTimer);mlbamEvidenceSearchTimer=setTimeout(()=>{updateMlbamReview({search,page:1});requestAnimationFrame(()=>{const input=$("#mlbamEvidenceSearch");input?.focus();input?.setSelectionRange(search.length,search.length)})},200)});
   $("#mlbamEvidencePrevious")?.addEventListener("click",()=>updateMlbamReview({page:Math.max(1,(importUiState.mlbamBackfill.review?.page||1)-1)}));
   $("#mlbamEvidenceNext")?.addEventListener("click",()=>updateMlbamReview({page:(importUiState.mlbamBackfill.review?.page||1)+1}));
-  $("#downloadMlbamEvidence")?.addEventListener("click",()=>{const csv=buildMlbamReviewCsv(importUiState.mlbamBackfill.preview),url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),link=document.createElement("a");link.href=url;link.download=`mlbam-identity-review-${importUiState.mlbamBackfill.season}.csv`;link.click();URL.revokeObjectURL(url)});
+  $("#downloadMlbamEvidence")?.addEventListener("click",()=>downloadMlbamReviewCsv(importUiState.mlbamBackfill.preview,{season:importUiState.mlbamBackfill.season}));
   $("#reviewMlbamBackfill")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,reviewed:event.target.checked};render()});
   $("#previewMlbamBackfill")?.addEventListener("click",async()=>{
     const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
