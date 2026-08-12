@@ -1,114 +1,171 @@
-# Next Task: V5.4.6E Gate 4D Deterministic Acceptance Harness for Maximum Sync
+# Next Task: V5.5A Automated Statcast Data Provider
 
 ## Status And Authority
 
-- Status: implementation plan for a separate architect-reviewed task. This checkpoint is planning-only and does **not** authorize implementation, deployment, migration, Supabase writes, release-setting changes, preview acquisition, audit creation, roster synchronization, imports, ownership or identity changes, or score recalculation.
-- Baseline: `feature/manager-intelligence` after the Gate 4D planning commit. Preserve the accepted migrations 009-011, Gate 4A audit visibility, Gate 4C authentication/shared-state repairs, Gate 4B hosted audit acceptance, Gate 3 production acceptance, and all historical Gate 4 stop evidence.
-- Gate 4 remains unaccepted. A later execution task may authorize exactly one 10-player batch only after the harness itself is implemented, tested, hosted-accepted read-only, and separately approved for persistence.
-- `docs/WORKFLOW.md` Rule 20 remains authoritative: 1-3 is the default; an expanded batch requires explicit, gate-specific architect approval and every accepted safeguard. No authority carries forward automatically.
+- Status: planning and implementation contract for the next separately executed task.
+- Baseline: `feature/manager-intelligence` after the documentation commit `Suspend Gate 4 and begin V5.5 intelligence roadmap`.
+- This document does not itself authorize implementation, deployment, migration application, production import, cloud writes, player creation, identity repair, score calculation, or any Fantrax synchronization operation.
+- V5.4.6E Gate 4E-1 is suspended because external GitHub Pages infrastructure prevented publication of its exact hosted artifact. Fantrax synchronization is frozen at its current safe checkpoint; the ten-player production synchronization remains unexecuted.
 
 ## Objective
 
-Implement a deterministic, production-safe Gate 4 acceptance harness that replaces fragile click-by-click orchestration with explicit, inspectable checkpoints while using the same authenticated V5 production services, repositories, Supabase client, RLS, triggers, and database constraints as the normal UI. The harness is orchestration and evidence collection only. It must not create a second business-logic path or weaken any existing guard.
+Establish a reliable automated Statcast ingestion foundation that replaces repeated screenshots and CSV-only collection with a provider-driven pipeline:
 
-The harness must allow a human to review the exact ten candidates, Preview B manifest-v2 digest, protected-field summary, and every readiness result before one separately authorized persistence call. Implementation and read-only hosted acceptance of the harness do not themselves authorize that call.
+```text
+source collector
+  -> immutable/raw snapshot preservation
+  -> schema and value validation
+  -> MLBAM player identity resolution
+  -> normalized hitter/pitcher metrics
+  -> authenticated, league-scoped Supabase persistence
+  -> Data Health and audit reporting
+```
 
-## Architecture Contract
+V5.5A supplies trustworthy, fresh metrics. It does not implement Player Intelligence Engine 2.0 scoring, waiver decisions, roster-churn classification, or trade recommendations.
 
-### Hosted Surface And Authentication
+## Required Discovery Before Implementation
 
-1. Add a narrowly scoped Gate 4 acceptance surface inside the hosted V5 module graph, reachable only through an explicit acceptance-mode entry selected by the approved artifact. It must use the canonical Supabase singleton and canonical `appState` module instance already used by authentication, league loading, repositories, and UI rendering.
-2. Obtain identity only from the normal hosted V5 authentication flow. Never accept a user ID, JWT, refresh token, cookie, localStorage dump, service key, or session object as harness input. Never copy credentials between origins.
-3. Require the authenticated user, active league UUID, and loaded league membership to remain unchanged at every checkpoint. The active league must be Reddit Phanatics UUID `6573ac24-f433-48c7-a834-ffe6b58726bc`; a different or missing league fails closed.
-4. Use only normal authenticated repository calls subject to production RLS and database actor stamping. No service-role client, direct privileged database connection, public authorization wrapper, RLS bypass, or alternate origin is permitted.
+1. Re-read all repository instructions and inspect the current V5 provider, import, repository, identity, metric, and Data Health boundaries.
+2. Use current primary-source Baseball Savant, Statcast, and MLB documentation plus safe live read-only endpoint inspection. Do not rely only on remembered interfaces.
+3. Inventory candidate public endpoints and downloadable interfaces, their terms and access constraints, supported seasons, pagination/row limits, rate limits, response formats, schema stability, and whether credentials or browser sessions are required.
+4. Prefer documented public endpoints or downloadable data interfaces. Do not use credentials, copied cookies, browser-session scraping, Selenium, or an undocumented authenticated endpoint without a separate architecture review.
+5. Produce a discovery record identifying which interface supplies each approved metric. Do not assume that one endpoint supplies every metric.
+6. Stop before implementation if the source requires prohibited authentication/scraping, lacks stable MLBAM identity, conflicts with repository schema/RLS, or cannot support a fail-closed validation boundary.
 
-### Reuse, Not Duplication
+## Existing Architecture And Safest Integration Point
 
-5. Reuse `fantraxPublicPreviewService.js` for Preview A, Preview B, normalization, exact player identity, exact persisted team identity, and preview comparison.
-6. Reuse `fantraxSeasonContextService.js` for reviewed/observed context comparison and the immediate season write guard.
-7. Reuse `fantraxRosterSyncService.js` for release policy/signature, Current-period guard, exact controlled selection, candidate validation, status normalization, exclusions, and result summaries.
-8. Reuse `fantraxSyncAuditService.js` and `fantraxSyncAuditRepository.js` for canonical manifest-v2 construction, deterministic serialization/digest, durable attempt preparation, immutable item validation, lifecycle outcomes, replay prevention, and audit reads.
-9. Reuse the canonical player/league/team repositories and the existing guarded roster-status persistence repository. Do not issue raw status updates or recreate grouped-write predicates in the harness.
-10. Move any orchestration currently embedded only in `v5/js/main.js` that is needed by both the normal UI and harness into one shared production coordinator. Both callers must invoke that same coordinator. Do not copy or fork the apply sequence.
-11. Acceptance-only code may format checkpoint evidence and compute deterministic read-only projections/hashes. It may not decide eligibility, identity, release policy, manifest content, recovery, or write predicates independently.
+- Existing CSV Statcast ingestion lives in `js/services/cloudCsvImportService.js`; it previews source rows, resolves existing players, writes `player_metrics`, and reports exceptions. V5 repositories include `v5/js/repositories/metricRepository.js`, `playerRepository.js`, `importJobRepository.js`, and the Data Health services/views.
+- Build a source-specific collector/provider behind a provider interface. It may fetch and preserve raw source payloads but may not resolve players, write Supabase rows, calculate intelligence scores, or render UI.
+- Put source-independent validation, MLBAM resolution, metric normalization, batching, partial-failure accounting, and refresh orchestration in services shared by automated and future manual ingestion paths. Do not duplicate those rules inside the provider or a view.
+- Persist normalized metrics through the canonical authenticated repository/Supabase boundary. Reuse or extend `metricRepository.js` and import-job/audit infrastructure rather than calling Supabase directly from the provider.
+- Keep the existing CSV workflow operational until automated ingestion is independently validated. If shared logic is extracted, prove CSV behavior remains unchanged with regression tests.
+- Views may request a refresh and render state only. They must not fetch Baseball Savant directly, normalize metrics, resolve identity, or issue writes.
 
-## Deterministic Checkpoint Model
+## Source And Metric Research Contract
 
-Each checkpoint produces a frozen, serializable evidence object with checkpoint version, artifact commit, authenticated user UUID, active league UUID, release signature, timestamp, prerequisite checkpoint digests, result status, and explicit failure reasons. A checkpoint is `PASS`, `FAIL`, or `UNAVAILABLE`; missing/error data is never zero or pass. Later checkpoints accept only the exact digest of their immediate prerequisites.
+### Hitter Metrics
 
-The harness must expose these checkpoints in order:
+Determine availability, definitions, units, minimum-sample behavior, and source endpoints for at least:
 
-1. **Artifact and authenticated user**: exact hosted commit, canonical module graph, authenticated user, one shared state instance, and no auth/loading error.
-2. **Active league and audit baseline**: exact Reddit Phanatics UUID, membership/RLS access, durable audit availability, exact attempt/item counts and IDs, lifecycle/recovery summary, and no unavailable-to-zero collapse.
-3. **Gate A readiness**: authoritative team identity availability, audit/recovery readiness, manual-override protection, deployed release/cap boundary, Current-only capability, application health, and all non-preview-dependent Data Health checks. Preview-dependent season review may be `UNAVAILABLE` but cannot authorize a write.
-4. **Preview A**: one fresh read-only Current preview from the production preview service, with fetched timestamp, normalized-input hash, returned period, external league ID, season year, history identity, endpoint/schema results, and release signature at fetch.
-5. **Gate B A and exact candidate review**: canonical season/period guards, exact identity/team coverage, known statuses, no release/removal, no ownership conflict, no manual override, and exactly ten explicitly supplied UUIDs. Candidate selection is never automatic and never substitutes another player. Jared Jones or any other ambiguous name is rejected unless the stable authoritative identity independently resolves the exact UUID.
-6. **Protected baseline**: deterministic counts, exact selected-player projections, and hashes covering all protected player fields, teams, managers/mappings, scores, metrics, imports/HKB data, and pre-existing audit history. Status, source, and timestamp are recorded separately as the only potentially authorized changes.
-7. **Expanded opt-in transition**: through the canonical authenticated league-settings repository and RLS, enable only the reviewed `V5.4.6E_OPT_IN_10` setting for the exact league. This is a separately armed mutation. It immediately invalidates Preview A and every downstream acknowledgement. It cannot create a manifest or audit attempt.
-8. **Preview B**: a new fresh Current preview after opt-in, with a different checkpoint identity and its own timestamp/hash. Preview B is the only write-eligible preview.
-9. **Repeated Gate B B**: rerun every season, period, league, release, player/team identity, owner, status, manual-provenance, conflict, exclusion, and stale-preview guard. Require the same exact ten UUIDs and the same bound candidate fields as the reviewed set. Any difference stops; no substitution or partial continuation is allowed.
-10. **Manifest review**: use the canonical audit service to construct and serialize manifest version 2 from Preview B only. Display the complete ordered rows 0-9, release tier, cap 10, reviewed count 10, season context, Current period, Preview B identity, and digest. Prove 11 rows are rejected by application/service/repository/database design without creating an attempt.
-11. **Human approval pause**: render a stable review artifact containing candidate names and UUIDs, Fantrax IDs, persisted Fantrax team IDs, expected owners, current/target statuses, override state, manifest digest, protected hashes, audit baseline, and all checkpoint digests. Require an explicit exact-digest acknowledgement. Closing, refreshing, changing input, changing selection, or recomputing any prerequisite invalidates approval.
-12. **Immediate pre-write guards**: immediately before any attempt creation, refresh the necessary authenticated rows and repeat active user/league, release signature, Preview B freshness, season/current period, exact ten UUIDs, identities, owners, statuses, targets, manual provenance, candidate set, manifest serialization/digest, and protected baseline preconditions. Any mismatch stops before persistence.
-13. **One authorized sync call**: expose exactly one call into the shared production coordinator. The harness must have no loop, automatic retry, smaller fallback batch, split operation, or second-call affordance. This checkpoint remains disabled unless a later NEXT_TASK explicitly authorizes Gate 4 persistence.
-14. **Audit outcomes**: load the attempt and items through the canonical audit repository; require one manifest-v2 attempt, ten ordered items, database actor stamping, exact digest/release/cap, ten terminal `APPLIED` outcomes, `COMPLETED`, terminal count 10, and recoverable count 0.
-15. **Protected comparison**: recapture the same projections/counts/hashes and require equality outside the reviewed roster-status, `FANTRAX` provenance, and expected update timestamp fields. Require exactly the ten selected rows and no unselected row to have changed.
-16. **Replay/idempotency**: use the canonical lookup/coordinator path with the same exact digest to prove duplicate-manifest resolution performs zero player writes and creates no second attempt/items. Verify terminal items cannot replay. Do not manufacture a failure or recover unrelated history.
-17. **Opt-in disablement**: after success, failure, cancellation, timeout, or uncertain state, disable the expanded opt-in through the canonical authenticated settings repository as the first safe cleanup action. Verify it is false and new expanded attempts are blocked while the completed attempt remains readable.
-18. **Final evidence**: post-write Current preview agreement, Data Health, audit UI model, console diagnostics, focused/full tests, Pages restoration, and a machine-readable plus human-readable acceptance report.
+- plate appearances;
+- xBA, xSLG, xwOBA, and wOBA;
+- barrel rate and hard-hit rate;
+- average and maximum exit velocity;
+- launch angle and sweet-spot rate;
+- chase rate and whiff rate;
+- strikeout and walk rates;
+- sprint speed where available.
 
-## Human Review And Arming Boundary
+### Pitcher Metrics
 
-- Separate read-only preparation from mutation with an explicit `PREPARED_FOR_HUMAN_REVIEW` state. The harness may progress through Preview B, repeated Gate B, manifest digest, and protected summary without creating an audit attempt.
-- The write control remains absent or disabled during implementation and read-only hosted acceptance. A later architect-approved execution task must provide the exact artifact commit, exact ten UUIDs or reviewed report digest, and one-call authority.
-- Human acknowledgement binds the artifact commit, authenticated user, league, Preview B hash/timestamp, release signature, exact ordered candidate rows, manifest serialization/digest, protected baseline digest, and checkpoint-chain digest.
-- The harness must show the candidate list, digest, and protected-field summary without requiring navigation across multiple views. Browser UI remains a secondary visual confirmation layer for authentication, league selection, Data Health/audit rendering, and clean console; it is not the primary source of orchestration truth.
+Determine availability, definitions, units, minimum-sample behavior, and source endpoints for at least:
 
-## Fail-Closed Stop Conditions
+- innings pitched and/or batters faced context;
+- xERA and xwOBA allowed;
+- strikeout and walk rates;
+- whiff and chase rates;
+- barrel and hard-hit rates allowed;
+- average exit velocity allowed;
+- velocity;
+- pitch usage where practical.
 
-Stop before persistence on any of the following:
+For every field, record canonical metric key, source column, player type, aggregation grain, numerator/denominator or sample context, unit, nullable behavior, season applicability, and validation range. Unsupported fields remain explicitly unavailable; never synthesize or infer them from names or unrelated metrics.
 
-- missing/changed authenticated user, league, membership, artifact, canonical module identity, RLS access, or audit availability;
-- any unavailable, permission-blocked, failed, timed-out, malformed, incomplete, or stale checkpoint;
-- non-Current or changed period; external league, season, history, or reviewed-context mismatch;
-- Preview A reused after opt-in, Preview B missing/stale, or configuration/release/league/input change after Preview B;
-- candidate count other than exactly 10, an attempted 11th row, evidence of a larger intended operation, split-batch intent, automatic substitution, duplicate UUID, or unordered/mismatched manifest row;
-- fuzzy/name/MLBAM fallback, ambiguous identity, missing/mismatched persisted team identity, ownership difference, free agent, release/removal, unknown or `UNCLASSIFIED` source status, manual override/provenance, or changed current/target status;
-- manifest version other than 2, cap other than 10, wrong release tier, digest mismatch, request/manifest mismatch, existing incompatible attempt, terminal replay, or database boundary contradiction;
-- any protected-field baseline mismatch before write or protected-field difference after write;
-- any unexpected skip, failure, pending/recoverable item, partial attempt, actor mismatch, duplicate attempt/item, or repository error;
-- failure to disable opt-in or restore temporary hosted configuration.
+## Retention And Refresh Decisions
 
-No stop condition permits improvisation, candidate replacement, smaller fallback, automatic retry, compensation, audit deletion, or a second batch.
+1. Compare current-season aggregate, game-level, and pitch-level retention for diagnostic value, storage cost, recomputation needs, and downstream V5.5B requirements.
+2. Default toward retaining immutable raw retrieval snapshots plus normalized current-season aggregates. Retain game- or pitch-level data only when a documented V5.5B use case requires it and storage/retention policy is approved.
+3. Define a sensible daily or periodic refresh cadence. Avoid high-frequency polling. Make refresh idempotent for the same provider, source date, season, player, metric type, and snapshot identity.
+4. Preserve enough raw metadata to reproduce normalization and diagnose source drift: provider, endpoint/interface, request parameters excluding secrets, response schema/version when available, source date, season, fetched time, checksum, row counts, and validation warnings/errors.
+5. The browser is never the raw-data source of truth.
 
-## Security And Persistence Boundaries
+## Identity And Data-Preservation Contract
 
-- Keep SECURITY INVOKER behavior, reviewed search paths, private authorization helpers, RLS, actor stamping, immutable manifests, lifecycle transitions, replay constraints, cross-league isolation, default cap 3, and expanded cap 10 unchanged.
-- The harness must never write player ownership, free-agent state, UUIDs, Fantrax/MLBAM identity, names, teams, managers, manual overrides, HKB/import fields, metrics, or scores.
-- The only future authorized player payload remains `roster_status`, `roster_status_source = 'FANTRAX'`, and the established update timestamp through the existing guarded repository.
-- Do not add a migration unless implementation proves a missing database invariant. Any such contradiction stops Gate 4D and requires a separate architect task; the harness plan assumes migrations 009-011 remain sufficient.
-- Do not persist auth material or sensitive checkpoint data. Reports may include UUIDs, non-secret manifest metadata, counts, hashes, and status evidence, but never tokens, cookies, keys, passwords, or session storage.
+- MLBAM ID is the authoritative Statcast join identity. Resolve incoming MLBAM IDs only to existing league-scoped players and preserve permanent `players.id` UUIDs.
+- Player names are diagnostic display data only and cannot authorize a match, insert, identity update, or metric write.
+- Do not recreate players, merge players, change `fantrax_id`, replace a valid `mlbam_id`, or backfill an MLBAM ID from ambiguous provider data.
+- Missing, malformed, duplicate, cross-league, or unmatched MLBAM IDs are reported and skipped. No fuzzy or normalized-name fallback is permitted.
+- A provider row must never write ownership, roster status/provenance, manual overrides, team identity, HKB values, calculated scores, Fantrax identity, or unrelated player fields.
+- All reads and writes remain authenticated, league-scoped, RLS-protected, paginated, and batched.
 
-## Implementation And Regression Plan
+## Validation And Failure Isolation
 
-1. Identify the smallest shared coordinator boundary that removes apply orchestration duplication from `v5/js/main.js` without changing behavior.
-2. Implement the acceptance checkpoint state machine and deterministic evidence serializer as a thin caller of canonical modules.
-3. Implement a compact hosted review surface showing checkpoint status, exact candidates, manifest digest, protected summary, and the explicit human pause. Keep persistence disabled until a separate task authorizes execution acceptance.
-4. Add dependency-injected tests proving the harness calls the canonical services/repositories and cannot replace them with raw Supabase writes or alternate identity logic.
-5. Add regression coverage for every checkpoint transition/invalidation, unavailable versus zero, canonical state/auth identity, exact league scoping, two-preview opt-in invalidation, exact ten rows, 11th rejection, no substitution, no releases/overrides/unknown statuses, period/season drift, stale Preview B, manifest-v2/digest binding, protected snapshots, one-call latch, replay rejection, cleanup, and report redaction.
-6. Prove the normal V5 UI and harness both call the same shared coordinator and guarded repositories. Existing Fantrax, season-context, audit, roster-sync, roster-manager, Data Health, auth, and configuration tests must remain unchanged in intent and pass.
-7. Run focused Gate 4D tests and the complete sorted `tests/*.test.mjs` suite, then `git diff --check`.
-8. Publish an exact implementation commit only for read-only hosted acceptance. Verify normal authentication, Reddit Phanatics selection, Gate A, Preview A, candidate review, protected baseline, and report rendering without changing production data. Exercise the opt-in transition, Preview B, manifest review, one-call latch, and cleanup deterministically with injected repository fixtures in tests; the hosted run must stop before the real transition unless a later NEXT_TASK separately authorizes that specific production setting change. Create no attempt and restore Pages to main.
-9. Stop for architect review. Do not execute Gate 4's ten-player write in the implementation or read-only hosted-acceptance task.
+1. Validate HTTP status, content type, payload size, parseability, required identity fields, season/source dates, schema, metric types, finite numeric values, ranges, and duplicate keys before persistence.
+2. Preserve explicit distinctions among no data, unsupported metric, stale data, source unavailable, permission blocked, malformed response, validation failure, unmatched identity, and persistence failure.
+3. One failed player or metric group must not corrupt validated rows. Batch results must report inserted, updated, unchanged, skipped, and failed counts; partial failure is never success.
+4. Use deterministic snapshot and normalized-row checksums. Repeating an identical successful snapshot must be idempotent and must not manufacture changed rows.
+5. Source-schema drift fails closed before affected metric writes and leaves the last successful normalized data intact.
+6. Define retry/resume semantics at safe batch boundaries. Do not retry non-idempotent writes blindly.
 
-## Explicitly Prohibited
+## Freshness, Audit, And Data Health
 
-- Implementing or executing synchronization during this planning checkpoint.
-- A CLI or script that accepts copied tokens, cookies, service keys, database credentials, user IDs, or untrusted candidate names.
-- Raw Supabase status updates, direct audit inserts, direct lifecycle manipulation, alternate manifest/digest code, alternate preview fetches, or duplicated eligibility/write predicates.
-- Automatic candidate discovery/substitution, Select All, more than 10 players, 1-9 fallback, split batches, retries, releases, ownership or identity repair, imports, migrations, score recalculation, or unrelated cloud writes.
-- Treating browser UI as the authoritative checkpoint state or treating the harness as authority for routine synchronization.
+Each normalized metric set must expose:
 
-## Definition Of Done For Gate 4D
+- provider;
+- source date;
+- season;
+- fetched_at;
+- normalized/imported timestamp;
+- freshness status;
+- source snapshot/checksum reference;
+- warnings and errors.
 
-Gate 4D implementation is complete only when the deterministic harness demonstrably reuses the canonical authenticated production paths, exposes every required checkpoint and human-review artifact, fails closed on every enumerated contradiction, cannot call persistence more than once, contains no alternate sync/identity/audit implementation, passes focused and full tests, completes read-only hosted acceptance, restores Pages to main, and stops for architect review. Completion of Gate 4D does not accept Gate 4 and does not authorize the ten-player synchronization.
+Data Health and refresh reporting must show:
+
+- players/rows requested;
+- rows received and validated;
+- players matched by MLBAM;
+- unmatched, malformed, and duplicate MLBAM IDs;
+- metric rows inserted, updated, unchanged, skipped, and failed;
+- stale or unavailable data;
+- last attempt and last successful refresh;
+- provider/schema drift and partial-failure state.
+
+Unavailable or failed reads must never render as a genuine zero. Audit records and source metadata must not expose credentials or session material.
+
+## Implementation Sequence
+
+1. Complete and document source-interface research and the metric-to-source matrix.
+2. Define the provider response contract, raw snapshot envelope, normalized metric schema, freshness model, and idempotency keys.
+3. Add focused collector fixtures/tests using recorded non-sensitive responses; live source tests remain read-only and bounded.
+4. Implement the collector with timeout, rate-limit, payload-size, schema, and error controls.
+5. Implement shared validation and MLBAM-only resolution against paginated existing-player reads.
+6. Implement normalized metric batches through the canonical repository and authenticated RLS path; create an additive migration only if the reviewed schema cannot represent required raw/audit/freshness metadata.
+7. Integrate import-job/audit and Data Health reporting without coupling provider code to views.
+8. Add an explicit preview/dry-run that performs collection, validation, identity resolution, and planned-write reporting with no database mutation.
+9. Validate idempotency, partial failures, source drift, cross-league isolation, protected fields, and unchanged legacy CSV imports.
+10. Stop for architect review before applying any migration, deploying, scheduling refreshes, or importing production Statcast data.
+
+## Required Tests And Acceptance Evidence
+
+- Provider contract and representative hitter/pitcher fixture normalization.
+- Missing/malformed/duplicate MLBAM IDs and explicit prohibition of name authorization.
+- Stable `players.id`, preserved Fantrax identity, and no player creation.
+- Raw snapshot/checksum metadata and schema-drift rejection.
+- Metric units, nullability, ranges, sample context, and season/source-date handling.
+- Pagination, bounded collection, batched persistence, idempotent replay, retry/resume, and isolated partial failure.
+- RLS/league scoping and rejection of cross-league rows.
+- Protected-field verification for ownership, roster status/provenance, overrides, identities, HKB, and calculated scores.
+- Data Health distinctions for zero, stale, unavailable, permission blocked, query failed, and partial failure.
+- Existing CSV Statcast imports and unrelated Fantrax synchronization behavior unchanged.
+- Focused tests, complete `tests/*.test.mjs` suite, and `git diff --check`.
+
+## Stop Conditions
+
+Stop and report before deviating if research or repository evidence reveals an unstable/prohibited source, ambiguous identity, destructive schema change, required service-role bypass, missing league/RLS boundary, source-to-metric contradiction, unbounded dataset, inability to preserve raw diagnostic evidence, or any need to overwrite protected fields.
+
+## Explicitly Out Of Scope
+
+- Production deployment, scheduler activation, migration application, or cloud/data writes.
+- Production Statcast import or score recalculation.
+- Player creation, merging, identity repair, Fantrax identity changes, ownership or roster-status changes.
+- Player Intelligence Engine 2.0 scoring, waiver-vs-roster decisions, churn classification, consolidation, or trade-target recommendations.
+- Reopening Gate 4E-1, expanded Fantrax opt-in, previews, manifests, audit attempts, or roster synchronization.
+
+## Deliverables
+
+- Primary-source research record and metric/source matrix.
+- Provider, raw snapshot, normalized metric, freshness, and audit contracts.
+- Smallest coherent implementation and any unapplied additive migration required by the reviewed design.
+- Focused regression coverage and complete-suite validation.
+- Updated `docs/NEXT_TASK_RESULT.md` containing implementation evidence and explicit confirmation that no production deployment, migration, import, score recalculation, identity change, or Fantrax synchronization occurred.

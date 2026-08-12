@@ -2,6 +2,19 @@
 
 Generated: 2026-08-01 America/Chicago.
 
+## Active Direction — V5.5 Baseball Intelligence
+
+- V5.4.6E Gate 4E-1 is **SUSPENDED**, not accepted. Exact feature commit `c120a2f941c2f2e132a794b85ccc0da0712c889f` could not be published because GitHub Pages workflow `31551384970` failed externally during Jekyll metadata retrieval with a TLS certificate-verification error; one bounded retry did not produce a verified hosted artifact.
+- Pages was restored to `main` at `df89840de0ea8563968b99b7acc75b528e02983f`. No hosted Gate 4E-1 application acceptance or ten-player synchronization occurred, and no production/data writes were made during the suspended attempt.
+- Fantrax synchronization work is frozen at its current safe checkpoint until deployment infrastructure is healthy or a verified production defect requires reopening it. Do not create another synchronization acceptance phase by default.
+- Active roadmap:
+  1. **V5.5A Automated Statcast Data Provider**
+  2. **V5.5B Player Intelligence Engine 2.0**
+  3. **V5.5C Waiver vs. Roster Decision Engine**
+  4. **V5.5D Roster Churn / Protected-Investment-Churn Classification**
+  5. **V5.5E Consolidation and Trade Target Intelligence**
+- The immediate next task is V5.5A only: establish automated, MLBAM-authoritative Statcast collection, raw snapshot preservation, validation, normalized metric persistence boundaries, and Data Health/audit reporting. Production ingestion and V5.5B scoring remain separately gated.
+
 ## Git State
 
 - Active branch: `feature/manager-intelligence`

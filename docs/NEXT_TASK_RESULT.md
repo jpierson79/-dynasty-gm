@@ -1629,3 +1629,37 @@
 - Architect review approved Gate 4E-1C1 for checkpointing only. Implementation commit `94538d4b8cd7b2858d66def4e736c2340f80ee43` (`Fix recoverable Fantrax digest arming`) contains exactly the seven approved implementation, regression-test, state, view, and evidence files.
 - Push succeeded to `origin/feature/manager-intelligence` (`f94adae..94538d4`). The focused 11-file validation, complete 37-file standalone suite, staged diff check, and post-commit working-tree check all passed.
 - No deployment or production/data operation accompanied the checkpoint. Production expanded opt-in remains disabled/recovery-only, and hosted Gate 4E-1 acceptance was not resumed.
+
+## V5.4.6E Gate 4E-1 Hosted Pre-Write Acceptance — Deployment Blocked
+
+### Authoritative Worktree Recovery
+
+- Date: 2026-08-11 (America/Chicago). The stale `C:\Users\joshu\Documents\-dynasty-gm` worktree remained untouched on `codex/v5-season-rollover-reconciliation` at `c0af659b46366cddee33f9e3383b92055ae68912`; its unrelated untracked `.codex/` directory was preserved.
+- The authoritative dedicated worktree was recovered at `C:\Users\joshu\Documents\-dynasty-gm-architect`. It was clean on `feature/manager-intelligence`, with local and remote HEAD both exactly `c120a2f941c2f2e132a794b85ccc0da0712c889f`; `git diff --check` passed.
+- Required repository instructions and project documentation were reread from that worktree. They consistently describe the Gate 4E-1 / Gate 4E-1C1 state, including the checkpointed recoverable `DIGEST_MISMATCH` semantics and production expanded opt-in disabled/recovery-only state.
+- Earlier observations made from the stale checkout were treated as diagnostic-only and were not reused as Gate 4 acceptance evidence.
+
+### Exact-Artifact Publication Failure
+
+- GitHub Pages was temporarily configured to publish `feature/manager-intelligence` at exact commit `c120a2f941c2f2e132a794b85ccc0da0712c889f` through the approved legacy Pages workflow.
+- Workflow run `31551384970` failed during `actions/jekyll-build-pages@v1` before publication. The runner's `jekyll-github-metadata` request to GitHub Pages failed TLS verification with `SSL_connect ... certificate verify failed (self-signed certificate)`. Repository application code did not cause the failure.
+- One bounded rerun of the same exact workflow was requested. It remained queued without runner progress during the acceptance window and did not establish a verified hosted artifact. Gate 4E-1 therefore did not enter the authenticated application workflow.
+- No hosted Gate A, Preview A, candidate review, protected baseline, opt-in transition, Preview B, manifest, wrong-digest check, exact-digest arm, or immediate pre-write guard was accepted in this attempt.
+
+### Safety And Restoration
+
+- GitHub Pages was restored to source `main`, path `/`. The restoration build completed successfully with status `built` at exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`, and repository Pages settings reported `main`.
+- Production expanded opt-in remained disabled/recovery-only. No Fantrax preview was fetched; no production harness was armed; no manifest, audit attempt/item, coordinator call, synchronization, player/protected-field write, migration, import, release, ownership/identity repair, score recalculation, or unrelated cloud/data write occurred.
+- Automated tests were not rerun because the required exact hosted artifact was not published and the acceptance contract failed before browser entry. The repository preflight and `git diff --check` passed before this documentation-only failure record.
+- Status: **Gate 4E-1 remains blocked by the external Pages build failure and is not accepted.** This result is intentionally unstaged, uncommitted, and unpushed for architect review.
+
+## Gate 4E-1 Suspension And V5.5 Roadmap Pivot
+
+- Architect decision: **V5.4.6E Gate 4E-1 is SUSPENDED**, not accepted and not classified as an application acceptance failure. The authoritative worktree is `C:\Users\joshu\Documents\-dynasty-gm-architect`, branch `feature/manager-intelligence`, at exact pre-documentation HEAD `c120a2f941c2f2e132a794b85ccc0da0712c889f`.
+- The suspension preserves the exact external failure evidence: Pages workflow `31551384970` failed during `actions/jekyll-build-pages@v1` when `jekyll-github-metadata` encountered `SSL_connect ... certificate verify failed (self-signed certificate)`. One bounded exact-workflow retry did not establish a verified hosted artifact.
+- GitHub Pages was restored and verified at source `main`, path `/`, with a successful `built` artifact from exact main commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- No hosted Gate 4E-1 application acceptance occurred. Production expanded opt-in remained disabled/recovery-only; no preview, manifest, harness arm, audit attempt/item, coordinator call, synchronization, migration, import, release, ownership/roster/identity change, score recalculation, or other production/data write occurred.
+- The exactly-ten-player production synchronization remains unexecuted. Fantrax synchronization work is frozen at its current safe checkpoint until deployment infrastructure is healthy or a verified production defect justifies reopening it. No Gate 4F/G or replacement synchronization acceptance phase is planned.
+- Active product direction is now **V5.5 Baseball Intelligence**: V5.5A Automated Statcast Data Provider; V5.5B Player Intelligence Engine 2.0; V5.5C Waiver vs. Roster Decision Engine; V5.5D Roster Churn / Protected-Investment-Churn Classification; and V5.5E Consolidation and Trade Target Intelligence.
+- `docs/NEXT_TASK.md` now defines V5.5A. Repository inspection selected a provider/service/repository pipeline that preserves raw snapshots, validates source data, resolves existing players only by authoritative MLBAM ID, writes normalized metrics through authenticated league-scoped repositories, and reports Data Health/audit evidence. It explicitly defers production ingestion, scoring, waiver logic, and view coupling.
+- This checkpoint changes documentation only. No V5.5 application code, tests, migrations, deployment configuration, Supabase state, player metrics, calculated scores, or cloud data were changed.

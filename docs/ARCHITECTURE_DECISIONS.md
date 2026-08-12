@@ -211,3 +211,17 @@ Decision: Canonicalize the observed external league ID, season year, and optiona
 Consequences: Read-only previews remain available during drift. When both contexts expose league-history identity, it must match; an unavailable optional value is surfaced without inventing a mismatch. Existing current-period, exact-selection, ownership, current-status, and manual-override checks still run. No schema migration is required, and saving a reviewed context updates only the league `settings` field while mapping writes remain league- and team-scoped.
 
 Evidence paths: `v5/js/services/fantraxSeasonContextService.js`, `v5/js/services/fantraxPublicPreviewService.js`, `v5/js/repositories/leagueRepository.js`, `v5/js/services/dataHealthService.js`, `tests/v5FantraxSeasonContext.test.mjs`.
+
+## ADR-019: Suspend Gate 4 And Pivot To Automated Baseball Intelligence
+
+Status: accepted.
+
+Context: V5.4.6E established and tested the guarded Fantrax synchronization architecture, but Gate 4E-1 could not publish exact commit `c120a2f941c2f2e132a794b85ccc0da0712c889f`. GitHub Pages workflow `31551384970` failed outside the application during Jekyll metadata TLS verification, and one bounded retry did not provide a verified hosted artifact. Pages was restored to `main`; no hosted acceptance or production synchronization occurred.
+
+Decision: Suspend Gate 4E-1 rather than treating the infrastructure failure as an application defect or creating further synchronization gates. Freeze Fantrax synchronization at the current safe checkpoint and move active product planning to V5.5 Baseball Intelligence: automated Statcast ingestion, Player Intelligence Engine 2.0, waiver-vs-roster decisions, churn classification, and consolidation/trade-target intelligence.
+
+V5.5A uses a source collector followed by raw snapshot preservation, validation, MLBAM-only identity resolution, normalized metrics, authenticated league-scoped repository persistence, and Data Health/audit reporting. Provider code cannot resolve by player name, create players, overwrite stable UUID/Fantrax/valid MLBAM identity, calculate intelligence scores, or couple directly to views.
+
+Consequences: The ten-player Fantrax synchronization remains unexecuted and unauthorized. Gate 4 may reopen only for healthy deployment infrastructure or a verified production defect under a new explicit task. V5.5A establishes data foundations only; scoring and decision engines remain V5.5B-E concerns. Existing CSV Statcast imports remain supported until the automated provider is independently validated.
+
+Evidence paths: `docs/NEXT_TASK_RESULT.md`, `docs/NEXT_TASK.md`, `js/services/cloudCsvImportService.js`, `v5/js/repositories/metricRepository.js`, `v5/js/services/dataHealthService.js`.
