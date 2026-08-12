@@ -12,6 +12,7 @@ import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
 import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
 import { applyMlbamIdentityBackfill, downloadMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
+import { captureProtectedBaseline } from "./services/protectedBaselineService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -39,7 +40,7 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:""},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
 let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
@@ -495,6 +496,11 @@ function bindViewEvents(){
   $("#mlbamEvidencePrevious")?.addEventListener("click",()=>updateMlbamReview({page:Math.max(1,(importUiState.mlbamBackfill.review?.page||1)-1)}));
   $("#mlbamEvidenceNext")?.addEventListener("click",()=>updateMlbamReview({page:(importUiState.mlbamBackfill.review?.page||1)+1}));
   $("#downloadMlbamEvidence")?.addEventListener("click",()=>downloadMlbamReviewCsv(importUiState.mlbamBackfill.preview,{season:importUiState.mlbamBackfill.season}));
+  $("#captureMlbamProtectedBaseline")?.addEventListener("click",async()=>{
+    const current=importUiState.mlbamBackfill,protectedBaseline={running:true,evidence:null,error:""};importUiState.mlbamBackfill={...current,protectedBaseline};render();
+    const evidence=await captureProtectedBaseline({leagueId:appState.activeLeague?.id,profile:"MLBAM_BACKFILL"});
+    importUiState.mlbamBackfill={...importUiState.mlbamBackfill,protectedBaseline:{running:false,evidence,error:evidence.status==="AVAILABLE"?"":evidence.errors?.join(" ")||evidence.status}};render();
+  });
   $("#reviewMlbamBackfill")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,reviewed:event.target.checked};render()});
   $("#previewMlbamBackfill")?.addEventListener("click",async()=>{
     const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
