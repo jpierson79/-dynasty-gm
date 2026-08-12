@@ -8,6 +8,14 @@ export const PROTECTED_BASELINE_PROFILES=Object.freeze({
   MLBAM_BACKFILL:Object.freeze({
     id:"MLBAM_BACKFILL",version:"1",
     allowedChanges:Object.freeze({players:Object.freeze(["mlbam_id","updated_at"]),scores:Object.freeze([]),metrics:Object.freeze([]),teams:Object.freeze([]),managers:Object.freeze([])})
+  }),
+  STATCAST_REFRESH:Object.freeze({
+    id:"STATCAST_REFRESH",version:"1",
+    allowedChanges:Object.freeze({players:Object.freeze([]),scores:Object.freeze([]),metrics:Object.freeze([]),teams:Object.freeze([]),managers:Object.freeze([])}),
+    domainPartitions:Object.freeze({metrics:Object.freeze([
+      Object.freeze({name:"metrics",label:"NON-STATCAST METRICS",filter:Object.freeze({field:"source",equals:"Statcast",negate:true}),expectedMutable:false}),
+      Object.freeze({name:"statcastMetrics",label:"STATCAST METRICS",filter:Object.freeze({field:"source",equals:"Statcast"}),expectedMutable:true})
+    ])})
   })
 });
 
@@ -31,6 +39,11 @@ export async function protectedDigest(value,{cryptoImpl=globalThis.crypto}={}){
   const bytes=await cryptoImpl.subtle.digest("SHA-256",encoder.encode(JSON.stringify(normalize(value))));
   return [...new Uint8Array(bytes)].map(byte=>byte.toString(16).padStart(2,"0")).join("");
 }
+function matchesFilter(row,filter){
+  if(!filter)return true;
+  const equal=String(row?.[filter.field]??"").toLowerCase()===String(filter.equals??"").toLowerCase();
+  return filter.negate?!equal:equal;
+}
 function immutable(value){
   if(value&&typeof value==="object"&&!Object.isFrozen(value)){Object.values(value).forEach(immutable);Object.freeze(value)}
   return value;
@@ -48,9 +61,13 @@ export async function captureProtectedBaseline({leagueId,profile="MLBAM_BACKFILL
   try{
     const rows=await read(leagueId,{dependencies:dependencies.repository});
     const capturedAt=new Date().toISOString(),domains={};
-    for(const name of ["players","scores","metrics","teams","managers"]){
-      const canonical=canonicalProtectedRows(rows[name]||[],contract.allowedChanges[name]||[]);
-      domains[name]=Object.freeze({domain:name.toUpperCase(),status:"AVAILABLE",count:(rows[name]||[]).length,hash:await protectedDigest(canonical,{cryptoImpl:dependencies.cryptoImpl}),capturedAt,profile:contract.id,contractVersion:contract.version});
+    for(const sourceName of ["players","scores","metrics","teams","managers"]){
+      const partitions=contract.domainPartitions?.[sourceName]||[{name:sourceName,label:sourceName.toUpperCase(),expectedMutable:false}];
+      for(const partition of partitions){
+        const selected=(rows[sourceName]||[]).filter(row=>matchesFilter(row,partition.filter));
+        const canonical=canonicalProtectedRows(selected,contract.allowedChanges[sourceName]||[]);
+        domains[partition.name]=Object.freeze({domain:partition.label||partition.name.toUpperCase(),sourceDomain:sourceName,status:"AVAILABLE",count:selected.length,hash:await protectedDigest(canonical,{cryptoImpl:dependencies.cryptoImpl}),expectedMutable:Boolean(partition.expectedMutable),capturedAt,profile:contract.id,contractVersion:contract.version});
+      }
     }
     return immutable({status:"AVAILABLE",leagueId,profile:contract.id,contractVersion:contract.version,capturedAt,allowedChanges:contract.allowedChanges,domains,errors:[],warnings:[]});
   }catch(error){
@@ -62,7 +79,11 @@ export function compareProtectedBaselines(before,after){
   if(before?.status!=="AVAILABLE")return immutable({status:before?.status||"UNAVAILABLE",domains:{},errors:before?.errors||["Before baseline is unavailable."]});
   if(after?.status!=="AVAILABLE")return immutable({status:after?.status||"UNAVAILABLE",domains:{},errors:after?.errors||["After baseline is unavailable."]});
   if(before.leagueId!==after.leagueId||before.profile!==after.profile||before.contractVersion!==after.contractVersion)return immutable({status:"CHANGED",domains:{},errors:["Protected baseline contract or league changed."]});
-  const domains={};let changed=false;
-  for(const name of Object.keys(before.domains)){const same=before.domains[name]?.count===after.domains[name]?.count&&before.domains[name]?.hash===after.domains[name]?.hash;domains[name]=Object.freeze({status:same?"UNCHANGED":"CHANGED",before:before.domains[name],after:after.domains[name]});if(!same)changed=true}
-  return immutable({status:changed?"CHANGED":"UNCHANGED",domains,errors:[]});
+  const domains={};let changed=false,expectedMutation=false;
+  for(const name of Object.keys(before.domains)){
+    const prior=before.domains[name],next=after.domains[name],same=prior?.count===next?.count&&prior?.hash===next?.hash;
+    const status=same?"UNCHANGED":prior?.expectedMutable&&next?.expectedMutable?"EXPECTED_MUTATION":"CHANGED";
+    domains[name]=Object.freeze({status,before:prior,after:next});if(status==="CHANGED")changed=true;if(status==="EXPECTED_MUTATION")expectedMutation=true;
+  }
+  return immutable({status:changed?"CHANGED":expectedMutation?"EXPECTED_MUTATION":"UNCHANGED",domains,errors:[]});
 }
