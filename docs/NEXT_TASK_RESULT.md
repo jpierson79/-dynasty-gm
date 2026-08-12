@@ -1790,3 +1790,8 @@
 - Files changed for V5.5A-2: `v5/js/services/mlbamIdentityBackfillService.js`, `v5/js/views/importsView.js`, `v5/js/main.js`, `v5/js/services/dataHealthService.js`, and `tests/v5MlbamIdentityBackfill.test.mjs`, plus this preserved result record. No provider endpoint, repository, migration, authentication, Fantrax identity, or persistence boundary changed.
 - Focused validation passed for MLBAM backfill, Statcast provider, player identity/migration/resolver, supplemental and Fantrax imports, import exception UI, Data Health, architecture, authentication, and Fantrax roster sync. The complete sorted standalone suite passed all 39 `tests/*.test.mjs` files. Final `git diff --check` passed with line-ending warnings only.
 - No deployment, production preview, MLBAM persistence, Statcast refresh, migration, cloud/data write, ownership/roster/Fantrax identity mutation, score recalculation, or Fantrax Gate 4 action occurred. Status: **implemented locally and intentionally uncommitted for architect review.**
+
+### Architect-Approved V5.5A-2 Checkpoint
+
+- Implementation commit: `b73cc5191b9e49cfda0e400a66aa5f498eff8093` (`Improve MLBAM preview diagnostics and collision safety`). Push to `origin/feature/manager-intelligence` succeeded (`04bd0b3..b73cc51`).
+- The checkpoint contains exactly the six approved V5.5A-2 files. No deployment, production preview, migration, MLBAM/Statcast persistence, score recalculation, or other cloud/data operation accompanied the checkpoint.
