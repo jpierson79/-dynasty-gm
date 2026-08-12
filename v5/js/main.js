@@ -11,6 +11,7 @@ import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
 import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
+import { applyMlbamIdentityBackfill, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -38,7 +39,7 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:""}};
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
 let waiverPage={recommendations:[],count:0,page:1,pageSize:50};
@@ -485,6 +486,19 @@ async function updateWaiverPage(query){
   render();
 }
 function bindViewEvents(){
+  $("#mlbamBackfillSeason")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
+  $("#reviewMlbamBackfill")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,reviewed:event.target.checked};render()});
+  $("#previewMlbamBackfill")?.addEventListener("click",async()=>{
+    const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
+    try{const preview=await previewMlbamIdentityBackfill({leagueId:appState.activeLeague.id,season:current.season});importUiState.mlbamBackfill={...current,running:false,preview,reviewed:false,result:null,error:""}}
+    catch(error){const message=String(error?.message||error);importUiState.mlbamBackfill={...current,running:false,preview:{status:"UNAVAILABLE",createdAt:new Date().toISOString(),error:message,summary:{}},reviewed:false,result:null,error:message}}render();
+  });
+  $("#applyMlbamBackfill")?.addEventListener("click",async()=>{
+    const current=importUiState.mlbamBackfill;if(!current.preview||!current.reviewed){setError("Preview and review the MLBAM backfill first.");return}
+    importUiState.mlbamBackfill={...current,running:true,result:null,error:""};render();
+    try{const result=await applyMlbamIdentityBackfill({leagueId:appState.activeLeague.id,reviewedPreview:current.preview,reviewed:true});importUiState.mlbamBackfill={...current,running:false,preview:null,reviewed:false,result,error:""};await refreshLeagueData()}
+    catch(error){importUiState.mlbamBackfill={...current,running:false,result:null,error:String(error?.message||error)}}render();
+  });
   $("#statcastSeason")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
   $("#statcastPlayerType")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,playerType:event.target.value,preview:null,reviewed:false,result:null,error:""};render()});
   $("#reviewAutomatedStatcast")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,reviewed:event.target.checked};render()});
@@ -841,7 +855,7 @@ function bindShellEvents(){
       if(appState.healthRunning)return;
       setState({healthRunning:true,healthError:""});
       try{
-        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview,fantraxSyncAttempts:appState.fantraxSyncAttempts,fantraxSyncAuditStatus:appState.fantraxSyncAuditStatus,fantraxSyncAuditError:appState.fantraxSyncAuditError}));
+        const health=await runWithDataHealthTimeout(()=>runDataHealth(appState.activeLeague.id,{teamId:selectedRosterTeamId(),authenticatedUserId:appState.authUser?.id||"",preferredTeamId:preferredTeamIdForLeague(appState.activeLeague.id),userTeamResolution:appState.userTeamResolution,tradeState:appState.tradeCenter,rosterStatusManager:appState.rosterStatusManager,fantraxPreview:appState.fantraxPreview,fantraxSyncAttempts:appState.fantraxSyncAttempts,fantraxSyncAuditStatus:appState.fantraxSyncAuditStatus,fantraxSyncAuditError:appState.fantraxSyncAuditError,mlbamBackfillPreview:importUiState.mlbamBackfill.preview}));
         setState({health,healthDetails:null,healthRunning:false,healthError:""});
       }catch(error){
         setState({healthRunning:false,healthError:String(error?.message||error||"Data Health failed.")});

@@ -15,6 +15,7 @@ import { buildScoreDiagnosticsFromRows } from "./liveScoreDiagnosticsService.js"
 import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6e-opt-in";
 import { fantraxRosterSyncReleasePolicy } from "./fantraxRosterSyncService.js?v5-4-6e-opt-in";
 import { statcastRefreshHealth } from "./statcastProviderService.js";
+import { mlbamBackfillHealth } from "./mlbamIdentityBackfillService.js";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -89,7 +90,7 @@ export function fantraxPreviewHealthChecks(preview=null){
     item("Last Fantrax Preview Fetch",data?.fetchedAt?"INFO":"WARNING",[{fetchedAt:data?.fetchedAt||"Never",previewOnly:true,cloudWrites:0}])
   ];
 }
-export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null,fantraxSyncAttempts=null,fantraxSyncAuditStatus="UNAVAILABLE",fantraxSyncAuditError=""}={}){
+export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",preferredTeamId="",userTeamResolution=null,tradeState={},rosterStatusManager=null,fantraxPreview=null,fantraxSyncAttempts=null,fantraxSyncAuditStatus="UNAVAILABLE",fantraxSyncAuditError="",mlbamBackfillPreview=null}={}){
   const [membershipRows,playerRows,rawTeamRows,managerRows,metricRows,scoreRows,leagueRows,statcastJobsResult]=await Promise.all([
     leagues.memberships(leagueId),
     players.allPlayers(leagueId),
@@ -101,6 +102,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     importJobs.latestImportJobs(leagueId).then(rows=>({available:true,rows,error:""})).catch(error=>({available:false,rows:[],error:String(error?.message||error)}))
   ]);
   const statcastHealth=statcastRefreshHealth({metricRows,importJobs:statcastJobsResult.rows,available:statcastJobsResult.available,error:statcastJobsResult.error});
+  const mlbamHealth=mlbamBackfillHealth(mlbamBackfillPreview);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
   const fantraxAuditAvailable=fantraxSyncAuditStatus==="AVAILABLE"&&Array.isArray(fantraxSyncAttempts);
   const fantraxAudit=fantraxSyncAuditHealth(fantraxAuditAvailable?fantraxSyncAttempts:[]);
@@ -231,6 +233,8 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Last Successful Automated Statcast Refresh",status:statcastHealth.lastSuccessfulAt?"PASS":statcastHealth.status==="UNAVAILABLE"?"FAIL":"WARNING",details:detail("Last Successful Automated Statcast Refresh",[statcastHealth])},
     {name:"Automated Statcast Freshness",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":statcastHealth.stale?"WARNING":"PASS",details:detail("Automated Statcast Freshness",[statcastHealth])},
     {name:"Automated Statcast Identity And Row Outcomes",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":Number(statcastHealth.failed)>0?"WARNING":"PASS",details:detail("Automated Statcast Identity And Row Outcomes",[statcastHealth])},
+    {name:"MLBAM Backfill Provider Preview",status:mlbamHealth.status==="UNAVAILABLE"?"FAIL":mlbamHealth.status==="NEVER_RUN"?"WARNING":"PASS",details:detail("MLBAM Backfill Provider Preview",[mlbamHealth])},
+    {name:"MLBAM Backfill Exact And Review Outcomes",status:mlbamHealth.status==="AVAILABLE"?(mlbamHealth.duplicateExisting||mlbamHealth.duplicateProposed?"FAIL":"PASS"):"WARNING",details:detail("MLBAM Backfill Exact And Review Outcomes",[mlbamHealth])},
     {name:"Fantrax Synchronization Audit Availability",status:fantraxAuditAvailable?"PASS":"FAIL",details:detail("Fantrax Synchronization Audit Availability",fantraxAuditAvailability)},
     {name:"Fantrax Synchronization Audit Integrity",status:fantraxAuditAvailable?fantraxAudit.status:"FAIL",details:detail("Fantrax Synchronization Audit Integrity",fantraxAuditAvailable?fantraxAudit.invalid:fantraxAuditAvailability)},
     {name:"Fantrax Synchronization Release And Cap Consistency",status:fantraxAuditAvailable?(fantraxAudit.releaseIssues.length?"FAIL":"PASS"):"FAIL",details:detail("Fantrax Synchronization Release And Cap Consistency",fantraxAuditAvailable?fantraxAudit.releaseIssues:fantraxAuditAvailability)},
