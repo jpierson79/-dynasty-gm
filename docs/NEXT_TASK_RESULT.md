@@ -1757,3 +1757,8 @@
 - Focused MLBAM provider/backfill, player identity/migration/resolver, supplemental/Fantrax import, Statcast provider, Data Health, architecture, and Fantrax regression tests passed. The complete sorted standalone suite passed all 39 `tests/*.test.mjs` files after moving identity writes out of the roster-oriented player repository. `git diff --check` passed.
 - Handoff after architect review: checkpoint this local foundation, separately review/apply migration 013, run an authenticated read-only production MLBAM preview, explicitly review/backfill only safe exact null IDs, verify protected fields and identity uniqueness, then resume V5.5A at hitter preview → pitcher preview → one reviewed Statcast refresh.
 - No deployment, migration application, production MLBAM preview/write, Statcast refresh, player creation, identity/ownership/roster/score mutation, Fantrax Gate 4 action, or other cloud/data operation occurred during implementation. Status: **implemented and validated locally; intentionally uncommitted for architect review.**
+
+### Architect-Approved V5.5A-1 Checkpoint
+
+- Implementation commit `9479b94` (`Add authoritative MLBAM identity backfill`) contains exactly the nine approved provider, service, repository, UI, Data Health, migration, test, and evidence files. Push to `origin/feature/manager-intelligence` succeeded (`3da6cf6..9479b94`).
+- Migration 013 remains unapplied. No deployment, production MLBAM preview/write, Statcast refresh, protected-field mutation, score recalculation, Fantrax action, or other production/data operation accompanied the checkpoint.
