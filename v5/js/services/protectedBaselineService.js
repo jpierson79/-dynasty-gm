@@ -16,6 +16,14 @@ export const PROTECTED_BASELINE_PROFILES=Object.freeze({
       Object.freeze({name:"metrics",label:"NON-STATCAST METRICS",filter:Object.freeze({field:"source",equals:"Statcast",negate:true}),expectedMutable:false}),
       Object.freeze({name:"statcastMetrics",label:"STATCAST METRICS",filter:Object.freeze({field:"source",equals:"Statcast"}),expectedMutable:true})
     ])})
+  }),
+  FANTRAX_PRODUCTION_IMPORT:Object.freeze({
+    id:"FANTRAX_PRODUCTION_IMPORT",version:"1",
+    allowedChanges:Object.freeze({players:Object.freeze([]),scores:Object.freeze([]),metrics:Object.freeze([]),teams:Object.freeze([]),managers:Object.freeze([])}),
+    domainPartitions:Object.freeze({metrics:Object.freeze([
+      Object.freeze({name:"metrics",label:"PROTECTED NON-PRODUCTION METRICS",filter:Object.freeze({not:Object.freeze({all:Object.freeze([Object.freeze({field:"source",equals:"Fantrax"}),Object.freeze({field:"metric_type",equals:"fantrax_league_production"})])})}),expectedMutable:false}),
+      Object.freeze({name:"fantraxProductionMetrics",label:"FANTRAX LEAGUE-PRODUCTION METRICS",filter:Object.freeze({all:Object.freeze([Object.freeze({field:"source",equals:"Fantrax"}),Object.freeze({field:"metric_type",equals:"fantrax_league_production"})])}),expectedMutable:true})
+    ])})
   })
 });
 
@@ -41,6 +49,9 @@ export async function protectedDigest(value,{cryptoImpl=globalThis.crypto}={}){
 }
 function matchesFilter(row,filter){
   if(!filter)return true;
+  if(Array.isArray(filter.all))return filter.all.every(item=>matchesFilter(row,item));
+  if(Array.isArray(filter.any))return filter.any.some(item=>matchesFilter(row,item));
+  if(filter.not)return !matchesFilter(row,filter.not);
   const equal=String(row?.[filter.field]??"").toLowerCase()===String(filter.equals??"").toLowerCase();
   return filter.negate?!equal:equal;
 }

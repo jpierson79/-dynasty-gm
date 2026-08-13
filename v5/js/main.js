@@ -41,7 +41,7 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
 function resetStatcastRefreshSession(){const contextSignature=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:importUiState.statcast.season,contextSignature})}
 let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
@@ -492,6 +492,11 @@ async function updateWaiverPage(query){
 }
 function bindViewEvents(){
   const updateMlbamReview=changes=>{const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,review:{...current.review,...changes}};render()};
+  $("#captureFantraxProductionProtectedBaseline")?.addEventListener("click",async()=>{
+    importUiState.fantraxProductionBaseline={running:true,evidence:null,error:""};render();
+    const evidence=await captureProtectedBaseline({leagueId:appState.activeLeague?.id,profile:"FANTRAX_PRODUCTION_IMPORT"});
+    importUiState.fantraxProductionBaseline={running:false,evidence,error:evidence.status==="AVAILABLE"?"":evidence.errors?.join(" ")||evidence.status};render();
+  });
   $("#mlbamBackfillSeason")?.addEventListener("change",event=>{importUiState.mlbamBackfill={...importUiState.mlbamBackfill,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
   $("#mlbamEvidenceClass")?.addEventListener("change",event=>updateMlbamReview({matchClass:event.target.value,page:1}));
   $("#mlbamEvidenceReason")?.addEventListener("change",event=>updateMlbamReview({reasonCode:event.target.value,page:1}));
