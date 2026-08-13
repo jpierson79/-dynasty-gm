@@ -2183,3 +2183,9 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Intended files: new `v5/js/services/fantraxPlayerProductionService.js`, new `tests/v5FantraxPlayerProduction.test.mjs`, updated `v5/js/services/playerIntelligenceInputService.js`, and this preserved evidence record. No migration is required or created.
 - Focused coverage reproduces the exact 16-header/18-value schema, duplicate and unlabeled columns, Matt Olson decimals, integer and zero values, blanks, multi-position rows, all reviewed status classes, strict ID-only matching, missing season, malformed arity, duplicate source identity, write-free preview/mapping, exact metric selection, team-total rejection, and unchanged Engine 5.1.1. Ten focused production, Player Intelligence, import-preview, identity, roster-sync, season-context, audit, and team-identity test files passed. The complete sorted standalone suite passed all 43 `tests/*.test.mjs` files. Final `git diff --check` passed.
 - No deployment, CSV read/import, production preview, Supabase operation, migration, player/identity/ownership/roster mutation, score calculation, Statcast refresh, Fantrax synchronization, Gate 4 action, or other cloud/data operation occurred. Architect review approved the four intended implementation/evidence files for narrow checkpointing.
+
+### Checkpoint
+
+- Implementation commit: `f4f58bd97964115a4944e9d29d9bf380a46885dd` (`Add authoritative Fantrax player production inputs`).
+- Push result: succeeded to `origin/feature/manager-intelligence` (`0b1b4a4..f4f58bd`).
+- The implementation commit contained exactly the four architect-approved files listed above. No deployment, import, migration, production read/write, score recalculation, identity/ownership/roster change, or other cloud/data operation accompanied the checkpoint.
