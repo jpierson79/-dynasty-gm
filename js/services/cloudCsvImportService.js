@@ -259,6 +259,7 @@ async function parseCsv(file){
   }
   return parseCsvSync(text);
 }
+export {parseCsv as parseCsvFile};
 function parseCsvSync(text){
   const rows=[];let cur=[],val="",q=false;
   for(let i=0;i<text.length;i++){

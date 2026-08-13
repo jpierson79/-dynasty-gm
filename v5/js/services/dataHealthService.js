@@ -16,6 +16,7 @@ import { fantraxSyncAuditHealth } from "./fantraxSyncAuditService.js?v5-4-6e-opt
 import { fantraxRosterSyncReleasePolicy } from "./fantraxRosterSyncService.js?v5-4-6e-opt-in";
 import { statcastRefreshHealth } from "./statcastProviderService.js";
 import { mlbamBackfillHealth } from "./mlbamIdentityBackfillService.js";
+import { fantraxProductionHealth } from "./fantraxPlayerProductionImportService.js";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -102,6 +103,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     importJobs.latestImportJobs(leagueId).then(rows=>({available:true,rows,error:""})).catch(error=>({available:false,rows:[],error:String(error?.message||error)}))
   ]);
   const statcastHealth=statcastRefreshHealth({metricRows,importJobs:statcastJobsResult.rows,available:statcastJobsResult.available,error:statcastJobsResult.error});
+  const fantraxProduction=fantraxProductionHealth({metricRows,importJobs:statcastJobsResult.rows,playerRows,league:leagueRows[0]||null,available:statcastJobsResult.available,error:statcastJobsResult.error});
   const mlbamHealth=mlbamBackfillHealth(mlbamBackfillPreview);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
   const fantraxAuditAvailable=fantraxSyncAuditStatus==="AVAILABLE"&&Array.isArray(fantraxSyncAttempts);
@@ -229,6 +231,10 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const staleTradeVersion=tradeState.analysis&&tradeState.analysis.tradeAnalysisVersion!==TRADE_ANALYSIS_VERSION?[tradeState.analysis]:[];
   const tradeScoreVersion=tradeState.analysis?.scoreVersion||tradeState.scoreVersion||"";
   const checks=[
+    {name:"Fantrax Player Production Import",status:fantraxProduction.status==="UNAVAILABLE"?"FAIL":["FAILED","PARTIAL"].includes(fantraxProduction.status)?"WARNING":fantraxProduction.status==="NEVER_RUN"?"WARNING":"PASS",details:detail("Fantrax Player Production Import",[fantraxProduction])},
+    {name:"Fantrax Player Production Season Context",status:fantraxProduction.seasonContextStatus==="MATCH"?"PASS":fantraxProduction.status==="NEVER_RUN"?"WARNING":"FAIL",details:detail("Fantrax Player Production Season Context",[fantraxProduction])},
+    {name:"Fantrax Player Production Coverage",status:fantraxProduction.playersWithProduction>0?fantraxProduction.playersMissingProduction?"WARNING":"PASS":"WARNING",details:detail("Fantrax Player Production Coverage",[fantraxProduction])},
+    {name:"Fantrax Player Production Freshness",status:fantraxProduction.status==="NEVER_RUN"?"WARNING":fantraxProduction.stale?"WARNING":"PASS",details:detail("Fantrax Player Production Freshness",[fantraxProduction])},
     {name:"Automated Statcast Provider Availability",status:statcastHealth.status==="UNAVAILABLE"?"FAIL":["FAILED","PARTIAL"].includes(statcastHealth.status)?"WARNING":"PASS",details:detail("Automated Statcast Provider Availability",[statcastHealth])},
     {name:"Automated Statcast Hitter Outcome",status:["FAILED","UNAVAILABLE","QUERY_FAILED","BLOCKED"].includes(statcastHealth.types?.hitter?.status)?"FAIL":["PARTIAL","NEVER_RUN","NOT_RUN","RUNNING"].includes(statcastHealth.types?.hitter?.status)?"WARNING":"PASS",details:detail("Automated Statcast Hitter Outcome",[statcastHealth.types?.hitter||{status:"UNAVAILABLE"}])},
     {name:"Automated Statcast Pitcher Outcome",status:["FAILED","UNAVAILABLE","QUERY_FAILED","BLOCKED"].includes(statcastHealth.types?.pitcher?.status)?"FAIL":["PARTIAL","NEVER_RUN","NOT_RUN","RUNNING"].includes(statcastHealth.types?.pitcher?.status)?"WARNING":"PASS",details:detail("Automated Statcast Pitcher Outcome",[statcastHealth.types?.pitcher||{status:"UNAVAILABLE"}])},

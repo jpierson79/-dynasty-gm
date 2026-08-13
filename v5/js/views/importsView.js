@@ -3,6 +3,7 @@ import { MLBAM_MATCH_CLASSES, MLBAM_REASON_DESCRIPTIONS, queryMlbamPreviewRows }
 
 const DESCRIPTIONS={
   fantrax:"Canonical player pool, fantasy-team ownership, and roster slots.",
+  fantraxProduction:"Authoritative Fantrax FPts and FP/G, matched only by exact existing Fantrax identity.",
   hkb:"HarryKnowsBall values, ranks, and supplemental player valuation fields.",
   statcastHitters:"Statcast hitter metrics keyed by MLBAM player_id when safely matched.",
   statcastPitchers:"Statcast pitcher metrics keyed by MLBAM player_id when safely matched.",
@@ -45,6 +46,10 @@ function renderAutomatedStatcast(statcast={}){
 }
 function renderImportPreview(preview){
   if(!preview)return"<p class='note'>Choose a file and preview it before uploading.</p>";
+  if(preview.schema==="fantrax-production-import-preview-v1"){
+    const counts=preview.productionCounts||{},plan=preview.plan||{},season=preview.seasonContext?.seasonYear??"UNAVAILABLE",items=[["Total rows",preview.counts?.total],["Matched",preview.counts?.matched],["Unmatched",preview.importCounts?.unmatched],["Identity conflicts",preview.importCounts?.conflicts],["Rows with FPts",counts.rowsWithFantasyPoints],["Rows with FP/G",counts.rowsWithFantasyPointsPerGame],["Zero FPts",counts.zeroFantasyPoints],["Missing FPts",counts.missingFantasyPoints],["Invalid FPts",counts.invalidFantasyPoints],["Zero FP/G",counts.zeroFantasyPointsPerGame],["Missing FP/G",counts.missingFantasyPointsPerGame],["Invalid FP/G",counts.invalidFantasyPointsPerGame],["Planned inserts",plan.inserted?.length],["Planned updates",plan.updated?.length],["Planned no-op",plan.unchanged?.length],["Non-writable",plan.nonWritable?.length]];
+    return `<h3>Fantrax Player Production Preview</h3><p class="note">Read-only preview · ${preview.sourceFilename||"Unknown file"} · season ${season} · ${preview.status}. Exact Fantrax identity only; names and Status text cannot authorize ownership or writes.</p><div class="grid">${items.map(([label,value])=>`<div class="metric"><span>${label}</span><b>${value??"Unavailable"}</b></div>`).join("")}</div><p class="note"><b>Schema:</b> 16 reviewed headers / 18 preserved row values · FPts index 8 · FP/G index 9 · ${preview.schemaEvidence?.headerRowArityMismatch||"UNAVAILABLE"}</p><p class="note"><b>Warnings:</b> ${(preview.warnings||[]).join(" · ")||"None"}</p><p class="note"><b>Errors:</b> ${(preview.errors||[]).map(row=>row.message||row.code||String(row)).join(" · ")||"None"}</p>`;
+  }
   const headers=(preview.columns||[]).join(", ")||"JSON file";
   const teams=(preview.fantasyTeamsDetected||[]).join(", ")||"None";
   const tokens=(preview.nonTeamStatusTokensDetected||[]).join(", ")||"None";
@@ -53,6 +58,7 @@ function renderImportPreview(preview){
 }
 function renderImportProgress(result){
   if(!result)return"<p class='note'>No import has run yet.</p>";
+  if(result.importType==="fantrax_player_production")return `<h3>Fantrax Production Import Result</h3><p class="${result.status==="COMPLETED"?"note":"error"}" role="status">${result.status}: ${result.processed||0} processed, ${result.matched||0} matched, ${result.inserted||0} inserted, ${result.updated||0} updated, ${result.unchanged||0} no-op, ${result.unmatched||0} unmatched, ${result.nonWritable||0} non-writable, ${result.failed||0} failed.</p>`;
   const details=result.exceptionDetails||[];
   return `<h3>Import Result</h3><div class="grid"><div class="metric"><span>Matched</span><b>${result.matched||0}</b></div><div class="metric"><span>Inserted</span><b>${result.inserted||0}</b></div><div class="metric"><span>Updated</span><b>${result.updated||0}</b></div><div class="metric"><span>Skipped</span><b>${result.skipped||result.unmatched||0}</b></div><div class="metric"><span>Warnings</span><b>${result.warnings||details.length||0}</b></div><div class="metric"><span>Errors</span><b>${result.errors||0}</b></div></div>${details.length?`<details open><summary><b>View Details</b></summary><table class="exception-table"><thead><tr><th>CSV row</th><th>Player</th><th>Fantrax</th><th>MLBAM</th><th>Team</th><th>Action</th><th>Reason</th><th>Suggested resolution</th></tr></thead><tbody>${details.map(row=>`<tr><td>${row.csvRow||""}</td><td>${row.playerName||""}</td><td>${row.fantraxId||""}</td><td>${row.mlbamId||""}</td><td>${row.team||""}</td><td>${row.actionAttempted||""}</td><td>${row.failureReason||""}</td><td>${row.suggestedResolution||""}</td></tr>`).join("")}</tbody></table></details>`:""}`;
 }
