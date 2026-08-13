@@ -200,6 +200,13 @@ The B-3 controlled apply path is production-accepted for the exact three-player 
 - No score recalculations.
 - No commits or pushes.
 
+## V5.5 Active Direction
+
+- **V5.5A Automated Statcast Data Provider implementation is complete.** The accepted baseline includes the public Baseball Savant collector, MLBAM-only resolver, normalized hitter/pitcher metrics, authenticated league-scoped metric persistence, import-job metadata, Data Health, protected-baseline profiles, coordinated review/session execution, and truthful type/session outcome reporting.
+- **V5.5A live production refresh acceptance is suspended.** No coordinated production Statcast refresh has been performed. GitHub Pages repeatedly failed to publish the exact feature artifact; this is an external deployment blocker, not a proven application defect. The existing V5.5A-6B contract may resume when exact-artifact publication is reliable.
+- **V5.5B Player Intelligence Engine 2.0 is active.** The immediate task is documentation-only audit and architecture. No scoring formula, calculated score, metric, identity, roster, ownership, or Fantrax behavior is authorized to change during the audit.
+- V5.5C remains the Waiver vs. Roster Decision Engine and must consume explainable V5.5B outputs rather than duplicate player-value logic.
+
 ## V5.4.6C Reconciled Implementation — Fantrax Season Rollover Safety
 
 - The Fantrax preview now derives an observed season context from the exact external league ID, Fantrax season year, and optional league-history ID, then compares it with an explicitly reviewed context stored in the active league's existing `settings` object.

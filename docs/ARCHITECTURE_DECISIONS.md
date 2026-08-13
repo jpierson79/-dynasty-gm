@@ -225,3 +225,15 @@ V5.5A uses a source collector followed by raw snapshot preservation, validation,
 Consequences: The ten-player Fantrax synchronization remains unexecuted and unauthorized. Gate 4 may reopen only for healthy deployment infrastructure or a verified production defect under a new explicit task. V5.5A establishes data foundations only; scoring and decision engines remain V5.5B-E concerns. Existing CSV Statcast imports remain supported until the automated provider is independently validated.
 
 Evidence paths: `docs/NEXT_TASK_RESULT.md`, `docs/NEXT_TASK.md`, `js/services/cloudCsvImportService.js`, `v5/js/repositories/metricRepository.js`, `v5/js/services/dataHealthService.js`.
+
+## ADR-020: Complete The Statcast Foundation And Suspend Live Refresh Acceptance
+
+Status: accepted.
+
+Context: V5.5A implemented and locally validated automated Baseball Savant collection, MLBAM-only matching, normalized metrics, protected-baseline evidence, coordinated hitter/pitcher review and persistence, and type/session outcome integrity. The first live coordinated refresh could not begin because GitHub Pages continued serving stale `main` commit `df89840de0ea8563968b99b7acc75b528e02983f` instead of required feature commit `99aa6c15abc3548b1e81795e29a5e710d4842a9c`. Pages was restored to `main`; no production refresh or data write occurred.
+
+Decision: Treat V5.5A implementation as complete enough for downstream development while suspending, not accepting, its live production refresh. Do not create another infrastructure gate. Resume the existing V5.5A-6B acceptance contract only when exact-artifact publication is reliable. Activate V5.5B as a documentation-first audit and architecture phase for league-specific, explainable Player Intelligence; retain V5.5C as the separate waiver-vs-roster decision phase.
+
+Consequences: Existing V5.5A code is the accepted implementation baseline, but production Statcast metrics have not been refreshed through the coordinated workflow. V5.5B may design from available provider, identity, metric, HKB, scoring, and roster data, but its audit cannot change formulas, scores, schema, ingestion, identity, roster state, or Fantrax behavior. V5.5C must consume V5.5B outputs rather than embed a competing player-ranking engine.
+
+Evidence paths: `docs/NEXT_TASK_RESULT.md`, `v5/js/services/statcastProviderService.js`, `v5/js/services/statcastRefreshSessionService.js`, `v5/js/services/protectedBaselineService.js`, `v5/js/services/dataHealthService.js`.
