@@ -65,11 +65,12 @@ assert.equal("owner_team_id" in preview.plan.writeRows[0],false);
 assert.equal("roster_status" in preview.plan.writeRows[0],false);
 assert.equal("fantrax_id" in preview.plan.writeRows[0],false);
 
-let coordinatorWrites=0,jobFinishes=[];
-const applied=await applyAutomatedStatcastRefresh({leagueId:"league-1",playerType:"hitter",reviewedPreview:preview,repositories:{
-  startJob:async()=>({id:"job-1"}),upsert:async(_league,rows)=>{coordinatorWrites+=rows.length;return rows},finishJob:async(_league,_id,row)=>{jobFinishes.push(row);return row}
+let coordinatorWrites=0,jobFinishes=[],jobStarts=[];
+const refreshSession={id:"session-1",intendedTypes:["hitter","pitcher"],sequence:1,startedAt:"2026-08-11T10:00:00.000Z"};
+const applied=await applyAutomatedStatcastRefresh({leagueId:"league-1",playerType:"hitter",reviewedPreview:preview,refreshSession,repositories:{
+  startJob:async(_league,row)=>(jobStarts.push(row),{id:"job-1"}),upsert:async(_league,rows)=>{coordinatorWrites+=rows.length;return rows},finishJob:async(_league,_id,row)=>{jobFinishes.push(row);return row}
 }});
-assert.equal(applied.inserted,1);assert.equal(applied.updated,0);assert.equal(applied.status,"partial");assert.equal(coordinatorWrites,1);assert.equal(jobFinishes[0].status,"partial");
+assert.equal(applied.inserted,1);assert.equal(applied.updated,0);assert.equal(applied.status,"partial");assert.equal(applied.importJobId,"job-1");assert.equal(applied.importType,"statcast_automated_hitter");assert.equal(coordinatorWrites,1);assert.deepEqual(jobStarts[0].sourceMetadata.refreshSession,refreshSession);assert.equal(jobFinishes[0].status,"partial");assert.equal(jobFinishes[0].sourceMetadata.outcome.unchanged,0);assert.deepEqual(jobFinishes[0].sourceMetadata.refreshSession,refreshSession);
 
 const partialBatchError=Object.assign(new Error("batch two failed"),{statcastBatchResult:{savedCount:1,failedBatchSize:1,remainingCount:1,batchStart:1}}),partialFinishes=[];
 await assert.rejects(applyAutomatedStatcastRefresh({leagueId:"league-1",playerType:"hitter",reviewedPreview:preview,repositories:{startJob:async()=>({id:"job-2"}),upsert:async()=>{throw partialBatchError},finishJob:async(_league,_id,row)=>{partialFinishes.push(row);return row}}}),/batch two failed/);
@@ -92,10 +93,12 @@ await assert.rejects(applyAutomatedStatcastRefresh({leagueId:"league-1",playerTy
 
 const healthUnavailable=statcastRefreshHealth({available:false,error:"query failed"});
 assert.equal(healthUnavailable.status,"UNAVAILABLE");assert.equal(healthUnavailable.rowsFetched,undefined);
-const now=Date.parse("2026-08-11T12:00:00.000Z"),job={import_type:"statcast_automated_hitter",status:"completed",completed_at:"2026-08-11T11:00:00.000Z",rows_processed:2,rows_matched:1,rows_unmatched:1,rows_inserted:1,rows_updated:0,rows_failed:0,source_metadata:{provider:"Baseball Savant",season:2026}};
+const now=Date.parse("2026-08-11T12:00:00.000Z"),job={import_type:"statcast_automated_hitter",status:"completed",completed_at:"2026-08-11T11:00:00.000Z",rows_processed:2,rows_matched:1,rows_unmatched:1,rows_inserted:1,rows_updated:0,rows_failed:0,source_metadata:{provider:"Baseball Savant",season:2026,snapshotId:"hitter-snapshot",outcome:{unchanged:3,warningCount:0},sources:[{sourceType:"hitter-feed",checksum:"hitter-source",schemaVersion:"hitter-schema",rowCount:2,fetchedAt:"2026-08-11T10:00:00.000Z"}]}};
 const healthy=statcastRefreshHealth({available:true,importJobs:[job],metricRows:[existing],now});
-assert.equal(healthy.status,"AVAILABLE");assert.equal(healthy.stale,false);assert.equal(healthy.matched,1);assert.equal(healthy.unmatched,1);
+assert.equal(healthy.status,"SUCCESS");assert.equal(healthy.stale,false);assert.equal(healthy.types.hitter.matched,1);assert.equal(healthy.types.hitter.unmatched,1);assert.equal(healthy.types.hitter.unchanged,3);assert.equal(healthy.types.hitter.sources[0].sourceChecksum,"hitter-source");assert.equal(healthy.types.hitter.sources[0].schemaChecksum,"hitter-schema");assert.equal(healthy.types.pitcher.status,"NEVER_RUN");assert.equal(healthy.session.status,"NOT_RUN");
 assert.equal(statcastRefreshHealth({available:true,importJobs:[job],metricRows:[existing],now:now+48*60*60*1000}).stale,true);
+const coordinated=id=>({refreshSession:{id,intendedTypes:["hitter","pitcher"],startedAt:"2026-08-11T10:00:00.000Z"}}),pitcherJob={...job,import_type:"statcast_automated_pitcher",status:"partial",rows_processed:4,rows_matched:3,rows_unmatched:1,rows_inserted:2,rows_updated:1,rows_failed:1,source_metadata:{...job.source_metadata,snapshotId:"pitcher-snapshot",sources:[{sourceType:"pitcher-feed",checksum:"pitcher-source",schemaVersion:"pitcher-schema"}],...coordinated("session-1")}},hitterJob={...job,source_metadata:{...job.source_metadata,...coordinated("session-1")}};
+const coordinatedHealth=statcastRefreshHealth({available:true,importJobs:[pitcherJob,hitterJob],metricRows:[existing],now});assert.equal(coordinatedHealth.status,"PARTIAL");assert.equal(coordinatedHealth.types.hitter.status,"SUCCESS");assert.equal(coordinatedHealth.types.pitcher.status,"PARTIAL");assert.equal(coordinatedHealth.session.status,"PARTIAL");assert.deepEqual(coordinatedHealth.session.typesCompleted,["hitter"]);assert.deepEqual(coordinatedHealth.session.typesPartial,["pitcher"]);assert.equal(coordinatedHealth.types.pitcher.failed,1);assert.equal(coordinatedHealth.types.pitcher.sources[0].sourceChecksum,"pitcher-source");assert.equal(coordinatedHealth.types.pitcher.sources[0].schemaChecksum,"pitcher-schema");
 
 const ui=renderImports({}, {statcast:{season:2026,sessionStatus:"NOT_RUN",protectedBaseline:{},types:{hitter:{preview,reviewed:false,running:false,result:null,error:""},pitcher:{preview:null,reviewed:false,running:false,result:null,error:""}}}});
 assert.match(ui,/Automated Statcast Refresh/);assert.match(ui,/Preview HITTERS/);assert.match(ui,/Apply HITTERS/);assert.match(ui,/exact hitter MLBAM/);assert.match(ui,/PITCHERS/);

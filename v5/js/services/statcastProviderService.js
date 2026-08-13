@@ -2,6 +2,7 @@ import { fetchStatcastSnapshot } from "../providers/baseballSavantStatcastProvid
 import { allPlayers } from "../repositories/playerRepository.js";
 import { listMetrics, upsertStatcastMetricRows } from "../repositories/metricRepository.js";
 import { finishAutomatedStatcastJob, startAutomatedStatcastJob } from "../repositories/importJobRepository.js";
+import { normalizeStatcastTypeOutcome, statcastSessionStatus } from "./statcastRefreshSessionService.js";
 
 const SOURCE="Statcast";
 const PREVIEW_MAX_AGE_MS=15*60*1000;
@@ -19,10 +20,10 @@ function metricValues(metrics={}){
   const {_statcast,statcast,...values}=metrics;
   return values;
 }
-function sourceMetadata(snapshot){return {
+function sourceMetadata(snapshot,refreshSession=null){return {
   provider:snapshot.provider,playerType:snapshot.playerType,season:snapshot.season,fetchedAt:snapshot.fetchedAt,
   snapshotId:snapshot.snapshotId,sources:snapshot.sources.map(source=>({sourceType:source.sourceType,endpoint:source.endpoint,season:source.season,fetchedAt:source.fetchedAt,rowCount:source.rowCount,headers:source.headers,schemaVersion:source.schemaVersion,checksum:source.checksum,warnings:source.warnings||[]})),
-  warnings:snapshot.warnings||[]
+  warnings:snapshot.warnings||[],...(refreshSession?{refreshSession}:{})
 }}
 async function snapshotId(snapshot){
   const value=snapshot.sources.map(source=>`${source.sourceType}:${source.checksum}`).sort().join("|");
@@ -76,16 +77,16 @@ function assertPreview(preview,{leagueId,playerType}){
   if(preview.status!=="READY"||preview.errors?.length)throw new Error("Blocked Statcast preview cannot be persisted.");
   if(Date.now()-Date.parse(preview.createdAt)>PREVIEW_MAX_AGE_MS)throw new Error("Statcast refresh preview is stale.");
 }
-export async function applyAutomatedStatcastRefresh({leagueId,playerType,reviewedPreview,repositories={upsert:upsertStatcastMetricRows,startJob:startAutomatedStatcastJob,finishJob:finishAutomatedStatcastJob}}={}){
+export async function applyAutomatedStatcastRefresh({leagueId,playerType,reviewedPreview,refreshSession=null,repositories={upsert:upsertStatcastMetricRows,startJob:startAutomatedStatcastJob,finishJob:finishAutomatedStatcastJob}}={}){
   assertPreview(reviewedPreview,{leagueId,playerType});
-  const {snapshot,resolution,plan}=reviewedPreview,metadata=sourceMetadata(snapshot);
+  const {snapshot,resolution,plan}=reviewedPreview,metadata=sourceMetadata(snapshot,refreshSession);
   let job;
   try{
     job=await repositories.startJob(leagueId,{playerType,sourceMetadata:metadata});
     const saved=await repositories.upsert(leagueId,plan.writeRows);
     const warningRows=(reviewedPreview.warnings||[]).slice(0,100),partial=reviewedPreview.warnings?.length>0;
-    const result={status:partial?"partial":"completed",processed:snapshot.rows.length,matched:resolution.matched.length,unmatched:resolution.unmatched.length,inserted:plan.inserted.length,updated:plan.updated.length,unchanged:plan.unchanged.length,failed:resolution.invalid.length+(snapshot.invalidRows?.length||0),warnings:warningRows,warningCount:reviewedPreview.warnings?.length||0,snapshot:metadata,saved:saved.length};
-    await repositories.finishJob(leagueId,job.id,{...result,errors:result.warnings,sourceMetadata:metadata});
+    const result={status:partial?"partial":"completed",processed:snapshot.rows.length,matched:resolution.matched.length,unmatched:resolution.unmatched.length,inserted:plan.inserted.length,updated:plan.updated.length,unchanged:plan.unchanged.length,failed:resolution.invalid.length+(snapshot.invalidRows?.length||0),warnings:warningRows,warningCount:reviewedPreview.warnings?.length||0,snapshot:metadata,saved:saved.length,importJobId:job.id,importType:`statcast_automated_${playerType}`};
+    await repositories.finishJob(leagueId,job.id,{...result,errors:result.warnings,sourceMetadata:{...metadata,outcome:{unchanged:result.unchanged,warningCount:result.warningCount}}});
     return result;
   }catch(error){
     const savedCount=Number(error?.statcastBatchResult?.savedCount||0),savedInserted=Math.min(savedCount,plan.inserted.length),savedUpdated=Math.max(0,savedCount-plan.inserted.length);
@@ -94,14 +95,22 @@ export async function applyAutomatedStatcastRefresh({leagueId,playerType,reviewe
   }
 }
 
+function jobType(job){const value=String(job?.import_type||"").replace("statcast_automated_","");return METRIC_TYPES[value]?value:""}
+function jobEvidence(job,now,staleAfterMs){
+  if(!job)return {status:"NEVER_RUN",stale:false};
+  const meta=job.source_metadata||{},completedAt=job.completed_at||"",status=normalizeStatcastTypeOutcome(job.status),sources=(meta.sources||[]).map(source=>({sourceType:source.sourceType,sourceChecksum:source.checksum,schemaChecksum:source.schemaVersion,rowCount:source.rowCount,fetchedAt:source.fetchedAt}));
+  return {status,fetched:job.rows_processed??null,matched:job.rows_matched??null,unmatched:job.rows_unmatched??null,inserted:job.rows_inserted??null,updated:job.rows_updated??null,unchanged:meta.outcome?.unchanged??null,failed:job.rows_failed??null,warnings:meta.outcome?.warningCount??meta.warnings?.length??0,errors:job.errors||[],provider:meta.provider||"",season:meta.season??null,snapshotId:meta.snapshotId||"",sources,refreshTimestamp:completedAt||job.started_at||job.created_at||"",stale:Boolean(completedAt&&now-Date.parse(completedAt)>staleAfterMs),refreshSession:meta.refreshSession||null};
+}
 export function statcastRefreshHealth({metricRows=[],importJobs=[],now=Date.now(),staleAfterMs=36*60*60*1000,available=true,error=""}={}){
   if(!available)return {status:"UNAVAILABLE",error:error||"Statcast refresh history is unavailable.",checks:[]};
   const jobs=importJobs.filter(job=>String(job.import_type||"").startsWith("statcast_automated_"));
-  const successful=jobs.filter(job=>job.status==="completed").sort((a,b)=>String(b.completed_at||"").localeCompare(String(a.completed_at||"")))[0]||null;
-  const latest=jobs.slice().sort((a,b)=>String(b.started_at||b.created_at||"").localeCompare(String(a.started_at||a.created_at||"")))[0]||null;
-  const reporting=successful||latest,statcastRows=metricRows.filter(row=>row.source===SOURCE),latestAt=successful?.completed_at||"",stale=!latestAt||now-Date.parse(latestAt)>staleAfterMs;
-  const meta=reporting?.source_metadata||{},status=latest?.status==="failed"?"FAILED":latest?.status==="partial"?"PARTIAL":successful?"AVAILABLE":"NEVER_RUN";
-  return {status,lastSuccessfulAt:latestAt,latestStatus:latest?.status||"NEVER_RUN",season:meta.season??null,provider:meta.provider||"",rowsFetched:reporting?.rows_processed??null,matched:reporting?.rows_matched??null,unmatched:reporting?.rows_unmatched??null,inserted:reporting?.rows_inserted??null,updated:reporting?.rows_updated??null,failed:reporting?.rows_failed??null,metricRows:statcastRows.length,stale,warnings:meta.warnings||[],errors:latest?.errors||[],error};
+  const ordered=jobs.slice().sort((a,b)=>String(b.completed_at||b.started_at||b.created_at||"").localeCompare(String(a.completed_at||a.started_at||a.created_at||""))),latestByType=type=>ordered.find(job=>jobType(job)===type)||null;
+  const types={hitter:jobEvidence(latestByType("hitter"),now,staleAfterMs),pitcher:jobEvidence(latestByType("pitcher"),now,staleAfterMs)};
+  const coordinated=ordered.find(job=>Array.isArray(job.source_metadata?.refreshSession?.intendedTypes)&&job.source_metadata.refreshSession.intendedTypes.length>1),sessionId=coordinated?.source_metadata?.refreshSession?.id||"",sessionJobs=sessionId?ordered.filter(job=>job.source_metadata?.refreshSession?.id===sessionId):[],intendedTypes=coordinated?.source_metadata?.refreshSession?.intendedTypes||[];
+  const sessionTypes=Object.fromEntries(["hitter","pitcher"].map(type=>[type,{result:sessionJobs.find(job=>jobType(job)===type)?{status:sessionJobs.find(job=>jobType(job)===type).status}:null,error:""}])),sessionStatus=sessionId?statcastSessionStatus(sessionTypes,intendedTypes):"NOT_RUN";
+  const session={status:sessionStatus,sessionId,timestamp:sessionJobs.map(job=>job.completed_at||job.started_at||job.created_at||"").sort().at(-1)||"",typesIntended:intendedTypes,typesCompleted:intendedTypes.filter(type=>normalizeStatcastTypeOutcome(sessionJobs.find(job=>jobType(job)===type)?.status)==="SUCCESS"),typesPartial:intendedTypes.filter(type=>normalizeStatcastTypeOutcome(sessionJobs.find(job=>jobType(job)===type)?.status)==="PARTIAL"),typesFailed:intendedTypes.filter(type=>normalizeStatcastTypeOutcome(sessionJobs.find(job=>jobType(job)===type)?.status)==="FAILED")};
+  const latest=ordered[0]||null,latestEvidence=jobEvidence(latest,now,staleAfterMs),statcastRows=metricRows.filter(row=>row.source===SOURCE),lastSuccessfulAt=ordered.find(job=>normalizeStatcastTypeOutcome(job.status)==="SUCCESS")?.completed_at||"";
+  return {status:sessionId?sessionStatus:latestEvidence.status,lastSuccessfulAt,latestStatus:latestEvidence.status,metricRows:statcastRows.length,stale:sessionId?intendedTypes.some(type=>types[type].stale):latestEvidence.stale,types,session,error};
 }
 
 export const AUTOMATED_STATCAST_SOURCE=SOURCE;

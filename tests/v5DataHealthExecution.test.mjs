@@ -31,6 +31,7 @@ assert.match(dataHealth,/buildScoreDiagnosticsFromRows\(leagueId,playerRows,metr
 assert.doesNotMatch(dataHealth,/await buildLiveScoreDiagnostics/);
 assert.match(dataHealth,/excludedInvalidTeamRowsFromRows\(rawTeamRows,playerRows\)/);
 assert.match(dataHealth,/const \[waiverPage,rosterPage\]=await Promise\.all/);
+assert.match(dataHealth,/Automated Statcast Hitter Outcome/);assert.match(dataHealth,/Automated Statcast Pitcher Outcome/);assert.match(dataHealth,/Automated Statcast Coordinated Session Outcome/);
 
 assert.equal(tradeSelectionHealthStatus({userTeamExists:true}),"WARNING","an idle Trade Center is not a data failure");
 assert.equal(tradeSelectionHealthStatus({userTeamExists:true,partnerTeamId:"partner",partnerExists:true}),"PASS");

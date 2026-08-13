@@ -19,7 +19,7 @@ function renderSettingsDataHealthBase(state){
 export function renderSettingsDataHealth(state){return `${renderSettingsDataHealthBase(state)}${renderFantraxSyncAudit(state.fantraxSyncAttempts,{status:state.fantraxSyncAuditStatus,error:state.fantraxSyncAuditError})}`}
 
 function renderHealthActions(health){
-  const alwaysVisible=["Score distribution diagnostics","Score grouping diagnostics","Score confidence coverage","Representative score sample"];
+  const alwaysVisible=["Score distribution diagnostics","Score grouping diagnostics","Score confidence coverage","Representative score sample","Automated Statcast Hitter Outcome","Automated Statcast Pitcher Outcome","Automated Statcast Coordinated Session Outcome"];
   const rows=health.checks.map((check,index)=>({check,index})).filter(item=>item.check.details?.count&&(item.check.status==="FAIL"||item.check.status==="WARNING"||alwaysVisible.includes(item.check.name)));
   return rows.length?`<div class="toolbar">${rows.map(item=>`<button class="secondary" data-health-detail="${item.index}">View Details: ${item.check.name} (${item.check.details.count})</button>`).join("")}</div>`:"";
 }
