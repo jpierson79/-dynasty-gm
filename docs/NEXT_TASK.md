@@ -1,28 +1,43 @@
-# Next Task: V5.5B Player Intelligence Engine 2.0 Audit And Architecture
+# Next Task: V5.5B-1 Canonical Player Intelligence Input And Component Foundation
 
 ## Status And Authority
 
-- V5.5A implementation is complete; its first coordinated production refresh remains unexecuted and live acceptance is suspended on external exact-artifact publication.
-- V5.5B is active. This task is documentation-only audit and architecture.
-- Do not change scoring formulas, application code, tests, schema, calculated scores, metrics, identity, ownership, roster state, imports, or Fantrax behavior.
-- V5.5C remains the separate Waiver vs. Roster Decision Engine.
+- V5.5A implementation is complete; live coordinated production refresh acceptance remains suspended and unexecuted because exact GitHub Pages publication is unreliable.
+- This task authorizes local V5.5B-1 implementation only. It does not authorize deployment, production reads/writes, score recalculation, migration creation/application, ingestion changes, identity/ownership/roster changes, or V5.5C waiver logic.
+- Preserve Engine 5.1.1 behavior through an explicit compatibility path while building the new versioned foundation. Stop on any schema, metric, league-setting, or data-contract contradiction.
 
 ## Objective
 
-Design an explainable player-intelligence foundation for the actual Reddit Phanatics scoring and roster environment—not a generic dynasty ranking. Audit every active and legacy player-value calculation, inventory trustworthy current data, identify league-specific gaps, and define small implementation slices that V5.5C can consume.
+Create one canonical, availability-aware input boundary and one normalized component-result contract for Player Intelligence Engine 2.0. Align accepted Statcast fields with engine consumers, make freshness/missingness explicit, and produce explainable component envelopes without tuning final Reddit Phanatics weights yet.
 
-## Required Audit
+## Required Implementation
 
-1. Inventory Dynasty Asset Score, league fit, championship impact, liquidity, scarcity, appreciation, risk, prospect, roster-pressure, replacement-level, waiver/ranking, recalculation, HKB, Statcast, and Fantrax-stat logic. Record file/function, inputs, formula, weights, scale, persistence, league specificity, active/legacy status, weaknesses, and tests.
-2. Compare current logic with documented Reddit Phanatics value drivers for hitters, pitchers, positional scarcity, defensive opportunity, role stability, dynasty timelines, prospect risk, and roster-slot opportunity cost.
-3. Inventory usable Fantrax, Statcast, HKB, MLB Stats API, player, roster, score, and internal fields with identity, coverage, and freshness limitations. Do not build ingestion.
-4. Design explainable components for league production, underlying skill, role stability, positional/defensive value, age trajectory, prospect risk, market evidence, replacement advantage, and future roster fit.
-5. Separate floor, expected value, ceiling, and confidence. Define evidence-based breakout, regression, role, scarcity, replacement, and prospect signals.
-6. Design actual league replacement levels by eligible position using teams, lineup slots, active/reserve depth, rostered players, free agents, and production. Treat multi-position eligibility explicitly.
-7. Design prospect opportunity cost with `PROTECTED`, `INVESTMENT`, and `CHURN` classifications without hard-coded player bonuses.
-8. Propose an auditable output contract and identify whether existing `calculated_player_scores` can hold it. Do not create a migration during audit.
-9. Define a calibration set from documented players and representative roles, then specify V5.5C handoff requirements.
+1. Inventory the current engine input at runtime and define `PLAYER_INTELLIGENCE_INPUT_VERSION` plus a deterministic adapter that accepts player, all relevant metric rows, league settings, and as-of time.
+2. Select Statcast rows by explicit source/season/type/freshness rather than a single undifferentiated latest metric row. Preserve hitter and pitcher domains and never combine incompatible player types.
+3. Canonicalize accepted automated-provider keys once at the adapter boundary. Support current normalized camelCase fields (`hardHitRate`, `barrelRate`, exit-velocity and allowed variants, `xwoba`, `xera`, etc.) and explicitly mapped reviewed legacy aliases. Modules must consume only canonical keys.
+4. Missing, stale, unsupported, conflicting, or malformed inputs return explicit status/warnings; they must not silently become zero or neutral evidence. Player names cannot join data.
+5. Define a reusable component envelope: `{score, status, confidence, evidence, warnings, version}`. Define scenario, signal, explanation, and source-freshness envelopes without deciding final component weights.
+6. Add a V5.5B explanation/output builder that fits inside existing `calculated_player_scores.explanation` JSONB and retains a compatibility projection for current top-level fields. Do not create a migration.
+7. Keep current Engine 5.1.1 calculation and persistence behavior unchanged by default. No view or decision service may create a second calculation path.
+8. Add fixture-based calibration coverage for hitter, pitcher, prospect, missing/stale data, mixed metric rows, alias equivalence, and stable UUID attachment. Do not hard-code player-specific bonuses.
 
-## Deliverable
+## Safety And Compatibility
 
-Update `docs/NEXT_TASK.md`, `docs/NEXT_TASK_RESULT.md`, `docs/CURRENT_STATE.md`, and `docs/ARCHITECTURE_DECISIONS.md` with the evidence-backed audit and a concrete sliced implementation plan. Run `git diff --check`, commit documentation only, push `feature/manager-intelligence`, and stop for architect review.
+- MLBAM remains authoritative for Statcast ingestion; permanent `players.id` remains the score attachment.
+- Do not modify the Baseball Savant provider, metric persistence, HKB import, Fantrax services, protected-baseline profiles, score schema, RLS, or production data.
+- Preserve existing score repository upsert key `(player_id, score_version)`, batches, cancellation, deterministic output, current views, recommendations, and trade consumers.
+- Do not invent player fantasy production, role, defensive, injury, or prospect evidence. Mark unavailable inputs for later slices.
+
+## Required Tests
+
+- Canonical camelCase Statcast mapping and reviewed legacy-alias equivalence.
+- Hitter/pitcher metric separation, season/source selection, freshness, and conflicts.
+- Missing/unavailable/stale/malformed semantics and no name-based join.
+- Component/scenario/signal/output envelope determinism and evidence traceability.
+- Stable UUID, compatibility projection, unchanged Engine 5.1.1 outputs, unchanged repository batching/upsert behavior.
+- Existing engine, calibration, player-intelligence, Data Health, Statcast, identity, decision, trade, auth, architecture, and Fantrax regressions.
+- Complete `tests/*.test.mjs` and `git diff --check`.
+
+## Deliverable And Stop
+
+Implement locally, update `docs/NEXT_TASK_RESULT.md`, and stop uncommitted for architect review. Do not deploy, run a production provider preview/refresh, recalculate production scores, create/apply migrations, or begin V5.5B-2/V5.5C.

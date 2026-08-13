@@ -237,3 +237,17 @@ Decision: Treat V5.5A implementation as complete enough for downstream developme
 Consequences: Existing V5.5A code is the accepted implementation baseline, but production Statcast metrics have not been refreshed through the coordinated workflow. V5.5B may design from available provider, identity, metric, HKB, scoring, and roster data, but its audit cannot change formulas, scores, schema, ingestion, identity, roster state, or Fantrax behavior. V5.5C must consume V5.5B outputs rather than embed a competing player-ranking engine.
 
 Evidence paths: `docs/NEXT_TASK_RESULT.md`, `v5/js/services/statcastProviderService.js`, `v5/js/services/statcastRefreshSessionService.js`, `v5/js/services/protectedBaselineService.js`, `v5/js/services/dataHealthService.js`.
+
+## ADR-021: Build Player Intelligence From Explainable League-Specific Components
+
+Status: proposed by completed V5.5B audit; implementation pending architect review.
+
+Context: Engine 5.1.1 persists deterministic scores and supports existing views, recommendations, and trades, but relies on static positional values, stage tables, fixed weights, HKB proxies, ownership/status bonuses, and a small subset of metric keys. It does not model actual Reddit Phanatics production, lineup-based replacement, defensive opportunity, saves/holds roles, or prospect roster-slot opportunity cost. Automated Statcast field names are not fully canonicalized for current engine consumers, and public Fantrax data does not provide accepted player fantasy points.
+
+Decision: Evolve the engine through versioned, independently testable components: league production, underlying skill, role stability, positional/replacement advantage, defensive scoring opportunity, age/trajectory, prospect opportunity cost, market evidence, risk, and confidence. Preserve separate floor, expected, and ceiling scenarios plus traceable signals and warnings. Derive scarcity from actual eligible player pools and lineup demand, not fixed position constants. Treat HKB as market evidence, not the final league-value answer. Keep V5.5C as a consumer that compares these outputs rather than a second scoring path.
+
+Persist the initial V5.5B contract in the existing `calculated_player_scores.explanation` JSONB under a new score version while retaining compatible top-level columns. Do not create a migration until an implemented query/access pattern proves JSONB insufficient. Canonicalize metric inputs at one engine adapter boundary; do not make modules interpret multiple provider dialects independently.
+
+Consequences: B-1 must establish canonical inputs, availability/freshness, component result envelopes, and compatibility before changing league weights. Missing production, role, or setting inputs remain explicit `UNAVAILABLE` warnings and lower confidence rather than becoming neutral evidence silently. Every component and final score must expose evidence and version. No player-specific calibration bonus is permitted.
+
+Evidence paths: `v5/js/engine/dynastyEngine.js`, `v5/js/engine/modules/`, `v5/js/services/decisionIntelligenceService.js`, `v5/js/repositories/playerIntelligenceRepository.js`, `supabase/migrations/001_initial_schema.sql`, `docs/NEXT_TASK_RESULT.md`.

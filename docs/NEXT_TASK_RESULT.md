@@ -1975,3 +1975,111 @@
 - Architect decision: **V5.5A IMPLEMENTATION = COMPLETE** and **V5.5A LIVE PRODUCTION REFRESH ACCEPTANCE = SUSPENDED**. The coordinated production refresh remains unexecuted because exact feature-artifact publication failed externally; no application defect was proven.
 - The accepted V5.5A baseline remains the automated Statcast provider, MLBAM identity foundation, `STATCAST_REFRESH` protected-baseline profile, coordinated hitter/pitcher session, outcome integrity, and three-layer Data Health evidence. No additional V5.5A infrastructure gate will be created.
 - V5.5B Player Intelligence Engine 2.0 is now active as an audit-and-architecture phase. V5.5C remains Waiver vs. Roster Decision Engine. This checkpoint changes documentation only and performs no deployment, production refresh, metric write, score recalculation, identity/ownership/roster change, migration, or Fantrax operation.
+
+## V5.5B Player Intelligence Engine 2.0 Audit And Architecture
+
+### Current Logic Inventory
+
+| Calculation | Active location and formula/inputs | Persistence / specificity / tests | Principal weakness |
+| --- | --- | --- | --- |
+| Orchestration | `v5/js/engine/dynastyEngine.js`; `calculatePlayerScores`, `calculateLeagueScores`; latest metric row per player, player row, shallow league settings; batches 200 | Active; `calculated_player_scores`, version `5.1.1`; deterministic/batch/cancel tests | One latest metric row, no canonical input envelope, league settings used by only two shallow modules |
+| Dynasty Asset | `dynastyEngine.js`: ceiling 20%, floor 14%, market 16%, impact 15%, HKB 13%, inverse risk 10%, breakout 8%, age 4% | Active/persisted `dynasty_asset_score`; tested | Generic fixed blend; no actual league production or replacement advantage |
+| Overall/GM | `modules/overallScore.js`: dynasty 20%, impact 14%, market 12%, liquidity 9%, scarcity 8%, ceiling 10%, floor 7%, inverse risk 8%, age 5%, breakout 5%, league fit 2% | Active/persisted `gm_score`; deterministic tests | Double-counts correlated components; league-specific contribution only 2% |
+| Championship impact | `championshipImpact.js`: HKB 24%, xwOBA/xERA proxy 30%, stage-current 22%, scarcity 10%, trend 10%, owned boost 4%, confidence-adjusted | Active/persisted; calibration tests | No actual fantasy points, playing time, starts/QS, saves/holds, or defensive scoring |
+| Scarcity | `scarcity.js`; maximum fixed constant by eligibility: C 88, SS 80, 2B 72, SP 70, 3B 66, OF 52, 1B 45, RP 38, etc. | Active/persisted; basic catcher/OF tests | Not derived from rostered/free-agent supply, lineup demand, or multi-position marginal value |
+| League fit | `leagueFit.js`; base 48 + 20% static scarcity, +9 points SP in points leagues, +3 RP plus +5 holds hint, bounded catcher modifier | Active in explanation; tests | Does not encode real Reddit Phanatics scoring; ignores MI/OF replacement, double plays, walks/wild pitches, role volume |
+| Breakout | `breakout.js`; age 24%, age curve 18%, contact-quality proxy 24%, HKB 16%, stage upside 18% | Active/persisted as `breakout_score`; tests | Reads legacy `hard_hit_percent`/`barrel_batted_rate`; lacks sample/role context and explicit surface-vs-skill delta |
+| Trend | `overallScore.js`; average available xwOBA/hard-hit/barrel or xERA/whiff/K signals | Active in explanation; tests | Same key mismatch; no time series, so “trend” is skill level rather than actual change |
+| Ceiling | `ceiling.js`; HKB 24%, age 18%, breakout 22%, metric quality 18%, stage ceiling 18%, confidence-adjusted | Active in explanation; tests | Correlated inputs and generic stage tables; no credible scenario assumptions |
+| Floor | `floor.js`; HKB 20%, impact 28%, stage floor 24%, inverse risk 20%, ownership certainty 8% | Active in explanation; tests | Ownership is not playing-time certainty; injury/role/demotion evidence absent |
+| Risk | `risk.js`; base 26 plus age >32, age <22, missing metrics/IDs, unclassified/free-agent penalties | Active/persisted; tests | No injury, role, option, prospect-distance, pitcher-volatility, or freshness risk |
+| Age/stage | `ageCurve.js`, `playerStage.js`; fixed age bands and stage tables inferred from age, metrics, HKB, owner/team/status, RP eligibility | Active in explanation; tests | Same curve for hitter/pitcher/prospect contexts; ownership can imply prospect proximity |
+| Market appreciation | `marketAppreciation.js`; age 22%, trend 22%, breakout 28%, stage 18%, HKB value-gap 10% | Active/persisted; tests | HKB-derived signals are reused; no observed market history or liquidity changes |
+| Trade liquidity | `tradeLiquidity.js`; HKB 24%, impact 26%, stage 22%, inverse risk 18%, identity 10%, free-agent adjustment | Active/persisted; tests | Identity is data quality, not market demand; no league-manager behavior/transaction market |
+| Portfolio/roster pressure | `portfolioFit.js`; scarcity 28%, competitive-window age fit 25%, contender ownership 30%, free-agent opportunity 17% | Active as `roster_pressure_score`; tested indirectly | Not calculated from actual team roster slots or weakest alternatives |
+| Acquisition opportunity | `dynastyEngine.js`; free-agent base/rostered base 38%, appreciation 26%, HKB 18%, inverse risk 12%, confidence 6% | Active in explanation; tests | Availability dominates without measuring upgrade over replacement |
+| Recommendations | `decisionIntelligenceService.js`; fixed thresholds for ADD/WATCH/STASH/HOLD/SHOP/CONSOLIDATE/DROP; roster depth counts, average dynasty, hard-coded 33/14/17 limits | Active but not persisted; consumes stored scores; extensive tests | Already approximates V5.5C and uses crude overlap/count thresholds; must not become the V5.5B scoring path |
+| Trade analysis | `tradeAnalysisService.js`; packages stored scores with roster/position/manager context | Active, ephemeral; tests | Useful consumer, but correlated score inputs and crude positional context inherit engine weaknesses |
+| Legacy scores | `js/app.js`, `js/workers/scoringWorker.js`, `js/services/cloudMigrationService.js` | Legacy/local migration compatibility; not canonical V5 calculation | Historical player-specific seed/fields and earlier formulas must not be revived as production logic |
+
+### Reddit Phanatics Fit Gap
+
+- Hitter strikeouts are not penalized, yet current logic neither models that scoring relief nor league production. Infield double-play opportunities are absent, so MI/SS/2B/3B defensive value and the weak OF defensive return are not represented.
+- Static scarcity partly favors C/SS/2B and discounts OF/RP, but it cannot prove actual MI scarcity, high OF replacement supply, catcher shape, or multi-position marginal value from this league's roster pool.
+- Pitcher fit adds only a generic SP points bonus and holds hint. Starts, quality starts, saves, holds, walks allowed, wild pitches, rotation/closer stability, and daily lineup deployment volume are not modeled.
+- Age and stage exist, but no hitter/pitcher-specific curves, injury evidence, option/demotion risk, role certainty, prospect distance, or time-to-value opportunity cost exists.
+- Current recommendation context counts roster positions and fixed active/reserve/minors limits; it does not solve lineup eligibility or compare every asset against a measured replacement frontier.
+
+### Available Data Inventory
+
+- **Fantrax:** stable player/team identities, current roster status, ownership, eligibility, league/period/team context, team matchup scores, standings/draft previews, and season context. Accepted public architecture does **not** supply player fantasy points or player scoring stats; team matchup scores cannot substitute.
+- **Statcast:** normalized season aggregates by MLBAM for hitters (`pa`, `bip`, BA/xBA, SLG/xSLG, wOBA/xwOBA, launch angle, sweet spot, EV, hard-hit, barrels, sprint speed) and pitchers (PA/BIP, expected/contact allowed, ERA/xERA, launch/EV/hard-hit/barrel allowed), plus provider/season/fetched time/snapshot/feed source and schema checksums. Coverage foundation has 5,442 populated MLBAM IDs, but the first coordinated production refresh is unexecuted; freshness and league-wide live coverage must remain explicit.
+- **HKB:** `hkb_value`, `overall_rank`, and `position_rank` on existing players, updated through reviewed identity-aware import. It is market/dynasty evidence with source freshness limitations, not league production.
+- **MLB Stats API:** accepted MLBAM identity evidence plus team/organization, primary position, active-person and roster/status evidence used by the identity preview. It is not yet a canonical playing-time, role, injury, or option-history feed for scoring.
+- **Internal:** permanent player UUID, age, positions, MLB team, owner, roster/free-agent status, minor-leaguer flag, HKB fields, versioned score rows/explanations, league/team settings, and Data Health. Managers/prefs and trade context are separate consumers.
+- Missing or insufficient inputs: authoritative player fantasy points and scoring-category totals; canonical full league scoring/lineup slot configuration; games/PA/IP/starts/QS/save/hold/walk/wild-pitch context; defensive double-play opportunities; role/lineup/rotation/bullpen designation; injury/IL history; option/demotion history; prospect level/ETA/quality beyond proxies; transaction/market history; per-source freshness at the engine adapter.
+- Contract mismatch: automated Statcast stores camelCase contact fields (`hardHitRate`, `barrelRate`, `averageExitVelocity`, allowed variants), while current modules read several legacy snake_case fields. `xwoba`/`xera` overlap, but other accepted metrics can be silently unused. B-1 must canonicalize once and warn on absent/deferred fields.
+
+### Proposed Component And Scenario Model
+
+1. **League Production:** actual Reddit Phanatics points/rates/volume when an authoritative source exists; otherwise `UNAVAILABLE`, never synthesized from team matchup totals.
+2. **Underlying Skill:** player-type-specific Statcast evidence with sample context, expected-vs-surface comparisons, canonical keys, freshness, and supported-only metrics.
+3. **Role Stability:** playing time, lineup/platoon/demotion for hitters; rotation/starts, closer/setup, saves/holds and innings opportunity for pitchers. Initially availability-aware until canonical role inputs exist.
+4. **Positional/Defensive Value:** actual eligible supply/demand and multi-position flexibility; separate evidence for infield double-play opportunity when data exists. Reputation is prohibited.
+5. **Age/Trajectory:** distinct hitter, starter, reliever, and prospect curves with explicit phase and horizon.
+6. **Prospect Opportunity Cost:** expected future value minus roster-slot carrying cost and available alternatives; output `PROTECTED`, `INVESTMENT`, or `CHURN` with evidence, never as a synonym for player quality.
+7. **Market Evidence:** HKB value/rank/freshness and later reviewed market history; does not determine league value.
+8. **Replacement Advantage:** expected contribution above the actual position-eligible replacement frontier.
+9. **Risk:** injury/role/sample/freshness/prospect/option uncertainty as available, with missingness separated from negative skill.
+10. **Confidence:** coverage, sample, identity, freshness, role clarity, prospect distance, and cross-source agreement.
+
+For each player, produce **floor**, **expected**, and **ceiling** from documented scenarios rather than scaling one opaque score. Floor uses conservative playing time/role and skill regression; expected uses median role/skill and measured replacement; ceiling uses credible role/skill growth bounded by evidence. Confidence is separate and cannot inflate the three scenarios.
+
+Signals are versioned evidence objects: `BREAKOUT` (surface below expected skill plus contact quality, role, sample), `UNDERPERFORMING_SKILLS`, `OVERPERFORMING_SKILLS`, `ROLE_UPSIDE`, `ROLE_RISK`, `SCARCITY_PREMIUM`, `REPLACEMENT_RISK`, and `PROSPECT_RISK`. Each contains metric/value/baseline/direction/source/freshness; unsupported signals remain absent with warnings.
+
+### Replacement And Prospect Opportunity-Cost Design
+
+- Build demand from ten teams and configured active lineup slots, then account separately for reserve/minors depth. Do not proceed with calibrated replacement until canonical lineup settings are available.
+- Build supply from all rostered and free-agent players by stable UUID and all eligible positions. Assign multi-position players through a deterministic constrained allocation so one player cannot fill multiple simultaneous demand slots. Their flexibility bonus equals bounded marginal roster value, not the maximum scarcity constant.
+- For each position, expose starter frontier, roster-depth frontier, top-free-agent frontier, distribution/sample size, freshness, and confidence. Replacement is the relevant marginal eligible alternative, not MLB average. OF abundance and MI scarcity must emerge from these distributions.
+- Replacement advantage is player expected production minus position-adjusted replacement, with a best-valid-position assignment and explicit comparison set. Missing production yields unavailable advantage rather than zero.
+- Prospect carrying cost accumulates expected replacement/waiver value forgone over the estimated wait, adjusted for roster-slot rules, promotion probability, role uncertainty, and confidence. `PROTECTED` means ceiling/expected surplus clearly exceeds carrying cost; `INVESTMENT` means positive but uncertain surplus; `CHURN` means current slot value is not justified versus alternatives. Labels never authorize a transaction.
+
+### Explanation And Output Contract
+
+Initial implementation can use `calculated_player_scores.explanation` JSONB under a new score version without migration:
+
+```text
+player_id, league_id, as_of_date, engine_version, input_contract_version
+components {
+  league_production, underlying_skill, role_stability,
+  positional_value, defensive_value, age_trajectory,
+  prospect_opportunity_cost, market_evidence,
+  replacement_advantage, risk
+} // each: score, status, confidence, evidence[], warnings[]
+scenarios { floor, expected, ceiling }
+confidence { score, coverage, sample, freshness, role, identity, warnings[] }
+signals[] { code, strength, direction, evidence[] }
+overall_player_intelligence
+explanations[]
+data_freshness { fantrax, statcast, hkb, mlb, calculated_at }
+compatibility { dynasty_asset_score, championship_impact, scarcity_score, ... }
+```
+
+Existing top-level score columns remain compatibility/index fields. JSONB is adequate for the first foundation and detail rendering; a migration is deferred until real query requirements prove indexed component columns necessary.
+
+### Calibration And V5.5C Handoff
+
+- Calibration players: Sal Stewart (young MLB upside/position), Brice Turang (MI and league-specific production), Hunter Goodman (catcher/eligibility), Esmerlyn Valdez (prospect opportunity cost), Bryan Baker and representative closers/setup relievers (saves/holds/role), Alec Burleson and representative replacement OF (high supply), Francisco Lindor (elite MI production/age), plus representative SP volume arms and top/distant prospects. Repository history directly names Stewart, Turang, Lindor, and Goodman; the architect-supplied remaining names/roles are audit calibration targets.
+- Calibration asserts relative reasoning and decomposition, never hard-coded bonuses or target final scores.
+- V5.5C receives stable UUID, positions, ownership/status, component scores/status, floor/expected/ceiling, confidence, signals, replacement frontier/advantage, prospect carrying cost/classification, warnings, freshness, and version. It compares a candidate with the weakest eligible replaceable roster asset; it must not calculate alternate player intelligence.
+
+### Recommended Implementation Slices
+
+1. **V5.5B-1 Canonical Input And Component Foundation:** versioned input adapter, Statcast key alignment, availability/freshness envelope, component result contract, compatibility mapping, fixture/calibration tests. No weight tuning or migration.
+2. **V5.5B-2 League Production And Replacement:** first obtain/validate authoritative league settings and player production inputs; deterministic eligibility allocation and position frontiers; replacement advantage and scarcity.
+3. **V5.5B-3 Statcast Skill And Signals:** supported hitter/pitcher skill components, sample/freshness, surface-vs-expected breakout/regression explanations.
+4. **V5.5B-4 Role, Age, Risk, Prospect Cost, Scenarios:** role availability contract, player-type curves, carrying cost/classification, floor/expected/ceiling/confidence.
+5. **V5.5B-5 Explainable UI And Calibration:** component decomposition/comparison, warnings/freshness, calibration suite, compatibility acceptance, V5.5C handoff freeze.
+
+- Documentation-only audit validation: `git diff --check`. Full application tests were not required or run because no application, schema, or test file changed. No deployment, provider request, production refresh, metric/score write, migration, import, identity/ownership/roster change, or Fantrax operation occurred.

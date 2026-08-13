@@ -207,6 +207,15 @@ The B-3 controlled apply path is production-accepted for the exact three-player 
 - **V5.5B Player Intelligence Engine 2.0 is active.** The immediate task is documentation-only audit and architecture. No scoring formula, calculated score, metric, identity, roster, ownership, or Fantrax behavior is authorized to change during the audit.
 - V5.5C remains the Waiver vs. Roster Decision Engine and must consume explainable V5.5B outputs rather than duplicate player-value logic.
 
+## V5.5B Audit Findings
+
+- The active persisted engine is `ENGINE_VERSION = 5.1.1`. It deterministically writes one `calculated_player_scores` row per player/version and stores additional component detail in `explanation` JSONB. Decision and trade services consume stored scores rather than recalculating in views.
+- Current components are mostly fixed 0–100 heuristics using HKB, age, stage, limited Statcast signals, ownership/status, static positional scarcity, and shallow league settings. They do not yet calculate actual Reddit Phanatics scoring production, lineup-based replacement levels, defensive double-play opportunity, role stability, saves/holds opportunity, or prospect slot opportunity cost.
+- Automated Statcast normalization and engine consumption are not fully aligned: the provider writes camelCase contact keys such as `hardHitRate` and `barrelRate`, while several engine modules read legacy snake_case keys. `xwoba` and `xera` overlap; other accepted metrics may currently be ignored by scoring.
+- Fantrax player fantasy points/scoring stats are not an accepted data source; public preview exposes team matchup scores only. Exact lineup/scoring settings, role data, injury history, and defensive opportunity inputs are incomplete or not normalized for engine use.
+- The existing score table can support a first V5.5B component contract inside versioned `explanation` JSONB without a migration. Queryable top-level columns remain useful compatibility fields; any future indexed component columns require separate evidence and review.
+- Active implementation plan: B-1 canonical input/component foundation; B-2 league production plus actual replacement/scarcity; B-3 Statcast skill and breakout/regression; B-4 role/age/prospect opportunity cost and scenarios; B-5 explainable UI/calibration. V5.5C follows only after the B contract is accepted.
+
 ## V5.4.6C Reconciled Implementation — Fantrax Season Rollover Safety
 
 - The Fantrax preview now derives an observed season context from the exact external league ID, Fantrax season year, and optional league-history ID, then compares it with an explicitly reviewed context stored in the active league's existing `settings` object.
