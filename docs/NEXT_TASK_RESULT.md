@@ -2233,3 +2233,9 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Files changed for this correction: `v5/js/services/protectedBaselineService.js`, `v5/js/main.js`, `v5/js/views/importsView.js`, `tests/v5ProtectedBaseline.test.mjs`, and this preserved result record. Final focused/full validation results are recorded below.
 - Eighteen focused protected-baseline, Fantrax production/import/sync, Statcast, MLBAM, scoring, Data Health, Cloud Imports/UI, architecture, authentication, and Gate 4 regression files passed. The complete sorted suite passed all 44 `tests/*.test.mjs` files. Syntax checks for every changed JavaScript/test file passed, and final `git diff --check` passed.
 - No deployment, production CSV preview/import, production baseline capture, Supabase read/write, migration, Statcast refresh, score recalculation, player/identity/ownership/roster change, scarcity/replacement/waiver implementation, Gate 4 action, or other cloud/data operation occurred. Architect review approved the five intended implementation/evidence files for narrow checkpointing.
+
+### V5.5B-1A-2A Checkpoint
+
+- Implementation commit: `d458f73dd594b3dc3cb9e142d8529b35675d5d65` (`Add Fantrax production protected baseline profile`).
+- Push result: succeeded to `origin/feature/manager-intelligence` (`9118863..d458f73`).
+- The implementation commit contained exactly the five architect-approved files. No deployment, production baseline capture/import, database write, migration, score recalculation, or player/identity/ownership/roster operation accompanied the checkpoint.
