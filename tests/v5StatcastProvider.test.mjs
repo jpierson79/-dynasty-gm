@@ -97,8 +97,8 @@ const healthy=statcastRefreshHealth({available:true,importJobs:[job],metricRows:
 assert.equal(healthy.status,"AVAILABLE");assert.equal(healthy.stale,false);assert.equal(healthy.matched,1);assert.equal(healthy.unmatched,1);
 assert.equal(statcastRefreshHealth({available:true,importJobs:[job],metricRows:[existing],now:now+48*60*60*1000}).stale,true);
 
-const ui=renderImports({}, {statcast:{playerType:"hitter",season:2026,preview,reviewed:false,running:false}});
-assert.match(ui,/Automated Statcast Refresh/);assert.match(ui,/Preview Statcast/);assert.match(ui,/Refresh Hitters/);assert.match(ui,/exact MLBAM/);
+const ui=renderImports({}, {statcast:{season:2026,sessionStatus:"NOT_RUN",protectedBaseline:{},types:{hitter:{preview,reviewed:false,running:false,result:null,error:""},pitcher:{preview:null,reviewed:false,running:false,result:null,error:""}}}});
+assert.match(ui,/Automated Statcast Refresh/);assert.match(ui,/Preview HITTERS/);assert.match(ui,/Apply HITTERS/);assert.match(ui,/exact hitter MLBAM/);assert.match(ui,/PITCHERS/);
 
 const root=new URL("../",import.meta.url);
 const main=await readFile(new URL("v5/js/main.js",root),"utf8");

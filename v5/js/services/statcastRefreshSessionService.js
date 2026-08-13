@@ -1,0 +1,15 @@
+const TYPES=Object.freeze(["hitter","pitcher"]);
+function typeState(value={}){return {preview:null,reviewed:false,running:false,result:null,error:"",...value}}
+export function createStatcastRefreshSession({leagueId="",season=new Date().getUTCFullYear(),contextSignature="",protectedBaseline={running:false,evidence:null,error:""}}={}){return {leagueId,season,contextSignature,sessionStatus:"NOT_RUN",protectedBaseline,types:{hitter:typeState(),pitcher:typeState()}}}
+export function invalidateStatcastRefreshSession(session,{leagueId=session?.leagueId||"",season=session?.season||new Date().getUTCFullYear(),contextSignature=session?.contextSignature||""}={}){return createStatcastRefreshSession({leagueId,season,contextSignature})}
+export function beginStatcastPreview(session,type){return {...session,types:{...session.types,[type]:typeState({...session.types[type],preview:null,reviewed:false,running:true,result:null,error:""})}}}
+export function finishStatcastPreview(session,type,preview){return {...session,types:{...session.types,[type]:typeState({...session.types[type],preview,reviewed:false,running:false,result:null,error:""})}}}
+export function failStatcastPreview(session,type,error){return {...session,types:{...session.types,[type]:typeState({...session.types[type],preview:null,reviewed:false,running:false,result:null,error:String(error?.message||error)})}}}
+export function reviewStatcastPreview(session,type,reviewed){const current=session.types[type];return {...session,types:{...session.types,[type]:{...current,reviewed:Boolean(reviewed)&&current.preview?.status==="READY"}}}}
+export function statcastTypeCanApply(session,type){const item=session?.types?.[type];return Boolean(item?.preview?.status==="READY"&&item.reviewed&&!item.running&&!item.result)}
+export function statcastSessionStatus(types){const results=TYPES.filter(type=>types[type]?.result),errors=TYPES.filter(type=>types[type]?.error);if(results.length&&!errors.length)return"SUCCESS";if(results.length&&errors.length)return"PARTIAL";if(errors.length&&!results.length)return"FAILED";return"NOT_RUN"}
+export async function applyStatcastSessionTypes(session,types,{leagueId=session.leagueId,applyType}={}){
+  let next=session;for(const type of types){if(!TYPES.includes(type))throw new Error(`Unsupported Statcast player type: ${type}`);if(!statcastTypeCanApply(next,type))throw new Error(`Preview and review ${type} Statcast data before applying.`)}
+  for(const type of types){const current=next.types[type];next={...next,types:{...next.types,[type]:{...current,running:true,error:""}}};try{const result=await applyType({leagueId,playerType:type,reviewedPreview:current.preview});next={...next,types:{...next.types,[type]:{...current,running:false,preview:null,reviewed:false,result,error:""}}}}catch(error){next={...next,types:{...next.types,[type]:{...current,running:false,result:null,error:String(error?.message||error)}}};return {...next,sessionStatus:statcastSessionStatus(next.types)}}}return {...next,sessionStatus:statcastSessionStatus(next.types)}
+}
+export const STATCAST_REFRESH_SESSION_TYPES=TYPES;

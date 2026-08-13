@@ -11,6 +11,7 @@ import { linkManagerToTeam } from "./repositories/managerRepository.js";
 import { calculateLeagueScores } from "./engine/dynastyEngine.js";
 import { previewImport, runImport } from "./imports/cloudImportController.js";
 import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "./services/statcastProviderService.js";
+import { applyStatcastSessionTypes, beginStatcastPreview, createStatcastRefreshSession, failStatcastPreview, finishStatcastPreview, invalidateStatcastRefreshSession, reviewStatcastPreview, statcastTypeCanApply } from "./services/statcastRefreshSessionService.js";
 import { applyMlbamIdentityBackfill, downloadMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
 import { captureProtectedBaseline } from "./services/protectedBaselineService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
@@ -40,7 +41,8 @@ import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:{playerType:"hitter",season:new Date().getUTCFullYear(),preview:null,reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}}};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
+function resetStatcastRefreshSession(){const contextSignature=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:importUiState.statcast.season,contextSignature})}
 let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
@@ -381,6 +383,7 @@ function saveTradeDraft(){
 async function renderView(){
   const root=$("#viewRoot");
   if(!root)return;
+  const statcastContext=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;if(importUiState.statcast.contextSignature!==statcastContext)resetStatcastRefreshSession();
   if(!appState.authUser){setHtml(root,`<section class="view-panel"><h2>Signed out</h2><p class="note">Sign in to connect to Supabase Cloud.</p></section>`);return}
   if(!appState.activeLeague){setHtml(root,`<section class="view-panel"><h2>Select a cloud league</h2><p class="note">No active cloud league is selected. Create or select one in the current application, then retry V5.</p></section>`);return}
   if(appState.view==="dashboard")setHtml(root,renderDashboard(appState,dashboardOverview));
@@ -518,33 +521,24 @@ function bindViewEvents(){
     try{const result=await applyMlbamIdentityBackfill({leagueId:appState.activeLeague.id,reviewedPreview:current.preview,reviewed:true});importUiState.mlbamBackfill={...current,running:false,preview:null,reviewed:false,result,error:""};await refreshLeagueData()}
     catch(error){importUiState.mlbamBackfill={...current,running:false,result:null,error:String(error?.message||error)}}render();
   });
-  $("#statcastSeason")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,season:Number(event.target.value),preview:null,reviewed:false,result:null,error:""};render()});
-  $("#statcastPlayerType")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,playerType:event.target.value,preview:null,reviewed:false,result:null,error:""};render()});
-  $("#reviewAutomatedStatcast")?.addEventListener("change",event=>{importUiState.statcast={...importUiState.statcast,reviewed:event.target.checked};render()});
-  $("#previewAutomatedStatcast")?.addEventListener("click",async()=>{
-    const current=importUiState.statcast;
-    importUiState.statcast={...current,running:true,preview:null,reviewed:false,result:null,error:""};render();
+  $("#statcastSeason")?.addEventListener("change",event=>{importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:Number(event.target.value)});render()});
+  $all("[data-statcast-reviewed]").forEach(input=>input.addEventListener("change",event=>{importUiState.statcast=reviewStatcastPreview(importUiState.statcast,event.target.dataset.statcastReviewed,event.target.checked);render()}));
+  $all("[data-preview-statcast]").forEach(button=>button.addEventListener("click",async()=>{
+    const playerType=button.dataset.previewStatcast,current=importUiState.statcast;
+    importUiState.statcast=beginStatcastPreview(current,playerType);render();
     try{
-      const preview=await previewAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType:current.playerType,season:current.season});
-      importUiState.statcast={...current,running:false,preview,reviewed:false,result:null,error:""};
+      const preview=await previewAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType,season:current.season});
+      importUiState.statcast=finishStatcastPreview(importUiState.statcast,playerType,preview);
       if(importUiState.mlbamBackfill.preview?.status==="READY"){
         const coverage=hypotheticalStatcastCoverage(importUiState.mlbamBackfill.preview,preview);
-        importUiState.mlbamBackfill.preview={...importUiState.mlbamBackfill.preview,hypotheticalStatcast:{...(importUiState.mlbamBackfill.preview.hypotheticalStatcast||{}),[current.playerType]:coverage,...coverage}};
+        importUiState.mlbamBackfill.preview={...importUiState.mlbamBackfill.preview,hypotheticalStatcast:{...(importUiState.mlbamBackfill.preview.hypotheticalStatcast||{}),[playerType]:coverage,...coverage}};
       }
-    }catch(error){importUiState.statcast={...current,running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error)}}
+    }catch(error){importUiState.statcast=failStatcastPreview(importUiState.statcast,playerType,error)}
     render();
-  });
-  $("#applyAutomatedStatcast")?.addEventListener("click",async()=>{
-    const current=importUiState.statcast;
-    if(!current.preview||!current.reviewed){setError("Preview and review the automated Statcast refresh first.");return}
-    importUiState.statcast={...current,running:true,result:null,error:""};render();
-    try{
-      const result=await applyAutomatedStatcastRefresh({leagueId:appState.activeLeague.id,playerType:current.playerType,reviewedPreview:current.preview});
-      importUiState.statcast={...current,running:false,preview:null,reviewed:false,result,error:""};
-      await refreshLeagueData();
-    }catch(error){importUiState.statcast={...current,running:false,result:null,error:String(error?.message||error)}}
-    render();
-  });
+  }));
+  const applyStatcastTypes=async types=>{const current=importUiState.statcast;if(types.some(type=>!statcastTypeCanApply(current,type))){setError("Preview and review every selected Statcast type first.");return}importUiState.statcast={...current,types:{...current.types,...Object.fromEntries(types.map(type=>[type,{...current.types[type],running:true}]))}};render();importUiState.statcast=await applyStatcastSessionTypes(current,types,{leagueId:appState.activeLeague.id,applyType:applyAutomatedStatcastRefresh});await refreshLeagueData();render()};
+  $all("[data-apply-statcast]").forEach(button=>button.addEventListener("click",()=>applyStatcastTypes([button.dataset.applyStatcast])));
+  $("#applyReviewedStatcastSession")?.addEventListener("click",()=>applyStatcastTypes(["hitter","pitcher"]));
   $("#startGate4Acceptance")?.addEventListener("click",async()=>{await gate4Controller?.start();publishGate4ControllerState()});
   $("#fetchGate4PreviewA")?.addEventListener("click",async()=>{await gate4Controller?.fetchPreviewA();publishGate4ControllerState()});
   $all("[data-gate4-candidate]").forEach(input=>input.addEventListener("change",event=>{gate4Controller?.toggleCandidate(event.target.dataset.gate4Candidate,event.target.checked);publishGate4ControllerState()}));
@@ -871,7 +865,7 @@ function bindShellEvents(){
     }
   });
   document.body.addEventListener("click",async event=>{
-    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
+    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");resetStatcastRefreshSession();await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
@@ -889,6 +883,7 @@ function bindShellEvents(){
   document.body.addEventListener("change",async event=>{
     if(event.target.id==="leagueSelect"){
       resetGate4Acceptance("Active league changed.");
+      resetStatcastRefreshSession();
       setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});
       await selectLeague(event.target.value);
       await refreshLeagueData();
