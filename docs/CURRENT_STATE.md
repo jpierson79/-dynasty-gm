@@ -1,12 +1,12 @@
 # Current State
 
-## V5.5B-5 Activated (2026-08-14)
+## V5.5B-6 Activated (2026-08-14)
 
-- V5.5B-4 is complete and checkpointed at implementation commit `564b21ba87067a07b7ab49aa921bf6a473eb07f3` and documentation commit `2fe7c2c3c98ba1215b4e717e4a11faba757420f3`.
-- Its accepted contextual components are Role Stability, Age/Trajectory, Risk, and Prospect Opportunity Cost. Prospect Opportunity Cost uses `HIGHER_IS_BETTER_LOWER_COST`; Risk uses higher-is-more-risk; the pitcher-prospect adjustment is bounded at seven points. Engine 5.1.1 remains unchanged.
-- The active implementation slice is **V5.5B-5 Player Intelligence Calibration and Explainable Composite**.
-- V5.5B-5 is local, read-only, in-memory, and unpersisted. It may combine applicable components by player archetype and confidence and may create explainable overall/floor/expected/ceiling output without projected FPts.
-- Deployment, production refresh/import, persistence, Engine 5.1.1 replacement/recalculation, migrations, production waiver actions, and changes to identity, ownership, or roster state remain unauthorized.
+- V5.5B-5 is complete and checkpointed at implementation commit `bf781b2ecf20ff6915f97db564fea5cad806a840` and documentation commit `901d46c7f3fb6777d9f6db8be94d24885a44ed37`.
+- Its accepted composite remains archetype-aware and confidence-adjusted. `NOT_APPLICABLE` is excluded without penalty, missing applicable evidence lowers confidence, Risk is transformed once through `riskSafety = 100 - risk`, Prospect Opportunity Cost remains `HIGHER_IS_BETTER_LOWER_COST`, scarcity remains subordinate to Replacement Advantage, HKB remains outside the MLB core score and bounded for prospects, and market divergence remains outside normalized floor/expected/ceiling. Engine 5.1.1 is unchanged.
+- The active slice is **V5.5B-6 Real-Player Inspection and Calibration**.
+- V5.5B-6 is local, read-only, in-memory, and unpersisted. It inspects representative real Reddit Phanatics players through the canonical services to detect generic structural defects; it must not tune the model to named players.
+- Deployment, production refresh/import, persistence, Engine 5.1.1 replacement/recalculation, migrations, production waiver actions, and changes to metrics, scores, identity, ownership, or roster state remain unauthorized.
 
 ## V5.5B Production Foundation Reconciliation (2026-08-13)
 
