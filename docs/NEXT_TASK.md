@@ -1,88 +1,69 @@
-# Next Task: V5.5B-2 League Production, Positional Scarcity, And Replacement Advantage
+# Next Task: V5.5B-3 Underlying Skill, Breakout, And Regression Intelligence
 
 ## Status And Authority
 
-- V5.5B-1 canonical inputs and component envelopes are accepted.
-- The V5.5B-1A production-data prerequisite is complete: the 2026 Reddit Phanatics import produced 10,326 canonical `Fantrax` / `fantrax_league_production` rows through exact identity, and its idempotency preview produced 10,326 no-ops.
-- V5.5B-1A-3 hosted acceptance remains incomplete because post-import Data Health timed out, the normal Player Intelligence UI did not expose the canonical FPts/FP-G envelope, and the CSV worker emitted fallback warnings. Do not claim those observability issues are resolved.
-- This task authorizes **local, read-only V5.5B-2 implementation only**. It does not authorize deployment, production reads or writes, production score calculation/persistence, migrations, imports, identity/ownership/roster changes, Statcast refresh, Fantrax synchronization, or V5.5C recommendations.
-- Engine 5.1.1 remains the authoritative production score path. Stop if implementation appears to require persistence or conflicts with the canonical production records.
+- V5.5B-1 canonical inputs and component envelopes are complete.
+- V5.5B-2 League Production, empirical positional scarcity, and replacement advantage are complete and checkpointed.
+- This task authorizes local, read-only V5.5B-3 implementation only. Do not deploy, run a production Statcast refresh, modify production data, persist Player Intelligence, replace Engine 5.1.1, or create migrations.
 
 ## Objective
 
-Implement the first meaningful Player Intelligence 2.0 components from actual league data:
+Implement the existing `underlyingSkill` component and structured breakout/regression evidence. Determine whether independent Statcast skill supports, exceeds, or trails independent Fantrax league production while making coverage and freshness explicit.
 
-1. League Production
-2. Positional / Scarcity Value
-3. Replacement Advantage
+## Independent Evidence Boundaries
 
-The model must answer how difficult a player's production is to replace in the configured Reddit Phanatics league. It must not encode generic positional assumptions.
+- Actual League Production is Fantrax FPts/FP-G.
+- Underlying Skill is Statcast.
+- Market Value is HKB.
+- HKB and Fantrax production cannot affect the raw Underlying Skill score. Production and skill may be compared only after both components are independently calculated.
+- Use canonical V5.5B inputs; never read raw provider responses or assume fields merely because Baseball Savant offers them.
 
-## Canonical Inputs And Population
+## Statcast Availability And Normalization
 
-1. Inspect the V5.5B-1 input boundary and repositories before implementation. Use the accepted Fantrax league-production metric records as the initial canonical source for season fantasy points and FP/G. Preserve source, season, freshness, stable player UUID, and raw evidence.
-2. Inventory reliable opportunity fields such as games, PA, IP, appearances, and starts. Do not invent unavailable fields. Missing opportunity context lowers confidence or produces insufficient-data status.
-3. Build league-scoped sets for rostered active-eligible MLB players, rostered reserves, minor/prospect players, and free agents. Do not mix prospects without MLB production into MLB replacement pools.
-4. Preserve every eligible position. Never select one arbitrary primary position before replacement analysis.
-5. Obtain team count and lineup demand from canonical league settings. Required slots include C, 1B, 2B, 3B, SS, OF, UT, SP, RP, and P where configured. Missing configuration fails closed with `LEAGUE_CONFIGURATION_MISSING`; do not substitute hidden Reddit Phanatics constants.
+- Audit and document the exact canonical hitter and pitcher fields before formulas are implemented.
+- Support `AVAILABLE`, `PARTIAL`, `STALE`, `MISSING`, and `NOT_APPLICABLE`, or accepted equivalents. Missing means unknown, never zero/bad skill/regression/low ceiling.
+- Build separate current-season hitter and pitcher percentile contexts once per league/session. Preserve raw value, percentile, direction, population size, freshness, and availability.
+- Exclude missing values from percentile populations and weighted denominators. Do not silently impute league average. Partial or stale evidence lowers confidence and emits structured warnings.
 
-## Calculation Contract
+## Hitter Skill
 
-### League Production
+- Use only canonical supported evidence, expected to include where present: xBA, xSLG, xwOBA, average exit velocity, hard-hit rate, barrel rate, and sprint speed.
+- Expected production has the largest named weight; contact quality has substantial weight; sprint speed is a small supporting factor and cannot dominate elite offensive evidence.
+- Do not invent unsupported chase, whiff, strikeout, walk, contact, or pitch metrics.
 
-- Normalize current-season Fantrax fantasy production against the relevant league population using the existing 0-100 component convention.
-- Include raw points, FP/G where available, percentile/distribution evidence, season, freshness, status, confidence, inputs used, explanations, and warnings.
-- Do not use HKB, Statcast, team matchup totals, or generic dynasty rankings.
-- Total Fantrax points already include league scoring such as defensive double-play points; do not add those points again.
+## Pitcher Skill
 
-### Replacement Pools And Scarcity
+- Use a separate formula and only canonical supported evidence, expected to include where present: ERA, xERA, allowed exit velocity, allowed hard-hit rate, and allowed barrel rate.
+- Explicitly invert lower-is-better metrics. Do not manufacture strikeout, walk, whiff, velocity, chase, pitch-usage, or Stuff+ evidence.
+- Narrow evidence must lower confidence and emit `LIMITED_PITCHER_SKILL_INPUTS` rather than overstate certainty.
 
-- Precompute position-eligible pools for C, 1B, 2B, 3B, SS, OF, SP, and RP from actual league players, ownership/status, and lineup demand.
-- Treat UT as additional hitter demand and P as additional pitcher demand, not as synthetic player positions. Keep SP and RP evidence separate even when P flex demand affects both pools.
-- For each position, expose starter demand/frontier, viable supply, free-agent count, best available free-agent production, top-alternative distribution, replacement production, drop after the starter tier, sample size, freshness, and confidence.
-- Scarcity must emerge from demand, eligible supply, free-agent depth, and replacement quality. Fixed bonuses such as `SS +10` or `OF -10` are prohibited.
-- Use a transparent deterministic approximation; do not add a full combinatorial lineup optimizer unless repository evidence proves it necessary.
+## Component And Signals
 
-### Multi-Position And Replacement Advantage
+- Populate only the existing `underlyingSkill` envelope with score, confidence, status, player type, metrics used, metric percentiles, coverage ratio, freshness, explanations, and warnings.
+- Do not calculate overall Player Intelligence or merge League Production and Underlying Skill into one score.
+- Compare independent production and skill percentiles with a named material-gap threshold:
+  - `BREAKOUT_SIGNAL`: skill materially exceeds production.
+  - `REGRESSION_RISK`: production materially exceeds skill.
+  - `SUPPORTED_PRODUCTION`: both are strong.
+  - `WEAK_PRODUCTION_SUPPORTED`: both are weak.
+  - neutral when the gap is small.
+- Preserve production percentile, skill percentile, gap, confidence, and supporting metrics. A 72/74 difference must not trigger a dramatic signal.
 
-- Calculate the production gap at every eligible position and preserve `bestReplacementPosition`, `replacementProduction`, `playerProduction`, and `rawReplacementGap`.
-- Use the most favorable valid replacement comparison plus a conservative bounded flexibility adjustment. Do not add full scarcity values for multiple positions or allow a player to fill multiple simultaneous demand slots.
-- Support both rostered players and free agents. Preserve negative raw gaps when a rostered player is worse than available replacement talent.
-- Prospects with no MLB production remain `NOT_APPLICABLE` or `INSUFFICIENT_DATA`; they do not receive fabricated zero production.
+## Isolation And Fail-Closed Rules
 
-## Output, Explanations, And Warnings
-
-- Populate the existing V5.5B-1 envelopes for `leagueProduction`, `positionalScarcity`, and `replacementAdvantage`. Leave the other components and floor/expected/ceiling weighting uncalculated.
-- Use structured factual explanations including `LEAGUE_PRODUCTION_ELITE`, `LEAGUE_PRODUCTION_ABOVE_AVERAGE`, `POSITION_SHALLOW`, `POSITION_DEEP`, `FREE_AGENT_DEPTH_HIGH`, `FREE_AGENT_DEPTH_LOW`, `REPLACEMENT_ADVANTAGE_STRONG`, `REPLACEMENT_ADVANTAGE_NEGATIVE`, and `MULTI_POSITION_FLEXIBILITY` when supported.
-- Support fail-closed warnings including `SMALL_SAMPLE`, `MISSING_PRODUCTION`, `NO_ELIGIBLE_POSITION`, `REPLACEMENT_POOL_INCOMPLETE`, `LEAGUE_CONFIGURATION_MISSING`, and `STALE_FANTRAX_PRODUCTION`.
-- Any development inspection surface must remain read-only and minimal. Do not build the final Player Intelligence UI.
-
-## Safety And Performance
-
-- Attach results only by permanent `players.id`; do not join by name.
-- Keep calculations league-scoped and deterministic. Build league context and positional pools once rather than repeatedly rescanning the full population for every player.
-- Do not change the Fantrax production importer, protected-baseline profile, Statcast provider, HKB path, score repository/schema, RLS, authentication, roster synchronization, identity rules, or normal V5 behavior.
-- Do not write component results to `calculated_player_scores`. Do not replace or modify Engine 5.1.1.
+- Raw Underlying Skill must be invariant to age, position, HKB, Fantrax FPts, role security, and scarcity.
+- Prospects without MLB Statcast evidence are `NOT_APPLICABLE` or `INSUFFICIENT_DATA`; do not substitute HKB, reputation, or scouting.
+- If two-way handling cannot preserve distinct hitter/pitcher envelopes, mark it deferred rather than averaging unrelated evidence.
+- Missing Statcast must not weaken a valid V5.5B-2 League Production component.
 
 ## Required Tests
 
-Add focused fixtures proving:
+Add focused coverage for breakout, regression, supported-star, small-gap/noise, partial coverage, missing xwOBA, sprint-speed non-dominance, pitcher lower-is-better direction, age neutrality, position neutrality, HKB isolation, production isolation, and no-Statcast behavior.
 
-- canonical league production uses Fantrax fantasy production and excludes HKB/Statcast;
-- all eight positional replacement calculations are league-scoped;
-- lineup demand and UT/P flex behavior use configuration;
-- free-agent depth changes empirical scarcity;
-- multi-position eligibility is preserved without double-counting;
-- negative rostered-player replacement gaps and positive free-agent gaps are preserved;
-- a deep-OF/shallow-MI fixture favors MI, while the reverse-depth fixture reverses the result;
-- prospects without MLB production do not receive fake zeroes;
-- small samples lower confidence and stale production is warned;
-- no production write occurs, V5.5B-1 remains green, and Engine 5.1.1 output is unchanged.
-
-Run the new V5.5B-2 tests, V5.5B-1 foundation/scoring tests, Fantrax/import, Statcast, MLBAM, Data Health, architecture, and auth regressions, the complete `tests/*.test.mjs` suite, and `git diff --check`.
+Run the new Underlying Skill tests; V5.5B foundation and League Production; Fantrax production; Statcast provider/session; MLBAM identity; Data Health; scoring; architecture; authentication; Fantrax regressions; the complete `tests/*.test.mjs` suite; JavaScript syntax checks; and `git diff --check`.
 
 ## Deliverable And Stop
 
-Implement locally, update `docs/NEXT_TASK_RESULT.md` with algorithms, population and demand rules, free-agent/flex/pitcher/sample treatment, fixture results, files, tests, and deferred limits, then stop uncommitted for architect review.
+Implement locally, update `docs/NEXT_TASK_RESULT.md` with exact canonical metrics, formulas/weights, normalization, missingness/freshness/confidence, signal thresholds, fixtures, limitations, files, and tests, then stop uncommitted for architect review.
 
-Do not deploy, persist Player Intelligence results, recalculate production scores, create/apply migrations, rerun the production import, run a Statcast refresh, change ownership/rosters/identity, implement V5.5C, or perform any cloud/data write.
+Do not deploy, run production refresh/imports, modify `player_metrics` or `calculated_player_scores`, persist outputs, replace Engine 5.1.1, implement age/role/market/risk/final scoring, implement V5.5C, or create migrations.

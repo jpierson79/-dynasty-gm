@@ -1,5 +1,12 @@
 # Current State
 
+## V5.5B-3 Activated (2026-08-13)
+
+- V5.5B-2 is complete and checkpointed. Its accepted baseline uses canonical Fantrax FPts with FP/G support, empirical scarcity, a median-of-top-five available replacement benchmark, self-exclusion, preserved negative gaps, bounded multi-position flexibility, separate SP/RP pools, and unchanged Engine 5.1.1 behavior.
+- The active implementation slice is **V5.5B-3 Underlying Skill, Breakout, and Regression Intelligence**.
+- V5.5B-3 is local and read-only. It will add independent Statcast skill and transparent production-versus-skill signals while treating partial, stale, and missing Statcast coverage as first-class uncertainty.
+- Deployment, production Statcast refresh, production persistence, score replacement/recalculation, migrations, and V5.5C logic remain unauthorized.
+
 ## V5.5B Production Foundation Reconciliation (2026-08-13)
 
 - **V5.5B-1A-3 hosted acceptance remains INCOMPLETE.** Unresolved observability items are the post-import Data Health timeout, absence of the canonical FPts/FP-G input envelope in the normal Player Intelligence UI, and three CSV-worker fallback warnings. These are not recorded as resolved.

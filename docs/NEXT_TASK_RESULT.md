@@ -2342,3 +2342,10 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Implementation commit: `091f3029704606b2570328296afbc16aa1ab8166` (`Add league production and replacement intelligence`).
 - Push result: succeeded to `origin/feature/manager-intelligence` (`6154524..091f302`).
 - The implementation commit contained exactly the four architect-approved files. No deployment, production read/write, import, metric mutation, score calculation/persistence, migration, Statcast refresh, roster/ownership/identity change, Fantrax synchronization, or other cloud/data operation accompanied the checkpoint.
+
+## V5.5B-3 Governance Activation
+
+- V5.5B-2 remains complete and checkpointed with all prior evidence preserved. Its accepted architecture includes Fantrax FPts League Production, supporting FP/G evidence, empirical scarcity, median-of-top-five replacement, self-exclusion, negative gaps, bounded multi-position flexibility, separate SP/RP pools, and unchanged Engine 5.1.1 behavior.
+- `docs/NEXT_TASK.md` now activates V5.5B-3 Underlying Skill, Breakout, and Regression Intelligence as a local read-only implementation slice.
+- The contract keeps Fantrax production, Statcast skill, and HKB market evidence independent; requires separate hitter/pitcher empirical contexts; treats missing/partial/stale Statcast as uncertainty rather than negative skill; and permits only transparent post-component breakout/regression comparison.
+- No application code, tests, migrations, schema, deployment, production data, scores, identity, ownership, roster state, import, Statcast refresh, or Gate 4 state changed during this documentation-only activation.
