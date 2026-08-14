@@ -29,6 +29,7 @@ import { clearFantraxPendingReviews, fantraxSeasonWriteGuard, reviewedFantraxSea
 import { listFantraxSyncAttempts } from "./repositories/fantraxSyncAuditRepository.js?v5-4-6e-opt-in";
 import { executeReviewedFantraxSync } from "./services/fantraxSyncCoordinator.js";
 import { createFantraxGate4AcceptanceController } from "./services/fantraxGate4AcceptanceController.js";
+import { compareInspectionPlayers, filterInspectionPlayers, loadPlayerIntelligenceInspection, rankInspectionPlayers } from "./services/playerIntelligenceInspectionService.js";
 import { renderDashboard } from "./views/dashboardView.js";
 import { renderPlayerResults, renderPlayers } from "./views/playersView.js";
 import { renderMyRoster } from "./views/rosterView.js";
@@ -40,6 +41,7 @@ import { renderImports } from "./views/importsView.js";
 import { renderSettingsDataHealth } from "./views/settingsDataHealthView.js?v5-4-6e-gate4a-audit-visibility";
 import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/fantraxPreviewView.js";
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
+import { renderPlayerIntelligenceInspection } from "./views/playerIntelligenceInspectionView.js";
 
 const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
 function resetStatcastRefreshSession(){const contextSignature=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:importUiState.statcast.season,contextSignature})}
@@ -54,6 +56,11 @@ const tradeRequestIds={outgoing:0,incoming:0};
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 const gate4AcceptanceMode=new URLSearchParams(location.search).get("gate4Acceptance")==="1";
 const gate4Controller=gate4AcceptanceMode?createFantraxGate4AcceptanceController({artifactCommit:new URLSearchParams(location.search).get("commit")||"CURRENT_HOSTED_ARTIFACT"}):null;
+const emptyInspectionState=()=>({status:"NOT_LOADED",contextKey:"",result:null,rows:[],ranking:"expected",filters:{group:"",archetype:"",position:"",availability:"",marketDivergence:"",missingStatcast:false},selectedPlayer:null,compareA:"",compareB:"",comparison:null,durationMs:null,error:""});
+let inspectionUi=emptyInspectionState();
+function inspectionContextKey(){return `${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`}
+function invalidatePlayerIntelligenceInspection(){inspectionUi=emptyInspectionState();setStateSilently({playerIntelligenceInspection:inspectionUi})}
+function refreshInspectionRows(){const inspection=inspectionUi.result?.inspection;if(!inspection)return;let filtered=filterInspectionPlayers(inspection,{archetype:inspectionUi.filters.archetype||undefined,position:inspectionUi.filters.position||undefined,availability:inspectionUi.filters.availability||undefined,marketDivergence:inspectionUi.filters.marketDivergence||undefined,missingStatcast:inspectionUi.filters.missingStatcast?true:undefined});if(inspectionUi.filters.group)filtered=filtered.filter(row=>row.groups.includes(inspectionUi.filters.group));const ids=new Set(filtered.map(row=>row.playerId));inspectionUi={...inspectionUi,rows:rankInspectionPlayers({...inspection,players:inspection.players.filter(row=>ids.has(row.playerId))},{dimension:inspectionUi.ranking}),comparison:null};setState({playerIntelligenceInspection:inspectionUi})}
 
 function publishGate4ControllerState(){
   if(!gate4Controller)return;
@@ -383,6 +390,7 @@ function saveTradeDraft(){
 async function renderView(){
   const root=$("#viewRoot");
   if(!root)return;
+  if(inspectionUi.contextKey&&inspectionUi.contextKey!==inspectionContextKey())inspectionUi=emptyInspectionState();
   const statcastContext=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;if(importUiState.statcast.contextSignature!==statcastContext)resetStatcastRefreshSession();
   if(!appState.authUser){setHtml(root,`<section class="view-panel"><h2>Signed out</h2><p class="note">Sign in to connect to Supabase Cloud.</p></section>`);return}
   if(!appState.activeLeague){setHtml(root,`<section class="view-panel"><h2>Select a cloud league</h2><p class="note">No active cloud league is selected. Create or select one in the current application, then retry V5.</p></section>`);return}
@@ -400,6 +408,7 @@ async function renderView(){
   }
   if(appState.view==="settings")setHtml(root,renderSettingsDataHealth(appState));
   if(appState.view==="gate4Acceptance")setHtml(root,renderFantraxGate4Acceptance(appState));
+  if(appState.view==="playerIntelligenceInspection")setHtml(root,renderPlayerIntelligenceInspection({...appState,playerIntelligenceInspection:inspectionUi}));
   bindViewEvents();
 }
 
@@ -408,6 +417,11 @@ function enableAcceptanceModeEntry(){
   const settingsButton=document.querySelector('[data-view="settings"]');
   if(!settingsButton||document.querySelector('[data-view="gate4Acceptance"]'))return;
   settingsButton.insertAdjacentHTML("afterend",'<button class="nav-link" data-view="gate4Acceptance">Gate 4 Acceptance</button>');
+}
+function enableInspectionEntry(){
+  const playersButton=document.querySelector('[data-view="players"]');
+  if(!playersButton||document.querySelector('[data-view="playerIntelligenceInspection"]'))return;
+  playersButton.insertAdjacentHTML("afterend",'<button class="nav-link" data-view="playerIntelligenceInspection">Player Intelligence Inspection</button>');
 }
 function render(){
   const badge=$("#modeBadge");
@@ -492,6 +506,15 @@ async function updateWaiverPage(query){
 }
 function bindViewEvents(){
   const updateMlbamReview=changes=>{const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,review:{...current.review,...changes}};render()};
+  $("#loadPlayerIntelligenceInspection")?.addEventListener("click",async()=>{if(!appState.authUser||!appState.activeLeague){invalidatePlayerIntelligenceInspection();return}const contextKey=inspectionContextKey(),started=performance.now();inspectionUi={...emptyInspectionState(),status:"LOADING",contextKey};setState({playerIntelligenceInspection:inspectionUi});try{const season=Number(appState.activeLeague.settings?.currentSeason??appState.activeLeague.settings?.current_season??new Date().getUTCFullYear()),result=await loadPlayerIntelligenceInspection({leagueId:appState.activeLeague.id,season});if(contextKey!==inspectionContextKey())return;inspectionUi={...inspectionUi,status:"READY",result,durationMs:Math.round(performance.now()-started)};refreshInspectionRows()}catch(error){if(contextKey!==inspectionContextKey())return;inspectionUi={...emptyInspectionState(),status:"FAILED",contextKey,durationMs:Math.round(performance.now()-started),error:String(error?.message||error)};setState({playerIntelligenceInspection:inspectionUi})}});
+  const updateInspectionFilter=(key,value)=>{inspectionUi={...inspectionUi,filters:{...inspectionUi.filters,[key]:value}};refreshInspectionRows()};
+  $("#inspectionRanking")?.addEventListener("change",event=>{inspectionUi={...inspectionUi,ranking:event.target.value};refreshInspectionRows()});
+  [["inspectionGroup","group"],["inspectionArchetype","archetype"],["inspectionPosition","position"],["inspectionAvailability","availability"],["inspectionMarketDivergence","marketDivergence"]].forEach(([id,key])=>$("#"+id)?.addEventListener("change",event=>updateInspectionFilter(key,event.target.value)));
+  $("#inspectionMissingStatcast")?.addEventListener("change",event=>updateInspectionFilter("missingStatcast",event.target.checked));
+  $all("[data-inspection-player]").forEach(button=>button.addEventListener("click",()=>{inspectionUi={...inspectionUi,selectedPlayer:inspectionUi.result.inspection.players.find(row=>row.playerId===button.dataset.inspectionPlayer)||null};setState({playerIntelligenceInspection:inspectionUi})}));
+  $("#inspectionCompareA")?.addEventListener("change",event=>{inspectionUi={...inspectionUi,compareA:event.target.value,comparison:null};setState({playerIntelligenceInspection:inspectionUi})});
+  $("#inspectionCompareB")?.addEventListener("change",event=>{inspectionUi={...inspectionUi,compareB:event.target.value,comparison:null};setState({playerIntelligenceInspection:inspectionUi})});
+  $("#compareInspectionPlayers")?.addEventListener("click",()=>{inspectionUi={...inspectionUi,comparison:compareInspectionPlayers(inspectionUi.result.inspection,inspectionUi.compareA,inspectionUi.compareB)};setState({playerIntelligenceInspection:inspectionUi})});
   $("#captureFantraxProductionProtectedBaseline")?.addEventListener("click",async()=>{
     importUiState.fantraxProductionBaseline={running:true,evidence:null,error:""};render();
     const evidence=await captureProtectedBaseline({leagueId:appState.activeLeague?.id,profile:"FANTRAX_PRODUCTION_IMPORT"});
@@ -870,7 +893,7 @@ function bindShellEvents(){
     }
   });
   document.body.addEventListener("click",async event=>{
-    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");resetStatcastRefreshSession();await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
+    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");resetStatcastRefreshSession();invalidatePlayerIntelligenceInspection();await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
@@ -889,6 +912,7 @@ function bindShellEvents(){
     if(event.target.id==="leagueSelect"){
       resetGate4Acceptance("Active league changed.");
       resetStatcastRefreshSession();
+      invalidatePlayerIntelligenceInspection();
       setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});
       await selectLeague(event.target.value);
       await refreshLeagueData();
@@ -913,6 +937,7 @@ async function bootstrap(){
 }
 subscribe(render);
 enableAcceptanceModeEntry();
+enableInspectionEntry();
 bindShellEvents();
 window.__DYNASTY_V5_SCORE_DIAGNOSTICS__={buildLiveScoreDiagnosticsForLeagueName};
 bootstrap();
