@@ -1,11 +1,12 @@
 # Current State
 
-## V5.5B-3 Activated (2026-08-13)
+## V5.5B-4 Activated (2026-08-13)
 
-- V5.5B-2 is complete and checkpointed. Its accepted baseline uses canonical Fantrax FPts with FP/G support, empirical scarcity, a median-of-top-five available replacement benchmark, self-exclusion, preserved negative gaps, bounded multi-position flexibility, separate SP/RP pools, and unchanged Engine 5.1.1 behavior.
-- The active implementation slice is **V5.5B-3 Underlying Skill, Breakout, and Regression Intelligence**.
-- V5.5B-3 is local and read-only. It will add independent Statcast skill and transparent production-versus-skill signals while treating partial, stale, and missing Statcast coverage as first-class uncertainty.
-- Deployment, production Statcast refresh, production persistence, score replacement/recalculation, migrations, and V5.5C logic remain unauthorized.
+- V5.5B-3 is complete and checkpointed at implementation commit `9e94a49f7023bf5dbd48c4e509b1b1cefcd27d32` and documentation commit `193d52a50140f975d0dc0f13fd5e2b6878fbcc38`.
+- Its accepted model keeps Fantrax production separate from Statcast skill, excludes surface ERA from Pitcher Underlying Skill, uses the reviewed hitter and pitcher metric weights, excludes missing metrics rather than imputing them, and applies a 20-percentile-point breakout/regression threshold. Engine 5.1.1 remains unchanged.
+- The active implementation slice is **V5.5B-4 Role Stability, Age/Trajectory, Risk, and Prospect Opportunity Cost**.
+- V5.5B-4 is local, read-only, in-memory, and unpersisted. It may populate only the four contextual component envelopes and must not calculate overall Player Intelligence.
+- Deployment, production refresh/import, production persistence, score replacement/recalculation, migrations, V5.5C logic, and changes to identity, ownership, or roster state remain unauthorized.
 
 ## V5.5B Production Foundation Reconciliation (2026-08-13)
 

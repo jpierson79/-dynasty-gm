@@ -2373,3 +2373,13 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Implementation commit: `9e94a49f7023bf5dbd48c4e509b1b1cefcd27d32` (`Add underlying skill and breakout intelligence`).
 - Push result: succeeded to `origin/feature/manager-intelligence` (`7e13677..9e94a49`).
 - The implementation commit contained exactly the four architect-approved files. No deployment, production refresh/import/read/write, Player Intelligence persistence, metric or score mutation, migration, score recalculation, or roster/ownership/identity operation accompanied the checkpoint.
+
+## V5.5B-4 Governance Activation
+
+- V5.5B-3 is complete and checkpointed at implementation commit `9e94a49f7023bf5dbd48c4e509b1b1cefcd27d32` and documentation commit `193d52a50140f975d0dc0f13fd5e2b6878fbcc38`.
+- The accepted V5.5B-3 model is preserved: hitter weights xwOBA 25%, xSLG 20%, xBA 15%, barrel rate 15%, hard-hit rate 12%, average exit velocity 8%, sprint speed 5%; pitcher weights xERA 40%, xwOBA allowed 25%, barrel rate allowed 15%, hard-hit rate allowed 12%, average exit velocity allowed 8%; surface ERA has zero raw-skill weight; breakout/regression requires a 20-percentile-point gap; missing metrics are excluded rather than imputed; Engine 5.1.1 is unchanged.
+- `docs/NEXT_TASK.md` now activates V5.5B-4 Role Stability, Age/Trajectory, Risk, and Prospect Opportunity Cost as a local, read-only, in-memory, unpersisted implementation slice.
+- The contract keeps Fantrax production, Statcast skill, empirical scarcity/replacement, role security, development stage, downside uncertainty, prospect roster-slot economics, and HKB market evidence separate. It authorizes only the four contextual component envelopes and explicitly prohibits an overall score, scenarios, persistence, deployment, imports/refreshes, migrations, V5.5C logic, and production/data changes.
+- Required implementation evidence includes canonical input auditing, fail-closed missingness, independent confidence, bounded pitcher/prospect and market/scarcity support, role/age isolation, near-MLB-versus-distant prospect comparison, young-MLB-versus-AA comparison, aging veteran, promotion/demotion, and limited-leverage RP fixtures.
+- A handoff rule now requires repository governance to advance beyond V5.5B-4 before another implementation slice begins; completed task text cannot silently authorize subsequent work.
+- This activation changed documentation only. No application code, tests, migrations, schema, deployment, production data, Player Intelligence output, metric, score, identity, ownership, roster state, import, refresh, or Gate 4 state changed.
