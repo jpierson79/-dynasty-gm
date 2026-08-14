@@ -2367,3 +2367,9 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Removed surface ERA from the raw Pitcher Underlying Skill composite. Revised underlying-only weights are xERA 40%, xwOBA allowed 25%, barrel rate allowed 15%, hard-hit rate allowed 12%, and average exit velocity allowed 8%; ERA raw-skill weight is exactly zero.
 - ERA remains canonical surface evidence only. When ERA and xERA both exist, separate explanations report `ERA_OUTPERFORMING_XERA` (ERA at least 0.5 lower), `ERA_UNDERPERFORMING_XERA` (ERA at least 0.5 higher), or `ERA_XERA_ALIGNED`; this evidence never feeds the raw score or overrides the independent production-versus-skill signal.
 - Pitcher expected metric count is now five. Missing ERA does not reduce coverage or confidence; missing xERA does. `LIMITED_PITCHER_SKILL_INPUTS` remains because richer strikeout, walk, whiff, velocity, arsenal, and role evidence is unavailable. Hitter weights and the 20-point breakout/regression threshold are unchanged.
+
+### V5.5B-3 Checkpoint
+
+- Implementation commit: `9e94a49f7023bf5dbd48c4e509b1b1cefcd27d32` (`Add underlying skill and breakout intelligence`).
+- Push result: succeeded to `origin/feature/manager-intelligence` (`7e13677..9e94a49`).
+- The implementation commit contained exactly the four architect-approved files. No deployment, production refresh/import/read/write, Player Intelligence persistence, metric or score mutation, migration, score recalculation, or roster/ownership/identity operation accompanied the checkpoint.
