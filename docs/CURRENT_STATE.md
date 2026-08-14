@@ -1,5 +1,14 @@
 # Current State
 
+## V5.5B Production Foundation Reconciliation (2026-08-13)
+
+- **V5.5B-1A-3 hosted acceptance remains INCOMPLETE.** Unresolved observability items are the post-import Data Health timeout, absence of the canonical FPts/FP-G input envelope in the normal Player Intelligence UI, and three CSV-worker fallback warnings. These are not recorded as resolved.
+- **V5.5B-1A production data prerequisite is COMPLETE.** The reviewed 2026 Reddit Phanatics import completed with 10,326 exact identity matches and 10,326 inserted `Fantrax` / `fantrax_league_production` metric rows, with zero unmatched, conflicts, invalid, or failed rows.
+- The idempotency preview reported zero inserts, zero updates, and 10,326 no-ops; no second apply was performed.
+- Protected evidence proved players, calculated scores, protected non-production metrics, teams, and managers unchanged. Only the expected Fantrax league-production metric partition changed from zero to 10,326 rows.
+- **V5.5B-2 local read-only development is UNBLOCKED** and may consume these canonical production rows for league-production, scarcity, and replacement calculations.
+- V5.5B-2 production persistence, score replacement, production score recalculation, deployment, and production rollout remain unauthorized. Engine 5.1.1 remains the authoritative production scoring path.
+
 Generated: 2026-08-01 America/Chicago.
 
 ## Active Direction — V5.5 Baseball Intelligence
