@@ -2292,3 +2292,47 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Protected before/after evidence proved players, calculated scores, protected non-production metrics, teams, and managers unchanged. Only the explicitly expected-mutable `Fantrax` / `fantrax_league_production` partition changed from zero to 10,326 rows. Identity, ownership, roster status, scores, Statcast, HKB, and season settings remained unchanged.
 - This clean canonical production foundation is sufficient to unblock **V5.5B-2 local read-only development** of league production, empirical scarcity, and replacement advantage. It does not authorize production persistence, replacement of Engine 5.1.1, production score recalculation, deployment, another import/apply, or any cloud/data write.
 - `docs/CURRENT_STATE.md` now records this split status, and `docs/NEXT_TASK.md` now contains the V5.5B-2 local implementation contract. No application code, test, migration, schema, database, deployment, or production state was changed during reconciliation.
+
+## V5.5B-2 League Production, Positional Scarcity, And Replacement Advantage — Local Implementation
+
+### Canonical Population And Read Boundary
+
+- Added a repository-backed read-only league loader that fetches players, metrics, and the active league exactly once, then builds the accepted V5.5B-1 canonical input for every stable `players.id`. It reads canonical metric rows only; it does not inspect CSV/provider payloads, join by name, or expose a write path.
+- The calculation accepts only canonical `source = Fantrax`, `metric_type = fantrax_league_production`, current-season `fantasyPoints` and supporting `fantasyPointsPerGame` selected by the existing B-1 adapter. HKB, Statcast, Engine 5.1.1 scores, team matchup totals, and generic rankings do not enter these three components.
+- The implementation is designed to evaluate the accepted 10,326-row production population in one league-context build. This local checkpoint did not query production or load those rows remotely; fixture populations prove the contract and performance shape without cloud access.
+- Numeric FPts zero remains real calculated production. Missing FPts remains unscored. A minor-league prospect without relevant production is `NOT_APPLICABLE`; other missing production is `INSUFFICIENT_DATA`.
+
+### Algorithms And Evidence
+
+- **League Production:** FPts is primary and maps to a transparent 0–100 empirical percentile across players with canonical production. FP/G is retained only as supporting evidence. Output preserves FPts, FP/G, percentile, population size, freshness, status, confidence, inputs, warnings, and factual explanation codes. No games value is derived from FPts / FP/G.
+- **Availability:** `FREE_AGENT` requires the canonical conjunction `isFreeAgent === true` and no owner. An owned non-free-agent is `ROSTERED`; explicit waiver/pending states are `WAIVER`; contradictory or incomplete ownership evidence is `UNKNOWN`. Only `FREE_AGENT` rows enter immediately available replacement pools.
+- **Positional pools:** one league context precomputes C, 1B, 2B, 3B, SS, OF, SP, and RP pools. Multi-position players remain in every eligible pool. Deep-minors/inactive rows and rows without canonical production or supported eligibility do not contaminate MLB replacement evidence.
+- **Replacement benchmark:** for each position, rank immediately available eligible players by FPts and use the median of the top five (or every available row when fewer than five exist). Five is a documented conservative default that reduces sensitivity to one temporary outlier and is configurable from 1–10. Evidence includes available/positive counts, best FPts, median top three/five, rostered median, replacement FPts, and the rostered-to-available cliff.
+- **Self exclusion:** every player is removed from the benchmark during evaluation. This prevents an elite free agent from becoming his own replacement and also ensures a rostered player is not present in the candidate pool.
+- **Scarcity:** a bounded 0–100 empirical score combines immediately available positive depth, the observed rostered-to-replacement production cliff, and authoritative direct lineup demand when present. When lineup slots are missing, the calculation uses roster/free-agent depth and reports `LINEUP_CONFIGURATION_INCOMPLETE`; it never inserts historical Reddit Phanatics slot constants. UT and P are recorded as cross-position demand rather than synthetic positions.
+- **Replacement Advantage:** calculate `playerFantasyPoints - replacementFantasyPoints` for every eligible position, preserve each comparison, and select the best valid position. Raw negative gaps remain negative and produce `BELOW_REPLACEMENT`. The normalized score is bounded while the raw evidence is retained.
+- **Multi-position value:** choose the best empirical position and apply only a small bounded scarcity flexibility premium (two points per additional eligible position, maximum five). Full positional scarcity scores are never added together.
+- **Pitchers:** SP and RP pools remain distinct. P flex demand is exposed as context but does not collapse roles. Actual Fantrax FPts already contain saves/holds and any double-play scoring; no extra scoring bonus is added.
+- **Confidence:** stale production reports `STALE_FANTRAX_PRODUCTION` and does not masquerade as a current calculated score. Because canonical Fantrax production currently lacks trustworthy games/PA/IP/appearance context, output reports `SAMPLE_SIZE_UNAVAILABLE` and reduces confidence rather than deriving a sample from FPts / FP/G. Small/empty replacement pools and unknown lineup demand also remain visible warnings.
+
+### Component Contract And Critical Fixtures
+
+- Populated only the existing `leagueProduction`, `positionalScarcityValue`, and `replacementAdvantage` component envelopes. Other B-1 components and floor/expected/ceiling remain uncalculated. The result also exposes read-only positional and replacement evidence for later inspection; nothing is persisted.
+- Deep-OF/shallow-SS fixture passed: two 500-FPts rostered players received empirical results with SS scarcity and SS replacement gap greater than OF because OF had ten near-equivalent free agents while SS had one weak alternative.
+- Reverse-depth fixture passed: after giving SS ten near-equivalent free agents and OF one weak alternative, OF scarcity exceeded SS scarcity. This proves there is no fixed positional bonus.
+- Free-agent upgrade fixture passed: the 500-FPts SS was excluded from his own pool; remaining 300/280/250 alternatives produced a 280-FPts benchmark and +220 raw gap with `REPLACEMENT_ADVANTAGE_STRONG`.
+- Below-replacement fixture passed: a 220-FPts rostered SS compared with 350/330/310 available alternatives produced a 330-FPts benchmark, -110 raw gap, and `BELOW_REPLACEMENT`.
+- Coverage also proves numeric zero, missing production, prospect handling, all eight pools, multi-position preservation/bounds, league isolation, waiver exclusion, stale/sample warnings, missing-lineup fallback, canonical-source isolation, one-time repository reads, no writes, and unchanged Engine 5.1.1 output/version.
+
+### Files, Validation, And Deferred Limits
+
+- Added `v5/js/engine/playerIntelligenceLeagueProduction.js`, `v5/js/services/playerIntelligenceLeagueProductionService.js`, and `tests/v5PlayerIntelligenceLeagueProduction.test.mjs`; updated this result record.
+- Focused validation passed 18 files covering B-2, B-1 foundation, current scoring/calibration, Player Intelligence, Fantrax production/import, Data Health, Statcast, MLBAM, architecture, auth, preview, roster sync, durable audit, and Gate 4 controller/harness behavior.
+- The complete sorted standalone suite passed all 45 `tests/*.test.mjs` files. Syntax checks passed for both new application modules and the new test. Final `git diff --check` is recorded after the documentation update.
+- Deferred to later V5.5B slices: authoritative games/PA/IP sample inputs, a complete production lineup configuration if absent, a constrained multi-position lineup optimizer, role sustainability, saves/holds opportunity, Statcast skill, projections/scenarios, overall weighting, final UI, V5.5C decisions, and persistence.
+- No migration was created. No deployment, production read/write, import, metric mutation, score calculation/persistence, Statcast refresh, roster/ownership/identity change, Fantrax synchronization, or other cloud/data operation occurred. Engine 5.1.1 and production data remain unchanged. The implementation remains unstaged, uncommitted, and unpushed for architect review.
+
+### Final Checkpoint Review Corrections
+
+- Final architectural review found two narrow issues and corrected them without broadening scope: unknown ownership was already excluded from immediate availability but now also emits `OWNERSHIP_STATE_UNKNOWN` and lowers confidence; per-player self-exclusion now filters the precomputed position-specific available pool rather than rescanning the full league population.
+- Regression coverage proves unknown/contradictory ownership is not treated as free-agent availability and remains visible, and statically verifies replacement evaluation consumes `availableByPosition`. The empirical benchmark, component formulas, Engine 5.1.1 compatibility, and all production boundaries remain unchanged.
