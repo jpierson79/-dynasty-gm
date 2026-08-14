@@ -1,11 +1,12 @@
 # Current State
 
-## V5.5B-6 Activated (2026-08-14)
+## V5.5B-6C Activated (2026-08-14)
 
 - V5.5B-5 is complete and checkpointed at implementation commit `bf781b2ecf20ff6915f97db564fea5cad806a840` and documentation commit `901d46c7f3fb6777d9f6db8be94d24885a44ed37`.
 - Its accepted composite remains archetype-aware and confidence-adjusted. `NOT_APPLICABLE` is excluded without penalty, missing applicable evidence lowers confidence, Risk is transformed once through `riskSafety = 100 - risk`, Prospect Opportunity Cost remains `HIGHER_IS_BETTER_LOWER_COST`, scarcity remains subordinate to Replacement Advantage, HKB remains outside the MLB core score and bounded for prospects, and market divergence remains outside normalized floor/expected/ceiling. Engine 5.1.1 is unchanged.
-- The active slice is **V5.5B-6 Real-Player Inspection and Calibration**.
-- V5.5B-6 is local, read-only, in-memory, and unpersisted. It inspects representative real Reddit Phanatics players through the canonical services to detect generic structural defects; it must not tune the model to named players.
+- V5.5B-6B diagnosis is complete at commit `fda1c416f6dde1674afba4994b567302f45693fc`. It proved synchronous quadratic main-thread evaluation as the primary `LOADING` blocker and eager full-population rendering as a secondary post-evaluation scalability defect.
+- The active slice is **V5.5B-6C Hosted Inspection Performance Repair**. It is limited to computational reuse, UUID-indexed evidence, reusable percentile/replacement contexts, bounded yielding with progress, and bounded/lazy rendering for the complete canonical population.
+- All model formulas, weights, thresholds, archetypes, identities, replacement and market semantics, composite outputs, and Engine 5.1.1 remain unchanged. Calibration remains `REAL_PLAYER_ACCEPTANCE_REQUIRED`; V5.5C remains blocked pending a separately authorized real-player acceptance retry after the repair is checkpointed.
 - Deployment, production refresh/import, persistence, Engine 5.1.1 replacement/recalculation, migrations, production waiver actions, and changes to metrics, scores, identity, ownership, or roster state remain unauthorized.
 
 ## V5.5B Production Foundation Reconciliation (2026-08-13)
