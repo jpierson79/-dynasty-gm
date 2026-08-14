@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+import {evaluatePlayerContext,evaluatePlayerContextPopulation,PLAYER_CONTEXT_VERSION,PROSPECT_OPPORTUNITY_COST_DIRECTION} from "../v5/js/engine/playerIntelligenceContext.js";
+import {calculatePlayerScores,ENGINE_VERSION} from "../v5/js/engine/dynastyEngine.js";
+
+const L="league";
+function input(id,{age=25,minor=false,level=null,pos=["SS"],status=minor?"MINORS":"ACTIVE",mlbStatus=minor?"MINORS":"MLB",transition=null,type="hitter",hkb=500,role={},fresh="AVAILABLE"}={}){return {schema:"player-intelligence-input-v1",inputVersion:"5.5B-1",playerId:id,leagueId:L,season:2026,player:{id,age,isMinorLeaguer:minor,rosterStatus:status},positionEligibility:{eligible:pos},role:{mlbStatus,rosterStatus:status,pitcherEligibility:pos.filter(x=>["SP","RP"].includes(x)),everydayRole:null,rotationRole:null,bullpenRole:null,savesHoldsOpportunity:null,recentTransition:transition,...role},ageDevelopment:{age,isMinorLeaguer:minor,level},prospectContext:{isProspect:minor,level},underlyingSkill:{playerType:type,metrics:{}},market:{value:hkb},dataFreshness:{fantrax:{status:fresh},statcast:{status:fresh}},warnings:[]}}
+function prior(id,{scarcity=50,gap=0,production=70,skill=70}={}){return {playerId:id,components:{leagueProduction:{status:"CALCULATED",score:production},underlyingSkill:{status:"CALCULATED",score:skill},positionalScarcityValue:{status:"CALCULATED",score:scarcity},replacementAdvantage:{status:"CALCULATED",score:50}},replacementContext:{rawReplacementGap:gap},signals:[]}}
+
+let near=evaluatePlayerContext(input("near",{age:21,minor:true,level:"AAA",pos:["SS"],hkb:4000}),prior("near",{scarcity:85,gap:100}));
+let distant=evaluatePlayerContext(input("far",{age:21,minor:true,level:"A",pos:["OF"],hkb:300}),prior("far",{scarcity:20,gap:-50}));
+assert.ok(near.components.prospectOpportunityCost.score>distant.components.prospectOpportunityCost.score+20,"near-MLB scarcity/market/readiness evidence beats distant deep-position cost without a fixed position bonus");
+assert.ok(near.components.prospectOpportunityCost.explanations.some(x=>x.code==="NEAR_MLB_PROSPECT"));assert.ok(distant.components.prospectOpportunityCost.explanations.some(x=>x.code==="DISTANT_PROSPECT"));
+assert.equal(PROSPECT_OPPORTUNITY_COST_DIRECTION,"HIGHER_IS_BETTER_LOWER_COST");assert.equal(near.components.prospectOpportunityCost.explanations.at(-1).data.scoreDirection,PROSPECT_OPPORTUNITY_COST_DIRECTION);
+
+const regular=evaluatePlayerContext(input("regular",{age:23,role:{everydayRole:true}}),prior("regular")),aa=evaluatePlayerContext(input("aa",{age:23,minor:true,level:"AA"}),prior("aa"));
+assert.ok(regular.components.roleStability.score>aa.components.roleStability.score);assert.ok(regular.components.risk.score<aa.components.risk.score);assert.ok(regular.components.ageTrajectory.score>=70&&aa.components.ageTrajectory.score>=60);
+
+const young=evaluatePlayerContext(input("young",{age:23,role:{everydayRole:true}}),prior("young",{production:90})),veteran=evaluatePlayerContext(input("vet",{age:35,role:{everydayRole:true}}),prior("vet",{production:90}));
+assert.equal(young.components.roleStability.score,veteran.components.roleStability.score,"age does not contaminate role stability");assert.ok(young.components.ageTrajectory.score>veteran.components.ageTrajectory.score);assert.equal(veteran.output.components.leagueProduction.score,90,"strong current production is preserved");assert.equal(veteran.components.prospectOpportunityCost.status,"NOT_APPLICABLE");
+
+const promoted=evaluatePlayerContext(input("promoted",{transition:"PROMOTED"}),prior("promoted")),demoted=evaluatePlayerContext(input("demoted",{transition:"DEMOTED",minor:true,level:"AAA"}),prior("demoted"));
+assert.ok(demoted.components.roleStability.score<promoted.components.roleStability.score);assert.ok(demoted.components.risk.score>promoted.components.risk.score);assert.ok(demoted.components.roleStability.explanations.some(x=>x.code==="RECENT_DEMOTION"));
+
+const relief=evaluatePlayerContext(input("rp",{pos:["RP"],type:"pitcher",role:{bullpenRole:true}}),prior("rp",{production:95}));assert.ok(relief.components.roleStability.warnings.some(x=>x.code==="RELIEF_ROLE_EVIDENCE_LIMITED"));assert.ok(relief.components.roleStability.score<100,"RP eligibility and production do not imply closer certainty");
+const roleA=evaluatePlayerContext(input("a",{age:25,role:{everydayRole:true}}),prior("a",{skill:80})),roleB=evaluatePlayerContext(input("b",{age:25,status:"RESERVE",role:{everydayRole:false}}),prior("b",{skill:80}));assert.equal(roleA.output.components.underlyingSkill.score,roleB.output.components.underlyingSkill.score);assert.equal(roleA.components.ageTrajectory.score,roleB.components.ageTrajectory.score);assert.notEqual(roleA.components.roleStability.score,roleB.components.roleStability.score);
+const ageA=evaluatePlayerContext(input("c",{age:24,role:{everydayRole:true}}),prior("c")),ageB=evaluatePlayerContext(input("d",{age:34,role:{everydayRole:true}}),prior("d"));assert.equal(ageA.components.roleStability.score,ageB.components.roleStability.score);assert.notEqual(ageA.components.ageTrajectory.score,ageB.components.ageTrajectory.score);
+const missingProductionPrior=prior("unknown",{scarcity:null});missingProductionPrior.components.leagueProduction={status:"NOT_APPLICABLE",score:null};
+const noLevel=evaluatePlayerContext(input("unknown",{minor:true,level:null,hkb:null}),missingProductionPrior);assert.ok(noLevel.components.prospectOpportunityCost.warnings.some(x=>x.code==="PROSPECT_DATA_INCOMPLETE"));assert.ok(noLevel.components.ageTrajectory.confidence<90);assert.equal(noLevel.output.components.leagueProduction.status,"NOT_APPLICABLE");assert.equal(noLevel.output.components.leagueProduction.score,null,"missing prospect production remains null rather than fake zero");
+const pitcherProspect=evaluatePlayerContext(input("pp",{minor:true,level:"AA",pos:["SP"],type:"pitcher"}),prior("pp")),hitterProspect=evaluatePlayerContext(input("hp",{minor:true,level:"AA",pos:["SS"],type:"hitter"}),prior("hp"));assert.equal(pitcherProspect.components.risk.score-hitterProspect.components.risk.score,7,"pitcher prospect risk adjustment is explicit and bounded");
+const population=evaluatePlayerContextPopulation([input("p1"),input("p2")],[prior("p1"),prior("p2")]);assert.equal(population.players.length,2);assert.equal(population.players[0].components.roleStability.version,PLAYER_CONTEXT_VERSION);
+assert.throws(()=>evaluatePlayerContextPopulation([input("x"),{...input("y"),leagueId:"other"}]),/league scoped/);
+
+const legacy=calculatePlayerScores({player:{id:"legacy",age:30,positions:["SS"]},metrics:{},leagueSettings:{}});assert.equal(ENGINE_VERSION,"5.1.1");assert.equal(legacy.overall_score_version,"5.1.1");
+const engine=await readFile(new URL("../v5/js/engine/playerIntelligenceContext.js",import.meta.url),"utf8"),service=await readFile(new URL("../v5/js/services/playerIntelligenceContextService.js",import.meta.url),"utf8");assert.doesNotMatch(engine,/repositories|supabase|fetch\(/);assert.doesNotMatch(service,/upsert|insert\(|update\(|delete\(|calculated_player_scores/);assert.match(service,/loadUnderlyingSkillEvaluation/,"service reuses the canonical production/skill path");
+console.log("v5PlayerIntelligenceContext tests passed");
