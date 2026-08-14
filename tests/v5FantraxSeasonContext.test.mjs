@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {canonicalFantraxSeasonContext,clearFantraxPendingReviews,compareFantraxSeasonContexts,fantraxSeasonWriteGuard,reviewedFantraxSeasonSettings,validateFantraxSeasonReview} from "../v5/js/services/fantraxSeasonContextService.js";
+import {canonicalFantraxSeasonContext,clearFantraxPendingReviews,compareFantraxSeasonContexts,fantraxSeasonContextAuthority,fantraxSeasonWriteGuard,reviewedFantraxSeasonSettings,validateFantraxSeasonReview} from "../v5/js/services/fantraxSeasonContextService.js";
 import {fantraxPreviewHealthChecks} from "../v5/js/services/dataHealthService.js";
 import {renderFantraxPreview} from "../v5/js/views/fantraxPreviewView.js";
+import {renderImports} from "../v5/js/views/importsView.js";
 
 const observed=canonicalFantraxSeasonContext({externalLeagueId:"1234567890abcdef",seasonYear:"2026",leagueHistoryId:"history-1"});
 assert.deepEqual(observed,{valid:true,externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:"history-1",leagueHistoryAvailable:true});
@@ -25,6 +26,14 @@ assert.equal(validateFantraxSeasonReview({leagueId:"l1",fantraxTeams,cloudTeams,
 assert.match(validateFantraxSeasonReview({leagueId:"l1",fantraxTeams,cloudTeams,pendingMappings:{aaaaaaaaaaaaaaaa:"c1",bbbbbbbbbbbbbbbb:"c1"},observedContext:observed,acknowledged:true}).errors.join(" "),/more than once/);
 assert.equal(validateFantraxSeasonReview({leagueId:"l1",fantraxTeams,cloudTeams:[...cloudTeams,{id:"outside",league_id:"l2"}],pendingMappings:{aaaaaaaaaaaaaaaa:"c1",bbbbbbbbbbbbbbbb:"outside"},observedContext:observed,acknowledged:true}).valid,false);
 assert.deepEqual(Object.keys(reviewedFantraxSeasonSettings(observed)),["fantraxSeasonContext"]);
+const reviewedLeague={id:"l1",settings:{fantraxSeasonContext:{...observed,reviewedAt:"2026-08-01T00:00:00Z"}}};
+assert.equal(fantraxSeasonContextAuthority({league:reviewedLeague}).status,"AVAILABLE_REVIEWED");
+assert.equal(fantraxSeasonContextAuthority({league:{id:"l1",settings:{fantraxSeasonContext:observed}}}).status,"AVAILABLE_UNREVIEWED");
+assert.equal(fantraxSeasonContextAuthority({league:{id:"l1",settings:{}}}).status,"MISSING");
+assert.equal(fantraxSeasonContextAuthority({league:{id:"l1",settings:{}}}).context,null,"missing context never becomes the calendar year");
+assert.equal(fantraxSeasonContextAuthority({league:reviewedLeague,observedContext:{...observed,seasonYear:2027}}).status,"CONFLICTING");
+assert.equal(fantraxSeasonContextAuthority({queryError:"permission denied"}).status,"PERMISSION_BLOCKED");
+assert.equal(fantraxSeasonContextAuthority({queryError:"network failed"}).status,"QUERY_FAILED");
 
 const comparison=compareFantraxSeasonContexts(null,observed),data={league:{scoringPeriods:[]},seasonContextComparison:comparison,observedSeasonContext:observed,rosterItems:[],teamRows:[],playerRows:[],matchups:[],standings:[],draftPicks:{currentDraftPicks:[],futureDraftPicks:[]},draftResults:{draftOrder:[],draftResults:[]},endpointHealth:[],diagnostics:{duplicateApiIds:[],invalidWrappedIds:0,unknownStatuses:[],teamMappingBlockers:0,playerMappingBlockers:0}};
 const html=renderFantraxPreview({fantraxPreview:{data,selectedTab:"rosters",filters:{},page:1,pageSize:50}});
@@ -34,7 +43,13 @@ assert.equal(health.find(row=>row.name==="Fantrax Season Context Review").status
 assert.equal(health.find(row=>row.name==="Fantrax Team And Status Writes").status,"WARNING");
 const matchedHealth=fantraxPreviewHealthChecks({data:{...data,seasonContextComparison:{...compareFantraxSeasonContexts(observed,observed),status:"MATCH",writeAllowed:true}}});
 assert.equal(matchedHealth.find(row=>row.name==="Fantrax Season Context Review").status,"PASS","Data Health consumes the shared canonical Preview A season comparison");
-assert.equal(fantraxPreviewHealthChecks({data:null}).find(row=>row.name==="Fantrax Season Context Review").status,"FAIL","Data Health remains fail-closed after shared preview invalidation");
+assert.equal(fantraxPreviewHealthChecks({data:null}).find(row=>row.name==="Fantrax Season Context Review").status,"WARNING","Data Health distinguishes missing context from a proven conflict while writes remain blocked");
+assert.equal(fantraxPreviewHealthChecks({data:null},fantraxSeasonContextAuthority({league:reviewedLeague})).find(row=>row.name==="Fantrax Season Context Review").status,"PASS","Data Health sees durable reviewed context without a roster preview");
+const reviewedImports=renderImports({activeLeague:reviewedLeague},{}),missingImports=renderImports({activeLeague:{id:"l2",settings:{}}},{}),unreviewedImports=renderImports({activeLeague:{id:"l3",settings:{fantraxSeasonContext:observed}}},{});
+assert.match(reviewedImports,/Season<\/span><b>2026/);assert.match(reviewedImports,/Review status<\/span><b>REVIEWED/);assert.match(reviewedImports,/Evidence source<\/span><b>durable settings/);
+assert.doesNotMatch(reviewedImports,/data-preview-import="fantraxProduction" disabled/,"durable reviewed context permits the production preview control without a roster preview");
+assert.match(missingImports,/Review status<\/span><b>MISSING/);assert.match(missingImports,/data-preview-import="fantraxProduction" disabled/);
+assert.match(unreviewedImports,/Review status<\/span><b>UNREVIEWED/);assert.match(unreviewedImports,/data-preview-import="fantraxProduction" disabled/);
 
 const repository=fs.readFileSync(new URL("../v5/js/repositories/leagueRepository.js",import.meta.url),"utf8"),main=fs.readFileSync(new URL("../v5/js/main.js",import.meta.url),"utf8"),view=fs.readFileSync(new URL("../v5/js/views/fantraxPreviewView.js",import.meta.url),"utf8");
 assert.match(repository,/update\(\{settings\}\)\.eq\("id",leagueId\)/,"reviewed settings write is league scoped and field limited");

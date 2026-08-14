@@ -1,5 +1,5 @@
 import { buildPlayerIdentityIndex, playerIdentityResult, unwrapStoredFantraxId } from "./fantraxPublicPreviewService.js";
-import { canonicalFantraxSeasonContext } from "./fantraxSeasonContextService.js";
+import { fantraxSeasonContextAuthority } from "./fantraxSeasonContextService.js";
 
 export const FANTRAX_PRODUCTION_SOURCE="Fantrax";
 export const FANTRAX_PRODUCTION_METRIC_TYPE="fantrax_league_production";
@@ -22,13 +22,13 @@ export function normalizeFantraxPlayersRawRow(row){
   return {valid:true,rawValues:[...row],raw:Object.fromEntries(FANTRAX_PLAYERS_RAW_ALIASES.map((key,index)=>[key,row[index]]))};
 }
 function reviewedContext(league){
-  const context=canonicalFantraxSeasonContext(league?.settings?.fantraxSeasonContext||{});
-  return league?.id&&context.valid?context:null;
+  const seasonAuthority=fantraxSeasonContextAuthority({league}),context=seasonAuthority.status==="AVAILABLE_REVIEWED"?seasonAuthority.context:null;
+  return {seasonAuthority,context:league?.id&&context?.valid?context:null};
 }
 export function previewFantraxPlayerProduction({league,header,rows=[],players=[],sourceFilename=null,sourceJobId=null,importedAt=new Date().toISOString()}={}){
   if(!league?.id)throw new Error("Active league is required.");
   if(!sameHeader(header))throw new Error("Fantrax Players header does not match the reviewed 16-column schema.");
-  const context=reviewedContext(league),identityIndex=buildPlayerIdentityIndex(players),sourceIds=new Map();
+  const {context,seasonAuthority}=reviewedContext(league),identityIndex=buildPlayerIdentityIndex(players),sourceIds=new Map();
   const records=[],invalidRows=[],identityFailures=[];
   rows.forEach((row,rowIndex)=>{
     const normalized=normalizeFantraxPlayersRawRow(row);
@@ -47,7 +47,7 @@ export function previewFantraxPlayerProduction({league,header,rows=[],players=[]
   });
   const duplicateSourceIds=[...sourceIds.entries()].filter(([id,count])=>id&&count>1).map(([fantraxId,count])=>({fantraxId,count}));
   if(duplicateSourceIds.length){const duplicates=new Set(duplicateSourceIds.map(item=>item.fantraxId));records.forEach(record=>{if(duplicates.has(record.fantraxId)){record.status="UNAVAILABLE";record.warnings.push("DUPLICATE_SOURCE_FANTRAX_ID")}})}
-  return {schema:"fantrax-player-production-preview-v1",writePerformed:false,leagueId:league.id,seasonContext:context,sourceFilename,sourceJobId,importedAt,schemaEvidence:{headerCount:header.length,rowCountExpected:18,headerRowArityMismatch:"REVIEWED_ACCEPTABLE",aliases:[...FANTRAX_PLAYERS_RAW_ALIASES]},counts:{total:rows.length,available:records.filter(row=>row.status==="AVAILABLE").length,matched:records.filter(row=>row.playerId).length,identityFailures:identityFailures.length,invalidRows:invalidRows.length,duplicateSourceIds:duplicateSourceIds.length},records,invalidRows,identityFailures,duplicateSourceIds,warnings:["REVIEWED_HEADER_ROW_ARITY_MISMATCH","RAW_COLUMNS_12_TO_17_NOT_USED_FOR_PLAYER_INTELLIGENCE"]};
+  return {schema:"fantrax-player-production-preview-v1",writePerformed:false,leagueId:league.id,seasonContext:context,seasonContextAuthority:seasonAuthority,sourceFilename,sourceJobId,importedAt,schemaEvidence:{headerCount:header.length,rowCountExpected:18,headerRowArityMismatch:"REVIEWED_ACCEPTABLE",aliases:[...FANTRAX_PLAYERS_RAW_ALIASES]},counts:{total:rows.length,available:records.filter(row=>row.status==="AVAILABLE").length,matched:records.filter(row=>row.playerId).length,identityFailures:identityFailures.length,invalidRows:invalidRows.length,duplicateSourceIds:duplicateSourceIds.length},records,invalidRows,identityFailures,duplicateSourceIds,warnings:["REVIEWED_HEADER_ROW_ARITY_MISMATCH","RAW_COLUMNS_12_TO_17_NOT_USED_FOR_PLAYER_INTELLIGENCE"]};
 }
 export function fantraxProductionMetricRow(record){
   if(record?.status!=="AVAILABLE"||!record.playerId||!record.leagueId||!record.season)throw new Error("Only an available, exactly identified production record can become a metric row.");

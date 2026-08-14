@@ -1,6 +1,7 @@
 const clean=value=>String(value??"").trim();
 const validLeagueId=value=>/^[A-Za-z0-9]{16}$/.test(clean(value));
 const validSeasonYear=value=>Number.isInteger(Number(value))&&Number(value)>=2000&&Number(value)<=2100;
+const permissionError=value=>/permission|row.level security|not authorized|42501/i.test(clean(value));
 
 export function canonicalFantraxSeasonContext({externalLeagueId,seasonYear,leagueHistoryId}={}){
   const leagueId=clean(externalLeagueId),historyId=clean(leagueHistoryId);
@@ -24,6 +25,20 @@ export function fantraxSeasonWriteGuard(comparison){
 
 export function clearFantraxPendingReviews(state={},patch={}){
   return {...state,...patch,pendingTeamMappings:{},reviewTeamMappings:false,confirmTeamMappings:false,allowReplacement:false,seasonReviewAcknowledged:false,reviewRosterSync:false,confirmRosterSync:false,rosterSyncReviewed:false,rosterSyncSelectedIds:[],rosterSyncReleaseSignature:""};
+}
+
+export function fantraxSeasonContextAuthority({league=null,observedContext=null,queryError=""}={}){
+  if(queryError)return {status:permissionError(queryError)?"PERMISSION_BLOCKED":"QUERY_FAILED",reviewStatus:"UNAVAILABLE",source:"durable settings",context:null,comparison:null,error:clean(queryError),writeAllowed:false};
+  const stored=league?.settings?.fantraxSeasonContext||null,context=canonicalFantraxSeasonContext(stored||{}),reviewedAt=clean(stored?.reviewedAt);
+  if(!stored||!Object.keys(stored).length)return {status:"MISSING",reviewStatus:"MISSING",source:"durable settings",context:null,comparison:null,error:"No durable Fantrax season context is stored for the active league.",writeAllowed:false};
+  if(!context.valid)return {status:"STALE",reviewStatus:"UNREVIEWED",source:"durable settings",context:null,comparison:null,error:"Stored Fantrax season context is invalid.",writeAllowed:false};
+  if(!reviewedAt)return {status:"AVAILABLE_UNREVIEWED",reviewStatus:"UNREVIEWED",source:"durable settings",context,comparison:null,error:"Stored Fantrax season context has not been explicitly reviewed.",writeAllowed:false};
+  if(observedContext){
+    const comparison=compareFantraxSeasonContexts(context,observedContext);
+    if(comparison.status!=="MATCH")return {status:comparison.status==="ROLLOVER"?"CONFLICTING":"STALE",reviewStatus:"CONFLICTING",source:"durable settings + observed context",context,comparison,error:comparison.reasons.join(" "),writeAllowed:false};
+    return {status:"AVAILABLE_REVIEWED",reviewStatus:"REVIEWED",source:"durable settings + observed context",context,comparison,error:"",writeAllowed:true};
+  }
+  return {status:"AVAILABLE_REVIEWED",reviewStatus:"REVIEWED",source:"durable settings",context,comparison:null,error:"",writeAllowed:true};
 }
 
 export function validateFantraxSeasonReview({leagueId,fantraxTeams=[],cloudTeams=[],pendingMappings={},observedContext,acknowledged=false}={}){

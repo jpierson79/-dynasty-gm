@@ -5,7 +5,7 @@ import { buildCanonicalPlayerIntelligenceInput } from "../v5/js/services/playerI
 import { ENGINE_VERSION } from "../v5/js/engine/dynastyEngine.js";
 
 const leagueId="11111111-1111-4111-8111-111111111111",playerId="22222222-2222-4222-8222-222222222222",importedAt="2026-08-13T12:00:00.000Z";
-const league={id:leagueId,name:"Reddit Phanatics",settings:{fantraxSeasonContext:{externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:"history-1"}}};
+const league={id:leagueId,name:"Reddit Phanatics",settings:{fantraxSeasonContext:{externalLeagueId:"1234567890abcdef",seasonYear:2026,leagueHistoryId:"history-1",reviewedAt:"2026-08-01T00:00:00Z"}}};
 const player={id:playerId,league_id:leagueId,name:"Matt Olson",fantrax_id:"*02mwm*",fantrax_api_player_id:"02mwm",positions:["1B"],owner_team_id:"team-1",roster_status:"ACTIVE"};
 const olson=["*02mwm*","Matt Olson","ATL","1B","1","Rhys","32","","662.5","5.48","100","32.9","100%","0%","91%","-8%","100%","99%"];
 

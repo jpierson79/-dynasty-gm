@@ -17,6 +17,7 @@ import { fantraxRosterSyncReleasePolicy } from "./fantraxRosterSyncService.js?v5
 import { statcastRefreshHealth } from "./statcastProviderService.js";
 import { mlbamBackfillHealth } from "./mlbamIdentityBackfillService.js";
 import { fantraxProductionHealth } from "./fantraxPlayerProductionImportService.js";
+import { fantraxSeasonContextAuthority } from "./fantraxSeasonContextService.js";
 
 const USER_TEAM_FALLBACK_TOKENS=["Rum Ham","Rum Ham & Rally Nuts","RHRN"];
 
@@ -53,22 +54,22 @@ function rosterStatusDiagnostics(playerRows){
   });
   return [...groups.values()].sort((a,b)=>a.mappedRosterStatus.localeCompare(b.mappedRosterStatus)||a.rawRosterStatus.localeCompare(b.rawRosterStatus));
 }
-export function fantraxPreviewHealthChecks(preview=null){
+export function fantraxPreviewHealthChecks(preview=null,seasonAuthority=null){
   const data=preview?.data||null,health=data?.endpointHealth||[],ok=name=>health.find(row=>row.endpoint===name)?.success===true;
   const playerTotal=data?.playerRows?.length||0,playerMatches=data?.playerRows?.filter(row=>row.identityResult==="MATCHED").length||0;
   const teamTotal=data?.teamRows?.length||0,teamMatches=data?.teamRows?.filter(row=>row.identityResult==="MATCHED").length||0;
   const persistedIds=(data?.teamRows||[]).filter(row=>row.identityResult==="MATCHED").map(row=>row.fantraxTeamId),duplicateTeamIds=persistedIds.filter((id,index)=>persistedIds.indexOf(id)!==index);
   const rosterRows=data?.rosterItems||[],validTeamRosterRows=rosterRows.filter(row=>row.teamIdentityResult==="MATCHED");
-  const season=data?.seasonContextComparison||{status:"INVALID",writeAllowed:false,reasons:["No loaded season evidence."]},reviewed=season.reviewed||{},observed=season.observed||{};
+  const durable=seasonAuthority||{status:"MISSING",reviewStatus:"MISSING",context:null,error:"No loaded season evidence."},season=data?.seasonContextComparison||null,reviewed=season?.reviewed||durable.context||{},observed=season?.observed||{};
   const item=(name,status,rows)=>({name,status,details:detail(name,rows)});
   return [
     item("Fantrax Public API Reachable",health.some(row=>row.success)?"PASS":"WARNING",health),
     item("Fantrax League Metadata Available",ok("league-info")?"PASS":"WARNING",[{available:ok("league-info"),previewOnly:true}]),
-    item("Fantrax Season Context Review",season.status==="MATCH"?"PASS":season.status==="INVALID"?"FAIL":"WARNING",[{status:season.status,reasons:season.reasons,networkReads:0}]),
+    item("Fantrax Season Context Review",season?.status==="MATCH"||(!season&&durable.status==="AVAILABLE_REVIEWED")?"PASS":season?.status==="ROLLOVER"||durable.status==="CONFLICTING"?"FAIL":"WARNING",[{status:season?.status||durable.status,reviewStatus:durable.reviewStatus,source:durable.source||"preview",reasons:season?.reasons||[durable.error].filter(Boolean),networkReads:0}]),
     item("Reviewed vs Observed Fantrax League ID",reviewed.externalLeagueId&&reviewed.externalLeagueId===observed.externalLeagueId?"PASS":"WARNING",[{reviewed:reviewed.externalLeagueId||"UNREVIEWED",observed:observed.externalLeagueId||"UNAVAILABLE"}]),
     item("Reviewed vs Observed Fantrax Season Year",reviewed.seasonYear&&reviewed.seasonYear===observed.seasonYear?"PASS":"WARNING",[{reviewed:reviewed.seasonYear||"UNREVIEWED",observed:observed.seasonYear||"UNAVAILABLE"}]),
     item("Fantrax League History Identity",reviewed.leagueHistoryAvailable&&observed.leagueHistoryAvailable?(reviewed.leagueHistoryId===observed.leagueHistoryId?"PASS":"WARNING"):"INFO",[{reviewed:reviewed.leagueHistoryId||"UNAVAILABLE",observed:observed.leagueHistoryId||"UNAVAILABLE",availabilityOnly:!reviewed.leagueHistoryAvailable||!observed.leagueHistoryAvailable}]),
-    item("Fantrax Team And Status Writes",season.writeAllowed?"PASS":"WARNING",[{blocked:!season.writeAllowed,reasons:season.reasons,period:preview?.period||"CURRENT"}]),
+    item("Fantrax Team And Status Writes",season?.writeAllowed?"PASS":"WARNING",[{blocked:!season?.writeAllowed,reasons:season?.reasons||["A current observed preview is required for synchronization writes."],period:preview?.period||"CURRENT"}]),
     item("Fantrax Player Identity Match Rate",playerTotal&&playerMatches===playerTotal?"PASS":playerTotal?"WARNING":"INFO",[{matched:playerMatches,total:playerTotal,previewOnly:true}]),
     item("Fantrax Team Identity Match Rate",teamTotal&&teamMatches===teamTotal?"PASS":teamTotal?"WARNING":"INFO",[{matched:teamMatches,total:teamTotal,persistable:Boolean(teamMatches),previewOnly:true}]),
     item("Fantrax Teams Found",teamTotal?"PASS":"WARNING",[{found:teamTotal}]),
@@ -99,17 +100,17 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     managers.listManagers(leagueId),
     metrics.listMetrics(leagueId),
     scores.listScores(leagueId),
-    leagues.leagueById(leagueId).then(row=>row?[row]:[]).catch(()=>[]),
+    leagues.leagueById(leagueId).then(row=>({available:true,row,error:""})).catch(error=>({available:false,row:null,error:String(error?.message||error)})),
     importJobs.latestImportJobs(leagueId).then(rows=>({available:true,rows,error:""})).catch(error=>({available:false,rows:[],error:String(error?.message||error)}))
   ]);
   const statcastHealth=statcastRefreshHealth({metricRows,importJobs:statcastJobsResult.rows,available:statcastJobsResult.available,error:statcastJobsResult.error});
-  const fantraxProduction=fantraxProductionHealth({metricRows,importJobs:statcastJobsResult.rows,playerRows,league:leagueRows[0]||null,available:statcastJobsResult.available,error:statcastJobsResult.error});
+  const league=leagueRows.row||null,seasonAuthority=fantraxSeasonContextAuthority({league,queryError:leagueRows.error}),fantraxProduction=fantraxProductionHealth({metricRows,importJobs:statcastJobsResult.rows,playerRows,league,available:statcastJobsResult.available,error:statcastJobsResult.error});
   const mlbamHealth=mlbamBackfillHealth(mlbamBackfillPreview);
   const teamRows=validFantasyTeamsForPlayers(rawTeamRows,playerRows);
   const fantraxAuditAvailable=fantraxSyncAuditStatus==="AVAILABLE"&&Array.isArray(fantraxSyncAttempts);
   const fantraxAudit=fantraxSyncAuditHealth(fantraxAuditAvailable?fantraxSyncAttempts:[]);
   const fantraxAuditAvailability=[{status:fantraxSyncAuditStatus,error:fantraxSyncAuditError,attemptCount:fantraxAuditAvailable?fantraxSyncAttempts.length:null}];
-  const fantraxRelease=fantraxRosterSyncReleasePolicy(leagueRows[0]||{});
+  const fantraxRelease=fantraxRosterSyncReleasePolicy(league||{});
   const invalidTeamRows=teams.excludedInvalidTeamRowsFromRows(rawTeamRows,playerRows);
   const teamIds=new Set(teamRows.map(team=>team.id));
   const playerIds=new Set(playerRows.map(player=>player.id));
@@ -190,7 +191,7 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
   const ownedFreeAgent=playerRows.filter(player=>player.owner_team_id&&normalizeRosterStatus(player.roster_status,{ownerTeamId:player.owner_team_id,isFreeAgent:player.is_free_agent,availabilityStatus:player.availability_status})==="FREE_AGENT");
   const freeAgentWithOwner=playerRows.filter(player=>player.is_free_agent&&player.owner_team_id);
   const teamsWithoutManagers=teamRows.filter(team=>!team.manager_id||!managerIds.has(team.manager_id));
-  const resolvedUserTeam=resolveUserFantasyTeam({leagueId,authenticatedUserId,preferredTeamId,leagueRows,membershipRows,teamRows,playerRows,scoreRows,scoreVersion:ENGINE_VERSION,fallbackTeamTokens:USER_TEAM_FALLBACK_TOKENS});
+  const resolvedUserTeam=resolveUserFantasyTeam({leagueId,authenticatedUserId,preferredTeamId,leagueRows:league?[league]:[],membershipRows,teamRows,playerRows,scoreRows,scoreVersion:ENGINE_VERSION,fallbackTeamTokens:USER_TEAM_FALLBACK_TOKENS});
   const effectiveResolution=userTeamResolution?.teamId===resolvedUserTeam.teamId?userTeamResolution:resolvedUserTeam;
   const canonicalTeamId=effectiveResolution.teamId||teamId;
   const canonicalTeam=teamRows.find(team=>team.id===canonicalTeamId)||null;
@@ -336,6 +337,6 @@ export async function runDataHealth(leagueId,{teamId="",authenticatedUserId="",p
     {name:"Team-manager links",status:teamRows.some(team=>team.manager_id&&!managerRows.some(manager=>manager.id===team.manager_id))?"WARNING":"PASS",details:detail("Team-manager link issues",teamRows.filter(team=>team.manager_id&&!managerRows.some(manager=>manager.id===team.manager_id)))},
     {name:"RLS access",status:"PASS",details:detail("RLS access",[{leagueId,readSucceeded:true}])}
   ];
-  checks.push(...fantraxPreviewHealthChecks(fantraxPreview));
+  checks.push(...fantraxPreviewHealthChecks(fantraxPreview,seasonAuthority));
   return {checks,failed:checks.filter(check=>check.status==="FAIL").length,warnings:checks.filter(check=>check.status==="WARNING").length};
 }
