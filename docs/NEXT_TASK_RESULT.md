@@ -2336,3 +2336,9 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 
 - Final architectural review found two narrow issues and corrected them without broadening scope: unknown ownership was already excluded from immediate availability but now also emits `OWNERSHIP_STATE_UNKNOWN` and lowers confidence; per-player self-exclusion now filters the precomputed position-specific available pool rather than rescanning the full league population.
 - Regression coverage proves unknown/contradictory ownership is not treated as free-agent availability and remains visible, and statically verifies replacement evaluation consumes `availableByPosition`. The empirical benchmark, component formulas, Engine 5.1.1 compatibility, and all production boundaries remain unchanged.
+
+### V5.5B-2 Checkpoint
+
+- Implementation commit: `091f3029704606b2570328296afbc16aa1ab8166` (`Add league production and replacement intelligence`).
+- Push result: succeeded to `origin/feature/manager-intelligence` (`6154524..091f302`).
+- The implementation commit contained exactly the four architect-approved files. No deployment, production read/write, import, metric mutation, score calculation/persistence, migration, Statcast refresh, roster/ownership/identity change, Fantrax synchronization, or other cloud/data operation accompanied the checkpoint.
