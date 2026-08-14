@@ -2423,3 +2423,13 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Push result: succeeded to `origin/feature/manager-intelligence` (`ca73d48..564b21b`).
 - The implementation commit contained exactly the four architect-approved files. Final review made the Prospect Opportunity Cost direction machine-readable as `HIGHER_IS_BETTER_LOWER_COST` and strengthened the missing-production fixture to prove `NOT_APPLICABLE` with a null score rather than a fabricated zero.
 - No deployment, production read/write, import, refresh, Player Intelligence persistence, metric or calculated-score mutation, migration, score recalculation, Fantrax synchronization, or roster/ownership/identity operation accompanied the checkpoint.
+
+## V5.5B-5 Governance Activation
+
+- V5.5B-4 is complete and checkpointed at implementation commit `564b21ba87067a07b7ab49aa921bf6a473eb07f3` and documentation commit `2fe7c2c3c98ba1215b4e717e4a11faba757420f3`.
+- The accepted components entering calibration are League Production, Underlying Skill, Role Stability, Positional Scarcity, Age/Trajectory, Risk, Replacement Advantage, and Prospect Opportunity Cost, with HKB retained as separate bounded market evidence. Prospect Opportunity Cost remains `HIGHER_IS_BETTER_LOWER_COST`; higher Risk remains more downside risk; pitcher-prospect uncertainty remains a bounded seven-point adjustment. Engine 5.1.1 is unchanged.
+- `docs/NEXT_TASK.md` now activates V5.5B-5 Player Intelligence Calibration and Explainable Composite as local, read-only, in-memory, unpersisted work.
+- The contract requires archetype-specific `REQUIRED`/`OPTIONAL`/`NOT_APPLICABLE` component treatment, explicit directionality, confidence-aware missing/stale/partial handling, transparent starting weights, and preservation of raw component contributions rather than a uniform average.
+- It authorizes an explainable overall envelope plus normalized floor/expected/ceiling bands, while prohibiting projected FPts, persistence, deployment, imports/refreshes, migrations, Engine 5.1.1 replacement, and production waiver actions.
+- Explicit overlap controls prevent full double counting of scarcity/replacement, role/production, age/prospect economics, and risk. HKB cannot dominate or force league-intelligence rankings, preserving market divergence for later trade analysis.
+- This activation changed documentation only. No application code, tests, schema, migration, deployment, production data, scores, metrics, identity, ownership, roster state, import, refresh, or Gate 4 state changed.

@@ -1,12 +1,12 @@
 # Current State
 
-## V5.5B-4 Activated (2026-08-13)
+## V5.5B-5 Activated (2026-08-14)
 
-- V5.5B-3 is complete and checkpointed at implementation commit `9e94a49f7023bf5dbd48c4e509b1b1cefcd27d32` and documentation commit `193d52a50140f975d0dc0f13fd5e2b6878fbcc38`.
-- Its accepted model keeps Fantrax production separate from Statcast skill, excludes surface ERA from Pitcher Underlying Skill, uses the reviewed hitter and pitcher metric weights, excludes missing metrics rather than imputing them, and applies a 20-percentile-point breakout/regression threshold. Engine 5.1.1 remains unchanged.
-- The active implementation slice is **V5.5B-4 Role Stability, Age/Trajectory, Risk, and Prospect Opportunity Cost**.
-- V5.5B-4 is local, read-only, in-memory, and unpersisted. It may populate only the four contextual component envelopes and must not calculate overall Player Intelligence.
-- Deployment, production refresh/import, production persistence, score replacement/recalculation, migrations, V5.5C logic, and changes to identity, ownership, or roster state remain unauthorized.
+- V5.5B-4 is complete and checkpointed at implementation commit `564b21ba87067a07b7ab49aa921bf6a473eb07f3` and documentation commit `2fe7c2c3c98ba1215b4e717e4a11faba757420f3`.
+- Its accepted contextual components are Role Stability, Age/Trajectory, Risk, and Prospect Opportunity Cost. Prospect Opportunity Cost uses `HIGHER_IS_BETTER_LOWER_COST`; Risk uses higher-is-more-risk; the pitcher-prospect adjustment is bounded at seven points. Engine 5.1.1 remains unchanged.
+- The active implementation slice is **V5.5B-5 Player Intelligence Calibration and Explainable Composite**.
+- V5.5B-5 is local, read-only, in-memory, and unpersisted. It may combine applicable components by player archetype and confidence and may create explainable overall/floor/expected/ceiling output without projected FPts.
+- Deployment, production refresh/import, persistence, Engine 5.1.1 replacement/recalculation, migrations, production waiver actions, and changes to identity, ownership, or roster state remain unauthorized.
 
 ## V5.5B Production Foundation Reconciliation (2026-08-13)
 

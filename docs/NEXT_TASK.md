@@ -1,88 +1,95 @@
-# Next Task: V5.5B-4 Role Stability, Age/Trajectory, Risk, And Prospect Opportunity Cost
+# Next Task: V5.5B-5 Player Intelligence Calibration And Explainable Composite
 
 ## Status And Authority
 
-- V5.5B-1 canonical inputs and component envelopes, V5.5B-2 League Production/scarcity/replacement advantage, and V5.5B-3 Underlying Skill/breakout/regression are complete and checkpointed.
-- This task authorizes local, read-only, in-memory V5.5B-4 implementation only.
-- Do not deploy, persist Player Intelligence, modify `player_metrics` or `calculated_player_scores`, replace Engine 5.1.1, run imports or refreshes, create migrations, implement overall Player Intelligence, or implement V5.5C.
+- V5.5B-1 through V5.5B-4 are complete and checkpointed. Independent components now exist for League Production, Underlying Skill, Role Stability, Positional Scarcity, Age/Trajectory, Risk, Replacement Advantage, and Prospect Opportunity Cost. HKB remains independent market evidence.
+- This task authorizes local, read-only, in-memory V5.5B-5 implementation only.
+- Do not deploy, persist Player Intelligence, modify `player_metrics` or `calculated_player_scores`, replace or recalculate Engine 5.1.1, run imports/refreshes, modify roster/ownership/identity, create migrations, or implement production waiver actions.
 
-## Objective And Separation
+## Objective
 
-Implement only `roleStability`, `ageTrajectory`, `risk`, and `prospectOpportunityCost`. Keep them independent from completed components:
+Implement the first explainable Player Intelligence composite. Do not average every component. Select components that apply to the player's archetype, account transparently for component confidence and availability, preserve raw evidence, and explain why one player ranks above another in the active league.
 
-- League Production: canonical Fantrax FPts with FP/G support.
-- Underlying Skill: canonical Statcast evidence.
-- Scarcity and replacement: empirical league population.
-- Role Stability: opportunity and role security.
-- Age/Trajectory: development stage.
-- Risk: contextual downside uncertainty, not poor production.
-- Prospect Opportunity Cost: dynasty roster-slot economics.
-- Market Value: separate HKB evidence.
+Create an in-memory `overallPlayerIntelligence` or repository-consistent equivalent containing at least score, confidence, archetype, applicable components, component contributions, explanations, and warnings. Preserve all source component envelopes and do not persist the result.
 
-Do not calculate overall Player Intelligence, floor, expected, or ceiling.
+## Archetypes And Applicability
 
-## Canonical Input Audit
+Explicitly distinguish at least:
 
-Before formulas, audit and document the exact canonical availability of age/date of birth, MLB/MiLB and active status, organization/team, roster/minors state, position eligibility, level/league, recent promotion/demotion or option evidence, playing-time and pitcher-role evidence, HKB market value, production, Statcast, and current injury/IL evidence. Do not infer fields that are unavailable. Missing evidence must lower confidence and remain visible.
+- MLB hitter
+- MLB starting pitcher
+- MLB reliever
+- young MLB/recent call-up
+- MLB veteran
+- near-MLB prospect
+- distant prospect
 
-## Role Stability
+Define a transparent applicability matrix marking every component `REQUIRED`, `OPTIONAL`, or `NOT_APPLICABLE` per archetype. Do not use identical weights across all archetypes.
 
-Measure how secure the player's opportunity is to generate fantasy points. Use only canonical evidence for roster security, playing time/usage, role clarity, recent promotion/demotion risk, and bounded position-flexibility support.
+- Established MLB players should emphasize actual League Production, Underlying Skill, Role Stability, Replacement Advantage, bounded Positional Scarcity, Age/Trajectory, and Risk; Prospect Opportunity Cost is normally not applicable.
+- Prospects may lack League Production and MLB Statcast without penalty-as-zero. They should emphasize Age/Trajectory, Risk, Prospect Opportunity Cost, and bounded market/scarcity/replacement context appropriate to their distance/readiness.
+- Role Stability for prospects represents lack of an established MLB role; it must not invent zero MLB production or imminent promotion.
 
-- Do not assume MLB means everyday, SP eligibility means rotation lock, RP eligibility means closer, or youth means imminent promotion.
-- Keep hitter and pitcher role evidence distinct. Saves/holds or rotation/bullpen evidence may support a role only when canonical.
-- An RP with strong production but incomplete leverage evidence must not receive automatic elite stability and must expose `RELIEF_ROLE_EVIDENCE_LIMITED` or equivalent.
-- Age, HKB, Statcast skill, and poor production do not enter the raw Role Stability score.
-- Confidence depends on freshness, known roster state, evidence coverage, usage evidence, and recent role changes.
+## Component Directions And Confidence
 
-## Age And Trajectory
+Preserve and document score direction before weighting:
 
-Measure how favorable the player's current development stage is for dynasty value while remaining independent of current skill and role. Use broad, transparent, bounded stages such as development, early prime, prime, late prime, and decline-risk, interpreted alongside MLB/MiLB stage. Youth alone is not sufficient: a young MLB regular and a same-age distant prospect may have different context and risk. Preserve age, stage, MLB/MiLB status, score, confidence, explanations, and warnings. Do not use HKB directly or pretend to have precise immutable age cliffs.
+- Higher League Production, Underlying Skill, Role Stability, Positional Scarcity, Age/Trajectory, Replacement Advantage, and Prospect Opportunity Cost scores are favorable.
+- Prospect Opportunity Cost direction is `HIGHER_IS_BETTER_LOWER_COST`.
+- Higher Risk means **more downside risk** and must be transformed consistently rather than treated as favorable.
 
-## Prospect Opportunity Cost
+Define how `CALCULATED`, stale, partial, insufficient, unavailable, and `NOT_APPLICABLE` components affect applicability, normalization, confidence, and the denominator. `NOT_APPLICABLE` and missing evidence are never zero. Missing Statcast must not behave like zero skill. Low-confidence evidence may contribute less, but do not blindly multiply score by confidence without documenting and testing the mathematical behavior.
 
-For prospects, measure whether the player is worth a dynasty roster slot relative to alternatives—not whether he is merely a good baseball prospect. Use canonical evidence where available: age, level and distance to MLB, readiness, MLB/MiLB state, market support, bounded scarcity support, replacement environment, production/Statcast availability, and roster/minors slot context.
+Overall confidence must remain separate from the overall value score and reflect required-component coverage, component confidence, freshness, and warnings.
 
-- Support evidence that can later inform `PROTECTED`, `INVESTMENT`, and `CHURN`; do not assign those labels from reputation.
-- Treat levels such as MLB, AAA, AA, A+/A, and complex/rookie only when canonical. Greater distance generally raises uncertainty and opportunity cost; do not invent ETA years.
-- HKB is bounded supporting market evidence and cannot erase development risk or dictate the result.
-- Scarcity is bounded supporting evidence and must not be double-counted.
-- A prospect without MLB production or Statcast is `NOT_APPLICABLE`/`INSUFFICIENT_DATA` for those components, never fake zero; prospect opportunity cost may still calculate from valid prospect context.
-- Established MLB players normally receive Prospect Opportunity Cost = `NOT_APPLICABLE`.
+## Starting Weights And Overlap Controls
 
-## Risk
+Use named, transparent starting weights defined generically before player examples. Do not optimize against named players.
 
-Measure contextual downside uncertainty from valid evidence such as role instability, MiLB distance, recent promotion/demotion, incomplete or stale data, pitcher-prospect volatility, current canonical injury/IL state, unclear playing time, and unclear roster state. Poor production itself is not risk. Do not invent injury prognosis. Any pitcher-prospect adjustment must be bounded, transparent, and supported rather than an arbitrary penalty.
+Explicitly prevent double counting:
 
-## Missing Data, Explanations, And Confidence
+- Positional Scarcity describes league depth; Replacement Advantage describes this player's gap over a realistic alternative. Do not give both full overlapping weight.
+- Role Stability supports sustainability/confidence but must not duplicate already-realized League Production.
+- Age/Trajectory is developmental runway; Prospect Opportunity Cost is roster-slot economics. Youth cannot earn the same reward twice.
+- Risk must not be subtracted repeatedly through score, floor, and confidence without distinct documented purposes.
+- HKB is bounded market/liquidity evidence, not a league-performance authority and not a dominant composite weight.
 
-Never fabricate playing time, role certainty, injury prognosis, ETA, scouting grade, or closer hierarchy. Each component has independent confidence. Preserve factual supporting values and structured explanations/warnings, including accepted equivalents of role established/uncertain, promotion/demotion, limited relief evidence, favorable/aging trajectory, near/distant prospect, high/low slot cost, scarcity/deep-position support, incomplete role/prospect data, and unavailable injury evidence.
+Preserve market divergence: high league intelligence with lower HKB and lower league intelligence with high HKB must both remain representable for future trade intelligence.
 
-## Required Fixtures And Isolation
+## Floor, Expected, And Ceiling
 
-Add focused regression coverage for:
+Implement first meaningful normalized Player Intelligence outcome bands, not scouting grades and not fantasy-point projections:
 
-1. Near-MLB scarce-position prospect versus distant deep-position prospect, with the first materially better on opportunity cost without a fixed position bonus.
-2. Young MLB regular versus a same-age AA prospect: higher Role Stability and lower Risk for the MLB regular while Age/Trajectory may remain favorable for both.
-3. Aging productive veteran: strong League Production and potentially strong Role Stability remain intact while Age/Trajectory is lower than a young MLB star.
-4. Recently promoted and recently demoted players, including lower stability/higher risk for demotion without changing identical Underlying Skill.
-5. RP with strong production but limited leverage evidence.
-6. Same Statcast/different role: same Underlying Skill, different Role Stability.
-7. Same age/different role: same Age/Trajectory, different Role Stability.
-8. Same role/different age: same Role Stability, different Age/Trajectory.
-9. MLB veteran Prospect Opportunity Cost = `NOT_APPLICABLE`.
-10. Prospect without MLB production is not assigned fake zero production.
-11. Bounded pitcher-prospect risk.
-12. Missing and stale evidence reduces confidence and fails safely.
+- **Floor:** conservative value under realistic role/skill/development disappointment.
+- **Expected:** most likely value based on applicable current production, skill, role, age, scarcity/replacement, and risk.
+- **Ceiling:** credible upside under favorable skill/role/development outcomes.
+
+Document how Risk, confidence, and breakout/regression evidence affect score versus band width. Breakout/regression signals may change explanations, spread, or confidence but must not become large blind fixed bonuses. Require `floor <= expected <= ceiling`, bounded outputs, and traceable assumptions.
+
+## Required Generic Fixtures
+
+Cover at least elite productive SS, equally productive replaceable OF, Statcast breakout hitter, high-production regression-risk hitter, ace SP, volatile productive RP, young MLB regular, aging productive veteran, near-MLB elite prospect, distant high-risk prospect, below-replacement rostered MLB player, and high-value available free agent.
+
+Critical regressions:
+
+1. Two players with similar production/skill: the scarce-position player with stronger replacement advantage must outrank the replaceable player for visible league-specific reasons.
+2. High league intelligence with low/moderate HKB must remain distinct from lower league intelligence with high HKB; HKB cannot force the ranking.
+3. A near-MLB prospect with favorable trajectory, low slot cost, scarcity, and strong market support must outrank a similar-market distant/high-risk/deep-position prospect without fake MLB production.
+4. Unavailable and `NOT_APPLICABLE` components do not become zero or silently depress the composite.
+5. Archetypes receive different applicability/weights; Risk and Prospect Opportunity Cost directions remain correct.
+6. Scarcity/replacement, role/production, and age/prospect overlap controls remain bounded.
+7. Engine 5.1.1 output and version remain unchanged.
+
+Named players may be used only as post-formula audit examples. Never add player-specific calibration bonuses.
 
 ## Implementation Shape And Validation
 
-Prefer narrow modules such as `v5/js/engine/playerIntelligenceContext.js`, `v5/js/services/playerIntelligenceContextService.js`, and `tests/v5PlayerIntelligenceContext.test.mjs`, plus only minimal canonical-input/foundation changes proven necessary. Avoid repeated per-player repository reads and reuse the V5.5B-2 league/scarcity context where applicable. Do not build final UI.
+Prefer a narrow pure composite engine plus a read-only service that consumes the existing canonical V5.5B evaluation pipeline. Preserve component evidence and avoid new repository reads or any write path. Do not build final production UI unless a minimal read-only inspection surface is explicitly required by repository evidence.
 
-Run the new context tests; V5.5B foundation, League Production, Underlying Skill, Fantrax production, Statcast, MLBAM identity, scoring, Data Health, architecture, authentication, and Fantrax regression tests; the complete `tests/*.test.mjs` suite; JavaScript syntax checks; and `git diff --check`.
+Run focused composite, V5.5B foundation, League Production, Underlying Skill, context, Fantrax production, Statcast, MLBAM identity, scoring, Data Health, architecture, auth, and Fantrax regression tests; the complete `tests/*.test.mjs` suite; JavaScript syntax checks; and `git diff --check`.
 
 ## Deliverable And Stop
 
-Update `docs/NEXT_TASK_RESULT.md` with exact canonical inputs, component algorithms, hitter/pitcher distinctions, prospect distance and market/scarcity support, missing-data/confidence behavior, known limitations, fixtures, files, and validation. Stop uncommitted for architect review. Do not stage, commit, push, deploy, migrate, import, refresh, persist, or perform cloud/data writes.
+Update `docs/NEXT_TASK_RESULT.md` with the archetype matrix, component directions/weights/applicability, confidence and missingness rules, overlap controls, market treatment, floor/expected/ceiling semantics, fixture outcomes, known limitations, files, and validation. Stop uncommitted for architect review.
 
-After V5.5B-4 is checkpointed, repository governance must be advanced to a new explicit `docs/NEXT_TASK.md` before any later implementation slice begins. Do not treat a completed V5.5B-4 contract as authority for subsequent work.
+After V5.5B-5 is checkpointed, advance repository governance in a separate documentation-only task before V5.5B-6 or V5.5C begins. Do not decide the next implementation slice prematurely.
