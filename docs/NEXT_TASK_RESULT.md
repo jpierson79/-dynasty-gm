@@ -2416,3 +2416,10 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - The complete sorted standalone suite passed all 47 `tests/*.test.mjs` files. Syntax checks passed for the new engine, service, and test. `git diff --check` passed before and will be repeated after this documentation update.
 - Known limitations are explicit canonical coverage gaps: minor-league level/distance, promotion/demotion history, playing-time usage, rotation/bullpen/leverage hierarchy, saves/holds opportunity, injury detail, and role freshness. The implementation does not manufacture them and therefore reports lower confidence until an accepted canonical provider exists.
 - Engine 5.1.1 is unchanged. No migration, schema change, deployment, browser/cloud read, production write, import, refresh, Player Intelligence persistence, metric mutation, calculated-score mutation, score recalculation, roster/ownership/identity change, or Fantrax synchronization occurred. The implementation was kept unstaged, uncommitted, and unpushed until architect checkpoint approval.
+
+### V5.5B-4 Checkpoint
+
+- Implementation commit: `564b21ba87067a07b7ab49aa921bf6a473eb07f3` (`Add player role trajectory and prospect context`).
+- Push result: succeeded to `origin/feature/manager-intelligence` (`ca73d48..564b21b`).
+- The implementation commit contained exactly the four architect-approved files. Final review made the Prospect Opportunity Cost direction machine-readable as `HIGHER_IS_BETTER_LOWER_COST` and strengthened the missing-production fixture to prove `NOT_APPLICABLE` with a null score rather than a fabricated zero.
+- No deployment, production read/write, import, refresh, Player Intelligence persistence, metric or calculated-score mutation, migration, score recalculation, Fantrax synchronization, or roster/ownership/identity operation accompanied the checkpoint.
