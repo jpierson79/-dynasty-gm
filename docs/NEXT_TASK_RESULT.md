@@ -2480,3 +2480,41 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - Named players may be audit examples only. No weight, threshold, or component may be tuned to force a preferred named-player rank; any correction must identify a generic structural cause supported across a representative group.
 - The decision gate is explicit: a clean inspection may recommend architect consideration of V5.5C, while a material generic defect may recommend one narrow V5.5B-6A repair. Neither phase starts automatically, and both require separate architect governance.
 - This activation changed documentation only. No application code, test, migration, schema, deployment, production/cloud data, Player Intelligence output, metric, calculated score, Engine 5.1.1 result, identity, ownership, roster state, import, refresh, waiver action, or Fantrax synchronization changed.
+
+## V5.5B-6 Real-Player Inspection and Calibration — Local Implementation
+
+### Inspection architecture and loading
+
+- Added a narrow read-only `playerIntelligenceInspectionService` over the accepted `loadPlayerIntelligenceComposite` pipeline. The inspection service performs no scoring and contains no repository, Supabase, fetch, or persistence call. It consumes the already-built canonical input map, completed component results, and V5.5B-5 composites.
+- `loadPlayerIntelligenceInspection` invokes the canonical population loader once, then builds identity, classification, composite, component-contribution, market, explanation, group, and diagnostic envelopes entirely in memory. A dependency-injected fixture proves one bounded population load; the service does not reload the league per player.
+- No UI was added. The deterministic service, filters, rankings, pairwise comparison, aggregate diagnostics, and tests provide the smallest useful local inspection surface without production routing or view changes.
+
+### Groups, thresholds, and inspection output
+
+- All 12 governance groups are supported through generic evidence: elite MLB hitters, middle infielders, outfielders, catchers, starting pitchers, relievers/closers, young MLB players, aging productive veterans, near-MLB prospects, distant prospects, authoritative free agents, and below-replacement rostered players.
+- Centralized inspection-only thresholds are visible in `INSPECTION_THRESHOLDS`: elite League Production score at least 80, strong veteran production at least 65, low confidence below 60, single-component dominance at 45% normalized contribution share, and overlap review at 45% combined normalized share. These thresholds classify or flag evidence only and never change a score.
+- Availability is fail-closed: only explicit free-agent state with no owner is `FREE_AGENT`; explicit owner/non-free-agent state is `ROSTERED`; waiver-like states remain `WAIVER`; incomplete evidence is `UNKNOWN`.
+- Each record exposes stable UUID plus available Fantrax/MLBAM identity, organization, eligibility, availability, archetype/confidence, expected/floor/ceiling/overall confidence, every existing composite contribution envelope, raw HKB/percentile/divergence/signed gap, positive and negative contributors, warnings, missing required evidence, stale evidence, raw replacement gap, groups, and diagnostic flags.
+
+### Ranking, comparison, and aggregate diagnostics
+
+- Read-only ranking supports expected, floor, ceiling, confidence, League Production, Underlying Skill, Replacement Advantage, Positional Scarcity, Role Stability, Age/Trajectory, Risk Safety, Prospect Opportunity Cost, and signed market-divergence gap. Filtering supports archetype, MLB/prospect, position, authoritative availability, confidence band, missing Statcast, and market-divergence state.
+- Pairwise comparison reports expected, floor, ceiling, and confidence differences; market-percentile and signed market-divergence differences; contribution differences for all present components; and the strongest reasons favoring either UUID. It makes no waiver or trade recommendation.
+- Archetype and representative-group summaries expose count; median expected, confidence, floor, ceiling, production, skill, replacement, scarcity, role, and Risk Safety; missing-Statcast and low-confidence percentages; market-divergence distribution; and median normalized contribution shares.
+- Diagnostic flags include component dominance, low archetype confidence, missing Statcast, reliever confidence suppression, prospect market-support dominance, scarcity/replacement overlap, role/production overlap, age/prospect overlap, available-above-replacement, and rostered-below-replacement. Flags are observational and cannot mutate composite output.
+
+### Calibration audits and decision
+
+- Deterministic fixtures cover the reliever, positional, prospect, veteran, free-agent, below-replacement, missing-Statcast, double-count, and contribution-share audits. Missing Statcast remains missing, is visible as a confidence concern, and does not cause the inspection layer to alter expected value. Bounded prospect market support remains inspectable through its normalized contribution share.
+- Player names are never used for grouping, ranking, filtering, or calibration. Static regression coverage prohibits named-player branches and confirms the canonical composite loader remains the source of evaluation.
+- No real Reddit Phanatics data was accessed because the active task prohibits production/cloud reads. Therefore no honest structural calibration conclusion can be drawn from real league evidence and no V5.5B-5 formula or weight was changed.
+- Calibration decision: **`REAL_PLAYER_ACCEPTANCE_REQUIRED`**. A separately authorized read-only acceptance must run the inspection service against canonical Reddit Phanatics data before the architect can choose `PASS` and consider V5.5C or establish evidence for `CALIBRATION_REQUIRED` and one narrow V5.5B-6A repair.
+- No structural defect was demonstrated by deterministic inspection architecture fixtures. This is not a claim that real-player calibration passed.
+
+### Files, validation, and safety
+
+- Added `v5/js/services/playerIntelligenceInspectionService.js` and `tests/v5PlayerIntelligenceInspection.test.mjs`; updated this result record. No view, engine, repository, migration, or schema file changed.
+- Focused validation passed the new inspection test plus V5.5B foundation, League Production, Underlying Skill, Context, Composite, Fantrax production, Statcast provider/session, MLBAM identity, architecture, auth, roster-sync, and Gate 4 harness tests. Two initially requested shorthand filenames did not exist; their repository equivalents (`v5DataHealthExecution.test.mjs`, `v5DynastyEngine.test.mjs`, and `v5FantraxProductionImport.test.mjs`) passed in the complete suite.
+- The complete sorted standalone suite passed all 49 `tests/*.test.mjs` files. JavaScript syntax checks passed for the new service and test. `git diff --check` passed before this documentation update and is rerun afterward.
+- Engine 5.1.1 remains unchanged. No deployment, browser/hosted acceptance, production/cloud read or write, import, refresh, Player Intelligence persistence, metric/calculated-score mutation, migration, score recalculation, waiver action, Fantrax synchronization, or roster/ownership/identity operation occurred.
+- The work remains unstaged, uncommitted, and unpushed for architect review.
