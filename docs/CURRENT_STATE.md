@@ -1,5 +1,16 @@
 # Current State
 
+## V5.5B-6G0 Prospect Level Evidence Foundation Activated (2026-08-15)
+
+- V5.5B-6G1 stopped before editing with status **`BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`**, not failed.
+- The immediate repository/input defect is proven: `v5/js/repositories/playerIntelligenceRepository.js` does not load `players.is_minor_leaguer`, so canonical input normalizes the missing value to false and young non-MLB players can fall through to the age-based `YOUNG_MLB_OR_RECENT_CALLUP` rule.
+- Restoring that boolean alone is insufficient. The current schema does not preserve authoritative minor-league level, the importer collapses level/minors/prospect evidence into a boolean, and canonical Player Intelligence sets level/readiness to null. AAA/AA therefore cannot safely be distinguished from A+/A/Rookie/Complex/DSL.
+- The active task is **V5.5B-6G0 Prospect Level Evidence Foundation**: establish provider-neutral factual minor-league status, current level, source, freshness/availability, and unknown-state evidence before resuming archetype classification.
+- Provider review must start with accepted capabilities, prioritizing MLB Stats API organizational/roster evidence and preserving explicit accepted import evidence when available. Fantrax must not be forced into level authority if its reviewed data lacks level.
+- G0 must determine whether the existing schema can safely store canonical level evidence. Any required migration must be separately implemented and reviewed, additive, non-destructive, RLS-safe, identity-preserving, and must not rewrite ownership or rosters.
+- Missing evidence remains unknown. Age, HKB, Fantrax production, Statcast, names, and reputation cannot infer level.
+- Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**. After G0 is locally validated, reviewed, and checkpointed, work resumes with G1, then G2, G3, and G4.
+
 ## V5.5B-6G Real-Player Calibration Repair Foundation Activated (2026-08-15)
 
 - Immutable deployment integrity is **PASS** for target `7130399b4162989e5b1f6ed893e3158f2e411b23` through trusted workflow run `31906306902`: the 120-file manifest verified, the immutable module graph passed, and the prior mixed-version defect was absent.
