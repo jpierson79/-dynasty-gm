@@ -1,56 +1,104 @@
-# Next Task: V5.5B-6C Hosted Inspection Performance Repair
+# Next Task: V5.5B-6E Deployment Module-Graph Integrity Repair
 
 ## Status and authority
 
-- V5.5B-6B is complete at diagnosis commit `fda1c416f6dde1674afba4994b567302f45693fc`.
-- The accepted primary root cause is synchronous quadratic main-thread evaluation: repeated complete metric scans, percentile population sorting/scanning, production-range calculation, Statcast percentile work, and market percentile work, with no event-loop yielding.
-- The accepted secondary defect is eager rendering at approximately 10,326 players: about 5.82 million HTML characters, 10,340 table rows, 20,691 option elements, and 33 MiB heap growth. It occurs after evaluation and is not the primary cause of the observed `LOADING` freeze.
-- This task authorizes local performance repair only. Calibration remains `REAL_PLAYER_ACCEPTANCE_REQUIRED`; V5.5C remains blocked.
+- V5.5B-6D is complete at diagnosis commit `00fef1770d066101be2a34c5b502a790b06a531a`.
+- Accepted diagnosis: `MIXED_VERSION_MODULE_GRAPH_CONFIRMED`.
+- Retained Pages artifact result: `ARTIFACT_MATCHES_COMMIT` for feature commit `7130399b4162989e5b1f6ed893e3158f2e411b23` after line-ending normalization.
+- Calibration remains `REAL_PLAYER_ACCEPTANCE_REQUIRED`; V5.5C remains blocked.
+- This task authorizes local deployment-integrity implementation only. Deployment and calibration remain separately gated.
 
 ## Objective
 
-Preserve the full canonical population and every accepted scoring and evidence semantic while replacing repeated population work with reusable indexed contexts, bounded asynchronous evaluation, visible progress, and bounded rendering. Do not reduce the population or treat performance work as model calibration.
+Guarantee architecturally that one hosted V5 session cannot assemble JavaScript modules from more than one deployment version. Replace mutable cross-deployment module identity with a deterministic, inspectable, immutable deployment namespace without changing application behavior.
 
-## Target architecture
+## Required architecture
 
-Load canonical league data once, index canonical evidence by stable `players.id` UUID once, and precompute production distribution/ranks/range, positional replacement and scarcity pools, hitter and pitcher Statcast distributions, and market/HKB distribution and ranks. Evaluate each player from indexed evidence and reusable contexts without rescanning full populations, periodically yielding to the event loop. Aggregate diagnostics once, render only the visible page, and defer additional rows, detailed decomposition, and large comparison candidate sets.
+Prefer immutable commit-versioned static asset paths, conceptually:
 
-No second identity authority or parallel evaluation path is permitted. Repository access remains authenticated and league scoped, with no per-player query.
+```text
+/v5-builds/<commit-sha>/index.html
+/v5-builds/<commit-sha>/js/main.js
+/v5-builds/<commit-sha>/js/services/...
+/v5-builds/<commit-sha>/js/repositories/...
+/v5-builds/<commit-sha>/js/views/...
+```
 
-## Semantic invariant
+Preserve the V5 relative directory structure so every nested relative ES-module import remains within the same immutable `/v5-builds/<commit-sha>/` namespace. An equivalent immutable namespace is acceptable only when required by existing Pages packaging and proven equally coherent.
 
-For identical canonical inputs, optimized results must remain equivalent for archetype, League Production, Underlying Skill, Role Stability, Positional Scarcity, Replacement Advantage, Age/Trajectory, Risk and Risk Safety, Prospect Opportunity Cost, breakout/regression evidence, expected, floor, ceiling, confidence, applicability, weights, contributions, market percentile/divergence, and diagnostic classifications. No formula, weight, threshold, replacement methodology, identity rule, Engine 5.1.1 behavior, or evidence meaning may change.
+Mutable asset URLs such as `/v5/js/main.js`, `/v5/js/services/foo.js`, and `/v5/js/repositories/bar.js` are unsafe across feature/main publications because caches can combine valid bytes from different commits. Immutable URLs may remain cacheable; commit identity makes cached bytes correct for that URL.
 
-Precomputed percentile lookup must exactly preserve minimum, median, maximum, tied, missing, and pitcher-inverted semantics. Replacement optimization must preserve free-agent and rostered-player self-exclusion, including multi-position behavior.
+## Prohibited partial fixes
 
-## Reusable contexts and bounded evaluation
+- Do not rely only on `main.js?v=<commit>`. Native nested relative imports do not inherit the entry query token.
+- Do not manually edit version strings throughout source files for each deployment.
+- Do not version only selected modules or allow nested imports to fall back to mutable `/v5` paths.
+- Do not rename, duplicate, or modify `finishAutomatedStatcastJob`; its source contract is valid.
 
-- Index Fantrax production, Statcast hitter/pitcher metrics, HKB evidence, role/context evidence, and ownership/availability by stable player UUID once per run.
-- Build production population, sorted ranks, percentile context, and range once.
-- Build C, 1B, 2B, 3B, SS, OF, SP, and RP eligibility/available pools, replacement benchmarks, and depth/scarcity context once.
-- Build hitter and pitcher Statcast percentile distributions once, preserving missing-value exclusion and metric direction.
-- Build market distribution and percentile lookup once.
-- Use an explicit named chunk-size constant selected from local measurement. Yield between bounded chunks and expose `evaluatedPlayers`, `totalPlayers`, and `progressPercent` while `LOADING`; phase/elapsed timing may also be exposed.
-- Preserve stale-result invalidation on logout, session/user change, league change, and reload. A stale run must never publish across contexts.
+If copying the complete V5 tree under an immutable root is infeasible, build-time rewriting/version propagation across every static import may be considered only with evidence that it is safer and complete.
 
-## Aggregation and rendering
+## Deterministic packaging and entry point
 
-Preserve every diagnostic threshold and classification while reducing repeated scans where an equivalent accumulation is possible. Keep one evaluated population and sort the selected ranking dimension on demand or use justified cached indices with deterministic tie behavior.
+Implement deterministic packaging that:
 
-Use explicit display pagination, initially 50 or 100 rows based on measurement. Filtering and ranking operate over the complete in-memory population; paging performs no cloud load. Replace the two full-population comparison selects with bounded search/autocomplete or selected-row comparison. Materialize detailed decomposition only for the selected player and defer large diagnostic sections where appropriate.
+1. determines the exact deployment commit SHA;
+2. copies/builds the complete V5 static tree into the immutable version namespace;
+3. preserves relative module resolution within that namespace;
+4. generates an integrity manifest;
+5. publishes the exact static artifact; and
+6. routes the hosted entry to the selected versioned `index.html` without importing a versioned entry whose nested modules resolve to mutable paths.
 
-## Validation contract
+The hosted inspection surface must expose the exact deployment commit before calibration begins. A small generated root redirect/loader is permitted only if it selects one explicit immutable version and cannot mix module roots.
 
-Add structural performance evidence proving one canonical load, no per-player repository query or full metric scan, one construction of production/Statcast/market/replacement contexts, periodic yielding, bounded initial rows, and bounded comparison choices. Use a deterministic synthetic population around 10,326 players and record `contextBuildMs`, `evaluationMs`, `aggregationMs`, `rankingMs`, `viewModelMs`, `totalMs`, `yieldCount`, and `maxChunkMs` where measurable. Structural assertions are primary; avoid brittle wall-clock-only CI gates.
+## Integrity manifest
 
-Add semantic-equivalence coverage for an MLB hitter, SP, RP, young MLB player, veteran, near-MLB prospect, distant prospect, free agent, below-replacement player, missing Statcast, multi-position player, and market divergence. Explicitly cover percentile edges/ties/missing values and pitcher inversion, plus replacement self-exclusion.
+Generate deterministic deployment evidence containing at minimum:
 
-Run focused inspection/performance/view, composite, context, Underlying Skill, League Production, Fantrax production, Statcast, Data Health, architecture, auth, and Fantrax regression tests; then the complete `tests/*.test.mjs` suite, JavaScript syntax checks, and `git diff --check`.
+- exact deployment commit SHA;
+- emitted module path; and
+- SHA-256 of emitted bytes.
 
-## Boundaries and handoff
+Prioritize the complete V5 static dependency graph and make the manifest inspectable during hosted acceptance. It is deployment evidence, not a runtime scoring feature.
 
-Do not deploy, retry hosted calibration, access production/cloud data, persist Player Intelligence, modify `player_metrics` or `calculated_player_scores`, change Engine 5.1.1 or model semantics, run imports/refreshes/synchronization, modify identity/ownership/roster state, execute waiver/drop/trade actions, or create migrations.
+## Static module-graph regression
 
-Update `docs/NEXT_TASK_RESULT.md` with contexts/indexes, removed repeated work, chunking/progress, aggregation/ranking/rendering strategies, before/after measurements, semantic-equivalence evidence, files, tests, and limitations. Stop uncommitted for architect review.
+Add tooling/tests that walk or validate the emitted V5 static module graph and prove:
 
-After an exact, clean V5.5B-6C checkpoint, the next separately authorized task is V5.5B-6 Real-Player Calibration Acceptance Retry. Only a real-player calibration pass may unblock V5.5C.
+1. every named import resolves;
+2. every emitted module belongs to the selected deployment namespace;
+3. nested import resolution cannot fall back to mutable shared V5 asset URLs;
+4. no accidental unversioned cross-deployment import is introduced; and
+5. `main.js`, `statcastProviderService.js`, `importJobRepository.js`, and `playerIntelligenceInspectionService.js` match the same manifest/commit.
+
+## Pages workflow and restoration
+
+Preserve the approved ability to publish an exact feature artifact temporarily and restore GitHub Pages to the approved `main` application afterward. The workflow must make the deployed SHA, immutable namespace, integrity-manifest SHA, and restored SHA easy to verify. A feature acceptance deployment must never remain active after acceptance.
+
+## Hosted acceptance contract
+
+After local validation, architect review, and checkpointing, a separate hosted acceptance must verify:
+
+- exact feature commit and immutable namespace;
+- integrity-manifest SHA and sampled module hashes;
+- coherent `main.js`, Statcast service, import-job repository, and Player Intelligence inspection service bytes;
+- no sampled module matches restored/older `main` bytes;
+- normal V5 startup completes; and
+- Pages restores to the approved `main` commit.
+
+Only after module integrity and startup pass may real-player calibration be retried. V5.5B-6E itself cannot produce calibration `PASS`.
+
+## Semantic invariants and boundaries
+
+Do not change Statcast collection/refresh behavior, import-job lifecycle, protected baselines, Player Intelligence formulas/weights/thresholds/archetypes/performance architecture, Fantrax behavior, Data Health semantics, authentication, league scoping, Engine 5.1.1, or production data semantics.
+
+Implementation may modify only deterministic static packaging/build tooling, GitHub Pages deployment workflow, immutable versioned paths, root/version-selection plumbing, integrity evidence, and static module-graph tests.
+
+Do not deploy, retry calibration, run imports or refreshes, persist Player Intelligence, modify `player_metrics` or `calculated_player_scores`, modify identity/ownership/roster state, implement waiver logic, or create migrations during the local implementation checkpoint.
+
+## Validation and handoff
+
+Run focused packaging, manifest, module-graph, startup-import, architecture, auth, Statcast, Data Health, and Player Intelligence inspection regressions; then the complete `tests/*.test.mjs` suite, relevant syntax checks, deterministic build reproducibility checks, and `git diff --check`.
+
+Update `docs/NEXT_TASK_RESULT.md` with emitted structure, deployment identity, manifest/hash evidence, graph validation, semantic-preservation evidence, tests, files, and remaining hosted acceptance. Stop uncommitted for architect review unless separately authorized to checkpoint.
+
+Sequence after implementation: local validation, architect review, checkpoint, exact immutable hosted deployment acceptance, coherent module/startup verification, real-player calibration retry, and only then a possible V5.5C unblock after calibration `PASS`.

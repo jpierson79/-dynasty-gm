@@ -1,5 +1,15 @@
 # Current State
 
+## V5.5B-6E Activated (2026-08-14)
+
+- V5.5B-6D Hosted Module Integrity Diagnosis is complete at commit `00fef1770d066101be2a34c5b502a790b06a531a` with classification **`MIXED_VERSION_MODULE_GRAPH_CONFIRMED`** and retained feature artifact result **`ARTIFACT_MATCHES_COMMIT`**.
+- The feature source and retained artifact contained the canonical `finishAutomatedStatcastJob` export. Missing source/export, corrupted feature artifact, service worker, Workbox, application CacheStorage, and wrong repository import path are ruled out absent new evidence.
+- The failure mechanism was mutable shared Pages asset URLs plus unversioned nested ES-module imports and an unchanged entry token under cacheable responses, allowing a newer service module to resolve an older `main` repository module.
+- The active slice is **V5.5B-6E Deployment Module-Graph Integrity Repair**. Its preferred architecture copies the complete V5 tree into an immutable commit-versioned namespace such as `/v5-builds/<commit-sha>/`, preserving relative imports within that namespace and generating an inspectable deployment identity plus SHA-256 integrity manifest.
+- Entry-only query tokens and manual per-import version strings are not accepted. Static graph tooling must prove named imports resolve and no emitted nested import can escape to mutable shared V5 paths.
+- Calibration remains **`REAL_PLAYER_ACCEPTANCE_REQUIRED`**. V5.5C remains **BLOCKED** until module-integrity acceptance and a later real-player calibration `PASS`. Pages remains restored to approved `main` commit `df89840de0ea8563968b99b7acc75b528e02983f`.
+- Deployment, calibration retry, imports, refreshes, production persistence, Player Intelligence or Engine 5.1.1 semantic changes, identity/ownership/roster changes, and migrations remain unauthorized during documentation activation.
+
 ## V5.5B-6C Activated (2026-08-14)
 
 - V5.5B-5 is complete and checkpointed at implementation commit `bf781b2ecf20ff6915f97db564fea5cad806a840` and documentation commit `901d46c7f3fb6777d9f6db8be94d24885a44ed37`.
