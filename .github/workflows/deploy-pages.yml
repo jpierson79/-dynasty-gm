@@ -1,0 +1,67 @@
+name: Deploy immutable GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deployment_ref:
+        description: Exact branch, tag, or commit to package for temporary acceptance
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      deployment_sha: ${{ steps.identity.outputs.sha }}
+      versioned_entry: ${{ steps.package.outputs.entry }}
+      manifest_sha256: ${{ steps.package.outputs.manifest_sha256 }}
+    steps:
+      - name: Check out selected deployment
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.deployment_ref || github.sha }}
+      - name: Resolve exact deployment identity
+        id: identity
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Package immutable V5 deployment
+        id: package
+        shell: bash
+        run: |
+          node scripts/build-v5-deployment.mjs --commit "${{ steps.identity.outputs.sha }}" --output _site > deployment-result.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("deployment-result.json","utf8"));fs.appendFileSync(process.env.GITHUB_OUTPUT,`entry=${r.versionedEntry}\nmanifest_sha256=${r.manifestSha256}\n`)'
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Report immutable deployment
+        shell: bash
+        run: |
+          echo "Deployment SHA: ${{ needs.build.outputs.deployment_sha }}"
+          echo "Versioned entry: ${{ needs.build.outputs.versioned_entry }}"
+          echo "Manifest SHA-256: ${{ needs.build.outputs.manifest_sha256 }}"
