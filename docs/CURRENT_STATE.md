@@ -1,5 +1,16 @@
 # Current State
 
+## V5.5B-6G Real-Player Calibration Repair Foundation Activated (2026-08-15)
+
+- Immutable deployment integrity is **PASS** for target `7130399b4162989e5b1f6ed893e3158f2e411b23` through trusted workflow run `31906306902`: the 120-file manifest verified, the immutable module graph passed, and the prior mixed-version defect was absent.
+- Hosted inspection performance is **PASS** for the 10,363-player population. Inspection advanced `NOT_LOADED -> LOADING -> READY`, reported 21,832 ms application duration, completed in approximately 22.4 seconds, and completed a clean retry in approximately 28 seconds while the browser remained responsive and the console stayed clean.
+- Pages restoration succeeded and normal Pages serves main commit `a60ce3455b6da5077f5e799307112f36fc6ab6e5`.
+- Real-player calibration is **`CALIBRATION_REQUIRED`** because of six demonstrated structural defects: archetype collapse, unresolved persisted Statcast inputs, blank Prospect Opportunity Cost, missing-evidence composite inflation, potential Age/Trajectory dominance, and reliever confidence suppression.
+- The active task is **V5.5B-6G Real-Player Calibration Repair Foundation**, ordered as: archetype/context classification; canonical Statcast resolution; Prospect Opportunity Cost verification; missing-evidence sufficiency; deterministic fixtures; then age/trajectory and reliever review; and only then possible weight review.
+- Repairs must be generic and evidence-based. Named players are regression examples only and cannot authorize special cases or preferred-rank tuning.
+- Preferred implementation slices are V5.5B-6G1 archetype classification, V5.5B-6G2 Statcast canonical input resolution, V5.5B-6G3 evidence sufficiency/composite missingness, and V5.5B-6G4 post-repair real-player recalibration. Each later slice requires evidence from the preceding work.
+- V5.5C remains **BLOCKED** until post-repair immutable hosted acceptance produces a new calibration decision. Player Intelligence persistence, production refreshes/imports, identity/ownership/roster changes, Engine 5.1.1 recalculation, and unreviewed schema changes remain unauthorized.
+
 ## V5.5B-6F Trusted Deployment Workflow Activated (2026-08-15)
 
 - V5.5B-6E immutable module-graph implementation is checkpointed at `bbf9369213b7eb4606c63c7541369a7d7e0d8c6a`. The registration blocker and trust-boundary review are checkpointed through `797c9de10a1897f380ed07142fc693fa75718c88`.

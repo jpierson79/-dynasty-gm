@@ -1,112 +1,82 @@
-# Next Task: V5.5B-6F Trusted Default-Branch Deployment Workflow
+# Next Task: V5.5B-6G Real-Player Calibration Repair Foundation
 
 ## Status and authority
 
-- V5.5B-6E immutable module-graph implementation is checkpointed at `bbf9369213b7eb4606c63c7541369a7d7e0d8c6a`.
-- V5.5B-6F registration review is checkpointed at `797c9de10a1897f380ed07142fc693fa75718c88` with classification `REGISTRATION_ARCHITECTURE_REQUIRES_REVIEW`.
-- Proven defects are `MAIN_PUSH_WOULD_DEPLOY` and `TARGET_CODE_ENTERS_PAGES_TRUST_BOUNDARY`.
-- Calibration remains `REAL_PLAYER_ACCEPTANCE_REQUIRED`; V5.5C remains blocked.
-- This task authorizes local feature-branch implementation and validation only. It does not authorize modifying main, deploying, or retrying calibration.
+- Immutable deployment integrity and hosted inspection performance have passed for exact application target `7130399b4162989e5b1f6ed893e3158f2e411b23`.
+- Real-player calibration is `CALIBRATION_REQUIRED`; V5.5C remains blocked.
+- V5.5B-6G is local implementation first. It does not authorize deployment, production writes, imports, refreshes, persistence, score recalculation, identity/ownership/roster changes, or V5.5C activation.
 
 ## Objective
 
-Design and implement the minimum trusted deployment infrastructure whose security model is:
+Repair the generic evidence-resolution and calibration defects demonstrated by the 10,363-player real population without changing Engine 5.1.1 or tuning for named players. Preserve canonical UUID/MLBAM identities, missing-data semantics, league scoping, empirical replacement logic, and explainable component evidence.
 
-```text
-TRUSTED MAIN WORKFLOW
-  + TRUSTED MAIN PACKAGER
-  + TARGET SHA AS STATIC INPUT ONLY
-```
+## Required repair order
 
-The target application commit must never execute code merely because it is being packaged.
+Work must proceed in this order and stop when evidence contradicts the next step:
 
-## Workflow and privilege contract
+1. Repair archetype and context classification.
+2. Repair canonical persisted Statcast evidence resolution.
+3. Verify whether Prospect Opportunity Cost becomes populated for correctly classified prospects.
+4. Repair missing-evidence and zero-confidence composite inflation with a generic evidence-sufficiency rule.
+5. Rerun deterministic calibration fixtures.
+6. Only then assess Age/Trajectory dominance.
+7. Only then assess reliever confidence suppression.
+8. Only then consider any composite-weight adjustment.
 
-1. The acceptance workflow must use `workflow_dispatch` only. It must not contain a push-to-main trigger, so registering or updating it on main cannot deploy Pages.
-2. Code executed with `pages: write` or `id-token: write` must come only from trusted default-branch deployment infrastructure.
-3. Prefer an explicit full 40-character target SHA input. If a ref is accepted for convenience, resolve it once to an exact SHA before packaging and use only that resolved SHA afterward.
-4. The resolved SHA must drive the separate target checkout, `/v5-builds/<sha>/` directory, trusted manifest commit identity, and acceptance evidence.
-5. Keep trusted infrastructure and target input in separate directories. The workflow must preserve its main-sourced packager while checking the target SHA into a separate static-input directory.
-6. Never import, invoke, source, or otherwise execute target-provided scripts, hooks, package lifecycle code, workflow code, or equivalent executable deployment tooling.
+Do not skip directly to weights or bundle speculative weight tuning into the early repair slices.
 
-## Trusted packager contract
+## V5.5B-6G1: Archetype Classification Repair
 
-Implement a main-suitable trusted packager accepting only:
+Diagnose why 6,162 players were classified `YOUNG_MLB_OR_RECENT_CALLUP` while both `NEAR_MLB_PROSPECT` and `DISTANT_PROSPECT` had zero players. Use canonical MLB/MiLB status, level, roster status, promotion/recent-call-up evidence, missing-context fallback, and reviewed archetype precedence.
 
-- target directory;
-- exact resolved target SHA; and
-- output directory.
+- Do not classify from player names, HKB ranks, or arbitrary age thresholds.
+- Preserve conservative unknown behavior when authoritative context is missing.
+- Cover MLB veterans, young MLB players, recent call-ups, near-MLB hitters and pitchers, distant hitters and pitchers, missing context, and retired/inactive players where relevant.
 
-It may copy approved static application content, statically parse JavaScript, construct the immutable V5 tree, validate the module graph, hash actual emitted bytes, and generate trusted deployment metadata. It must not execute target JavaScript or accept a target-supplied manifest as integrity evidence.
+## V5.5B-6G2: Statcast Canonical Input Repair
 
-Define an explicit target-content allowlist containing only the required hosted application files: the V5 static application tree and each shared root static dependency proven necessary. Exclude `.git`, tests, documentation unrelated to the hosted application, local tooling, arbitrary scripts, repository-only configuration, and secrets.
+Determine why inspection reported 100% missing Statcast despite persisted coverage. Inspect source value/casing, metric type, season, league scope, MLBAM-to-UUID resolution, reviewed aliases, hitter/pitcher selection, freshness filters, and the optimized UUID index.
 
-## Path and input safety
+- Consume existing persisted evidence before considering any refresh.
+- Never fabricate metrics or guess identity.
+- Keep hitter and pitcher contexts separate.
+- Prove known hitter and pitcher UUIDs resolve `AVAILABLE`, missing evidence remains `UNAVAILABLE`, reviewed aliases are bounded, and indexing does not drop valid rows.
 
-Treat the target checkout as untrusted input. Fail closed on:
+## Prospect Opportunity Cost verification
 
-- `..` traversal or absolute target/output paths;
-- input paths outside the resolved target root;
-- generated paths escaping the output/deployment root;
-- symlinks or junctions escaping the target root;
-- unsupported file types or missing required static files;
-- malformed or non-full target SHAs; and
-- any attempt by target content to override generated deployment evidence.
+Treat blank Prospect Opportunity Cost as potentially downstream from the zero-prospect defect. After archetype repair, verify the accepted formula against canonical prospect populations before proposing formula changes.
 
-Adopt and test an explicit symlink policy. The preferred policy is rejection of symlinks and junctions in copied input.
+## V5.5B-6G3: Evidence Sufficiency and Composite Missingness Repair
 
-## Module and manifest invariants
+Prevent extreme missingness from raising a player through renormalization of the few remaining components. Define a generic, archetype-aware sufficiency boundary using reviewed approaches such as minimum usable evidence, confidence-adjusted shrinkage, bounded outcomes, or `INSUFFICIENT_EVIDENCE`.
 
-Preserve all V5.5B-6E guarantees:
+- Missing production remains missing, never numeric zero.
+- Missing Statcast lowers confidence.
+- Partial evidence remains usable when sufficient.
+- Prospects without MLB production are not treated as zero-production MLB players.
+- A zero-confidence player cannot rank as elite solely because missing components were omitted.
 
-- immutable `/v5-builds/<exact-target-sha>/` namespace;
-- complete required V5 and shared static dependency graph;
-- every local V5 import remains within the same SHA namespace;
-- no mutable `/v5/...` or `/js/...` JavaScript fallback;
-- named-import contracts resolve, including `finishAutomatedStatcastJob` from `importJobRepository.js`;
-- emitted-byte SHA-256 values match the trusted manifest; and
-- different SHAs produce different non-colliding paths.
+## Deferred calibration review
 
-The trusted packager, not target content, generates the manifest from emitted bytes. The manifest must include exact target SHA, emitted paths, and SHA-256 hashes.
+After G1-G3 and deterministic fixtures pass, rerun the demonstrated population and pairwise cases. Assess Age/Trajectory only if it still structurally overwhelms current value across populations. Assess reliever confidence only after Statcast resolution is repaired; do not add a closer bonus because canonical Fantrax production already contains league saves/holds value.
 
-## Minimum main installation boundary
+Named players from acceptance, including Sal Stewart, Manny Machado, Juan Soto, Ronald Acuna Jr., Francisco Lindor, and Brice Turang, are regression examples only. No branch, threshold, formula, or weight may target a named player or force a preferred ordering.
 
-During local implementation, determine and document the smallest future main file set, expected to be the dispatch-only workflow and trusted packager only. Do not copy Player Intelligence application code, feature documentation, unrelated tests, or application changes to main.
+## Suggested slicing
 
-Sequence is mandatory:
+- V5.5B-6G1: Archetype Classification Repair
+- V5.5B-6G2: Statcast Canonical Input Repair
+- V5.5B-6G3: Evidence Sufficiency / Composite Missingness Repair
+- V5.5B-6G4: Post-Repair Real-Player Recalibration
 
-1. implement locally on `feature/manager-intelligence`;
-2. run focused security/integrity tests and the required broader suite;
-3. stop for architect review;
-4. checkpoint the approved feature implementation;
-5. obtain separate authorization for file-level installation on main;
-6. verify registration produces no deployment side effect; and
-7. only then schedule immutable hosted acceptance.
+Create a later slice only when evidence from the prior slice justifies it.
 
-## Required regression coverage
+## Real-player acceptance gate
 
-Prove:
+After repairs are implemented, reviewed, checkpointed, and deployed through the trusted immutable path, rerun real-player calibration. Acceptance must demonstrate meaningful near-MLB and distant prospect populations, nonzero Statcast coverage where persisted evidence exists, populated Underlying Skill and applicable Prospect Opportunity Cost, no elite inflation of zero-confidence/missing-production rows, justified Age/Trajectory behavior, and reliever confidence reassessed after evidence repair.
 
-1. workflow is dispatch-only and has no push-to-main trigger;
-2. target input resolves to an exact full SHA;
-3. trusted packager source remains separate from the target checkout;
-4. target scripts are never executed;
-5. target and trusted roots are separate;
-6. traversal, absolute paths, escaping symlinks/junctions, and output-root escape are rejected;
-7. the target allowlist excludes repository/tooling content;
-8. namespace and manifest use the exact target SHA;
-9. the trusted packager generates and controls the manifest;
-10. a target-supplied manifest cannot override trusted evidence;
-11. the emitted module graph remains commit-coherent;
-12. named imports and the Statcast finalizer contract resolve;
-13. mutable module fallbacks are rejected;
-14. different SHAs produce distinct paths; and
-15. registering the workflow cannot itself deploy Pages.
+Only that acceptance may return `PASS` or retain `CALIBRATION_REQUIRED`. Until then, V5.5C remains blocked.
 
-Run focused workflow, packaging, path-security, manifest, module-graph, startup/import-contract, architecture, auth, Statcast, Data Health, and Player Intelligence inspection regressions; then the complete `tests/*.test.mjs` suite, JavaScript syntax checks, deterministic reproducibility checks, and `git diff --check`.
+## Safety boundaries
 
-## Semantic and operational boundaries
-
-Do not modify Player Intelligence, Engine 5.1.1, Statcast or Fantrax behavior, authentication, Data Health, application semantics, identity, ownership, roster state, metrics, scores, schema, or migrations. Do not deploy, modify main, retry calibration, access production application data, run imports/refreshes/synchronization, persist data, or implement V5.5C.
-
-Update `docs/NEXT_TASK_RESULT.md` with the trust architecture, exact main file set, security evidence, tests, files changed, and remaining installation/hosted-acceptance gates. Stop uncommitted for architect review unless separately authorized to checkpoint.
+Do not persist Player Intelligence, alter Fantrax production, refresh Statcast to mask a read defect, modify MLBAM identity, ownership, or rosters, recalculate Engine 5.1.1, create a migration without a separately proven and reviewed schema deficiency, or activate V5.5C.
