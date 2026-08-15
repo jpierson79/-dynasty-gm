@@ -11,7 +11,7 @@ const SCORE_COLUMNS={
   breakout_probability:"breakout_score",
   overall_score:"gm_score"
 };
-const PLAYER_COLUMNS="id,league_id,name,fantrax_id,mlbam_id,age,positions,mlb_team,owner_team_id,roster_status,is_free_agent,hkb_value,teams:owner_team_id(id,name,abbreviation)";
+const PLAYER_COLUMNS="id,league_id,name,fantrax_id,mlbam_id,age,positions,mlb_team,owner_team_id,roster_status,is_minor_leaguer,is_free_agent,hkb_value,current_level,level_source,level_availability,level_observed_at,level_raw_evidence,teams:owner_team_id(id,name,abbreviation)";
 const SCORE_SELECT=`id,league_id,player_id,score_version,gm_score,breakout_score,championship_impact,scarcity_score,trade_liquidity,market_appreciation,risk_score,dynasty_asset_score,roster_pressure_score,explanation,calculated_at,players!inner(${PLAYER_COLUMNS})`;
 
 function num(value){

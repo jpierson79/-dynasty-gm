@@ -23,7 +23,7 @@ try{
   const output=path.join(temp,"output");
   const result=await packageV5Deployment({targetRoot:target,targetSha:sha,outputRoot:output});
   const manifest=JSON.parse(await readFile(result.manifestPath,"utf8"));
-  assert.equal(manifest.commit,sha); assert.equal(result.graph.modules.length,102);
+  assert.equal(manifest.commit,sha); assert.equal(result.graph.modules.length,103);
   for(const denied of [".git",".github","tests","docs","scripts","node_modules"]) assert.equal(manifest.files.some(file=>file.path===denied||file.path.startsWith(`${denied}/`)),false);
   await writeFile(path.join(target,"v5","integrity-manifest.json"),'{"commit":"malicious"}\n');
   const replaced=await packageV5Deployment({targetRoot:target,targetSha:sha,outputRoot:path.join(temp,"replaced")});
