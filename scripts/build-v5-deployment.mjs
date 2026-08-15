@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +8,7 @@ const LOCAL_SPECIFIER = /^(?:\.\.?\/)/;
 const MUTABLE_LOCAL_SPECIFIER = /^\/(?:v5|js)\//;
 const STATIC_IMPORT = /\b(?:import\s+(?:[^'";]+?\s+from\s+)?|export\s+(?:\*|\{[^}]*\})\s+from\s+)["']([^"']+)["']/g;
 const NAMED_IMPORT = /\bimport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
+const APPROVED_STATIC_EXTENSIONS = new Set([".css", ".html", ".js"]);
 
 function slash(value) { return value.split(path.sep).join("/"); }
 function assertCommit(commit) {
@@ -51,6 +51,22 @@ async function walkFiles(root) {
   }
   await walk(root);
   return files.sort((a, b) => slash(path.relative(root, a)).localeCompare(slash(path.relative(root, b))));
+}
+function inside(root, target) { const relative = path.relative(root, target); return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative)); }
+async function copyStaticTree(sourceRoot, relative, destinationRoot) {
+  if (["AGENTS.md", "integrity-manifest.json"].includes(path.basename(relative))) return;
+  const source = path.resolve(sourceRoot, relative), destination = path.resolve(destinationRoot, relative);
+  if (!inside(sourceRoot, source) || !inside(destinationRoot, destination)) throw new Error(`Static path escapes approved root: ${relative}`);
+  const entry = await lstat(source);
+  if (entry.isSymbolicLink()) throw new Error(`Symbolic links and junctions are prohibited: ${relative}`);
+  if (entry.isDirectory()) {
+    await mkdir(destination, { recursive: true });
+    for (const child of await readdir(source)) await copyStaticTree(sourceRoot, path.join(relative, child), destinationRoot);
+  } else if (entry.isFile()) {
+    if (!APPROVED_STATIC_EXTENSIONS.has(path.extname(relative).toLowerCase())) throw new Error(`Unsupported static file type: ${relative}`);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await copyFile(source, destination);
+  } else throw new Error(`Unsupported static input type: ${relative}`);
 }
 async function moduleEntry(versionRoot) {
   const htmlFile = path.join(versionRoot, "v5", "index.html");
@@ -96,16 +112,19 @@ function redirectHtml({ commit, target, title }) {
   return `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width,initial-scale=1">\n  <meta http-equiv="refresh" content="0;url=${escapedTarget}">\n  <title>${title}</title>\n</head>\n<body>\n  <p>Deployment <code>${commit}</code></p>\n  <p><a href="${escapedTarget}">Open Dynasty Front Office V5</a></p>\n  <script>location.replace(${JSON.stringify(target)});</script>\n</body>\n</html>\n`;
 }
 
-export async function packageV5Deployment({ sourceRoot, outputRoot, commit }) {
-  const deploymentCommit = assertCommit(commit);
-  const resolvedSource = path.resolve(sourceRoot), resolvedOutput = path.resolve(outputRoot);
+export async function packageV5Deployment({ targetRoot, sourceRoot, outputRoot, targetSha, commit }) {
+  const deploymentCommit = assertCommit(targetSha || commit);
+  const resolvedSource = path.resolve(targetRoot || sourceRoot), resolvedOutput = path.resolve(outputRoot);
+  const sourceInfo = await lstat(resolvedSource);
+  if (!sourceInfo.isDirectory() || sourceInfo.isSymbolicLink()) throw new Error("Target root must be a real directory, not a link.");
+  if (inside(resolvedSource, resolvedOutput)) throw new Error("Output root must be separate from untrusted target input.");
   const versionRoot = path.join(resolvedOutput, "v5-builds", deploymentCommit);
   await rm(resolvedOutput, { recursive: true, force: true });
   await mkdir(resolvedOutput, { recursive: true });
-  for (const name of ["index.html", "css", "js"]) await cp(path.join(resolvedSource, name), path.join(resolvedOutput, name), { recursive: true });
+  for (const name of ["index.html", "css", "js"]) await copyStaticTree(resolvedSource, name, resolvedOutput);
   await mkdir(versionRoot, { recursive: true });
-  await cp(path.join(resolvedSource, "v5"), path.join(versionRoot, "v5"), { recursive: true });
-  await cp(path.join(resolvedSource, "js"), path.join(versionRoot, "js"), { recursive: true });
+  await copyStaticTree(resolvedSource, "v5", versionRoot);
+  await copyStaticTree(resolvedSource, "js", versionRoot);
   await writeFile(path.join(versionRoot, "index.html"), redirectHtml({ commit: deploymentCommit, target: "./v5/index.html", title: "Dynasty Front Office V5 deployment" }), "utf8");
   await writeFile(path.join(versionRoot, "deployment.json"), `${JSON.stringify({ commit: deploymentCommit, entry: "v5/index.html" }, null, 2)}\n`, "utf8");
   await mkdir(path.join(resolvedOutput, "v5"), { recursive: true });
@@ -123,8 +142,7 @@ export async function packageV5Deployment({ sourceRoot, outputRoot, commit }) {
 
 function argument(name) { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] : ""; }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const sourceRoot = path.resolve(argument("--source") || path.join(path.dirname(fileURLToPath(import.meta.url)), ".."));
-  const outputRoot = path.resolve(argument("--output") || path.join(sourceRoot, ".pages-dist"));
-  const commit = argument("--commit") || process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD"], { cwd: sourceRoot, encoding: "utf8" }).trim();
-  process.stdout.write(`${JSON.stringify(await packageV5Deployment({ sourceRoot, outputRoot, commit }), null, 2)}\n`);
+  const targetRoot = argument("--target-root"), outputRoot = argument("--output-root"), targetSha = argument("--target-sha");
+  if (!targetRoot || !outputRoot || !targetSha) throw new Error("--target-root, --target-sha, and --output-root are required.");
+  process.stdout.write(`${JSON.stringify(await packageV5Deployment({ targetRoot, outputRoot, targetSha }), null, 2)}\n`);
 }

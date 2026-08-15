@@ -1,20 +1,12 @@
 name: Deploy immutable GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
-      deployment_ref:
-        description: Exact branch, tag, or commit to package for temporary acceptance
-        required: false
+      target_sha:
+        description: Exact 40-character commit SHA to package
+        required: true
         type: string
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -22,27 +14,41 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       deployment_sha: ${{ steps.identity.outputs.sha }}
       versioned_entry: ${{ steps.package.outputs.entry }}
       manifest_sha256: ${{ steps.package.outputs.manifest_sha256 }}
     steps:
-      - name: Check out selected deployment
+      - name: Check out trusted deployment infrastructure
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.deployment_ref || github.sha }}
-      - name: Resolve exact deployment identity
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          persist-credentials: false
+      - name: Validate requested target identity
         id: identity
         shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+        run: |
+          requested='${{ inputs.target_sha }}'
+          [[ "$requested" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "target_sha must be a full commit SHA" >&2; exit 1; }
+          echo "sha=${requested,,}" >> "$GITHUB_OUTPUT"
+      - name: Check out target as static input
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.identity.outputs.sha }}
+          path: target
+          persist-credentials: false
+      - name: Verify target checkout identity
+        shell: bash
+        run: test "$(git -C target rev-parse HEAD)" = "${{ steps.identity.outputs.sha }}"
       - name: Package immutable V5 deployment
         id: package
         shell: bash
         run: |
-          node scripts/build-v5-deployment.mjs --commit "${{ steps.identity.outputs.sha }}" --output _site > deployment-result.json
+          node trusted/scripts/build-v5-deployment.mjs --target-root target --target-sha "${{ steps.identity.outputs.sha }}" --output-root _site > deployment-result.json
           node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("deployment-result.json","utf8"));fs.appendFileSync(process.env.GITHUB_OUTPUT,`entry=${r.versionedEntry}\nmanifest_sha256=${r.manifestSha256}\n`)'
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -50,6 +56,9 @@ jobs:
           path: _site
 
   deploy:
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
