@@ -1,5 +1,15 @@
 # Current State
 
+## V5.5B-6G0B Prospect Level Protected Baseline Profile Activated (2026-08-15)
+
+- V5.5B-6G0 is checkpointed. Migration 014 remains unapplied, additive, and scoped to five prospect-level evidence columns.
+- V5.5B-6G0A stopped safely before migration, schema verification, provider collection, preview, population writes, Data Health, or canonical-input checks because no canonical prospect-level-population protected-baseline profile exists. The blocker evidence is checkpointed.
+- The active task is **V5.5B-6G0B Prospect Level Protected Baseline Profile**. Its proposed provider-neutral profile is `PROSPECT_LEVEL_POPULATION`.
+- The future profile must derive its exact allowed set from Migration 014: `current_level`, `level_source`, `level_availability`, `level_observed_at`, and `level_raw_evidence`. `is_minor_leaguer` remains protected. Whether `updated_at` is protected or expected mutable must be proven from the canonical write path; protection is preferred.
+- Baseline capture must work before Migration 014 is applied, separate protected player evidence from expected-mutable evidence, protect scores/metrics/teams/managers/settings and all other domains, use normal authenticated league-scoped RLS, and preserve fail-closed comparison states.
+- Existing `STRICT`, `MLBAM_BACKFILL`, `STATCAST_REFRESH`, and `FANTRAX_PRODUCTION_IMPORT` semantics remain independent and unchanged.
+- Calibration remains **`CALIBRATION_REQUIRED`**. G1 remains **`BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`** and V5.5C remains **BLOCKED**. After G0B is validated, reviewed, and checkpointed, G0A may restart.
+
 ## V5.5B-6G0 Prospect Level Evidence Foundation Activated (2026-08-15)
 
 - V5.5B-6G1 stopped before editing with status **`BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`**, not failed.

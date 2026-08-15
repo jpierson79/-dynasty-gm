@@ -1,81 +1,81 @@
-# Next Task: V5.5B-6G0 Prospect Level Evidence Foundation
+# Next Task: V5.5B-6G0B Prospect Level Protected Baseline Profile
 
 ## Status and authority
 
-- V5.5B-6G remains active, calibration is `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
-- V5.5B-6G1 Archetype Classification Repair is `BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`, not failed.
-- This task is a local evidence-foundation implementation. It does not authorize deployment, production/cloud access, provider refreshes, imports, Player Intelligence persistence, Engine 5.1.1 changes, identity/ownership/roster changes, or V5.5C activation.
-
-## Proven blocker
-
-The Player Intelligence repository omits `players.is_minor_leaguer`. Canonical input receives it as missing, converts it to false, and lets young players fall through to the age-based `YOUNG_MLB_OR_RECENT_CALLUP` rule.
-
-The schema stores only the minor-leaguer boolean and no authoritative competitive level. Existing import behavior collapses level/minors/prospect source evidence into that boolean, while canonical Player Intelligence exposes null level and readiness. The application therefore cannot safely distinguish AAA/AA from A+/A/Rookie/Complex/DSL.
-
-Do not apply a partial G1 fix that merely loads `is_minor_leaguer`. G0 must establish level evidence first.
+- V5.5B-6G0 is checkpointed. V5.5B-6G0A stopped safely before writes because no operation-specific protected-baseline profile exists.
+- Migration 014 remains unapplied. V5.5B-6G1 remains `BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
+- This task is local implementation and validation only. It does not authorize migration application, deployment, provider collection, production/cloud access, imports, prospect-level population, Player Intelligence persistence, Engine 5.1.1 changes, or identity/ownership/roster changes.
 
 ## Objective
 
-Create an authoritative, provider-neutral foundation for:
+Implement a provider-neutral protected-baseline profile named `PROSPECT_LEVEL_POPULATION` for the future authenticated, league-scoped prospect-level population operation. The profile proves mutation boundaries only; it must not apply Migration 014, collect or normalize provider data, or write prospect-level evidence.
 
-- minor-league status;
-- current competitive level;
-- level evidence source;
-- source timestamp and freshness where available;
-- availability and unknown state; and
-- raw provider evidence needed for audit.
+Do not overload or weaken `STRICT`, `MLBAM_BACKFILL`, `STATCAST_REFRESH`, or `FANTRAX_PRODUCTION_IMPORT`.
 
-This foundation must let the later G1 classifier distinguish near-MLB and distant prospects without inference from age, HKB, production, Statcast, name, or reputation.
+## Authoritative player-field contract
 
-## Source and provider review
+Derive and test the allowed field set directly from `supabase/migrations/014_prospect_level_evidence.sql`. The exact Migration 014 fields are:
 
-Trace the complete accepted path from source to raw evidence, normalizer, repository, and canonical Player Intelligence input before selecting a storage or collection design.
+- `current_level`
+- `level_source`
+- `level_availability`
+- `level_observed_at`
+- `level_raw_evidence`
 
-1. Inspect accepted MLB Stats API capabilities first for authoritative MLB/MiLB organization, roster, and level evidence.
-2. Inspect current Fantrax exports and accepted import paths for explicit level evidence already present but discarded. Do not force Fantrax to provide level if reviewed data does not contain it.
-3. Prefer preserving and normalizing existing factual raw evidence over adding a new provider.
-4. Do not introduce another provider without separate evidence and architectural review.
-5. Never use credentials, names, fuzzy matching, HKB rankings, Fantrax FPts, Statcast values, age, or prospect reputation as level authority.
+Do not include `is_minor_leaguer`; Migration 014 does not authorize it for mutation.
 
-## Canonical level contract
+Determine whether the canonical repository/database update path unavoidably changes `updated_at`. Return exactly one implementation decision in the result:
 
-Derive a provider-neutral vocabulary from actual reviewed provider values and repository conventions. Candidate concepts include MLB, AAA, AA, A+, A, Rookie, Complex, DSL, inactive, and unknown, but do not adopt enum names or mappings blindly.
+- `UPDATED_AT_PROTECTED`; or
+- `UPDATED_AT_EXPECTED_MUTABLE` with the proven mechanism requiring it.
 
-Canonical evidence must expose factual equivalents of:
+Prefer `UPDATED_AT_PROTECTED`. Do not allow it merely for convenience.
 
-- `isMinorLeaguer`;
-- `currentLevel`;
-- `levelSource`;
-- `levelAvailability`;
-- `levelFreshness`; and
-- bounded raw source evidence for diagnostics.
+Every other player field remains protected, including UUID and external identities, name, position, age, minor-leaguer boolean, organization/team data, ownership, roster/free-agent state, scoring/market data, provider identities, and unrelated timestamps.
 
-Absent level remains `UNKNOWN` or null. It must not become MLB, near-MLB, or distant prospect.
+## Protected domains
 
-Restore `players.is_minor_leaguer` through the canonical repository/input path, while preserving the distinction between the boolean minor-league state and specific level evidence.
+Fully hash and protect calculated player scores, all player metrics, teams, managers, league settings, ownership and roster state, identities, Fantrax data, Statcast data, and HKB data. No metric partition is expected mutable.
 
-## Schema review
+## Pre-migration capture
 
-Determine explicitly whether existing storage can represent canonical level, source, freshness, availability, and audit evidence safely.
+The before baseline must be capturable before Migration 014 exists in production. Hash existing protected player fields without querying absent Migration 014 columns as protected data. Represent the expected-mutable partition's absent schema state deterministically without inventing field values. Capture scores, metrics, teams, managers, and other protected domains normally.
 
-If a schema addition is proven necessary, propose the smallest additive migration. It must be non-destructive, narrowly scoped, RLS-safe, preserve stable `players.id` UUIDs and all external identities, and make no ownership or roster rewrite. Migration creation, application, deployment, and production backfill require the authority stated by the future implementation task and subsequent architect gates.
+Logically separate protected player evidence from expected-mutable prospect-level evidence. After migration and a future population operation, exact allowed-field changes may produce `EXPECTED_MUTATION`; any protected change produces `CHANGED`, overriding simultaneous expected mutation.
 
-## Boundaries with G1
+## Comparison and determinism
 
-G0 supplies factual evidence; it does not choose final archetype weights or repair composite scoring. G1 remains responsible for centralized classification precedence and the reviewed mapping from canonical levels to `NEAR_MLB_PROSPECT` and `DISTANT_PROSPECT`.
+Preserve the fail-closed states `UNCHANGED`, `EXPECTED_MUTATION`, `CHANGED`, `UNAVAILABLE`, `PERMISSION_BLOCKED`, and `QUERY_FAILED`. Unreliable protected reads cannot report success.
 
-Do not classify archetypes in G0 except where a narrow fixture is required to prove the input contract. Do not repair Statcast resolution, missing-evidence composite inflation, age/trajectory dominance, reliever confidence, or Prospect Opportunity Cost formulas.
+Hashes must remain row-order independent, object-field-order independent, stable for nulls, and unaffected by capture time. Timestamps participate only when the profile contract explicitly includes them.
 
-## Required validation
+## Authentication, RLS, and routing
 
-Add deterministic coverage for MLB, AAA, AA, A+, A, Rookie/Complex, DSL, missing level, stale level, inactive state, provider alias normalization, minor-leaguer true with missing level, minor-leaguer false with MLB level, and unknown-state preservation.
+Capture remains authenticated, league-scoped, read-only, provider-neutral, and subject to normal Supabase RLS. No service role or privileged bypass is permitted.
 
-Prove age, HKB, Fantrax production, Statcast, and names cannot change level. Prove UUIDs and identity fields remain unchanged, canonical reads remain league scoped, missing values remain missing, and any preview/import boundary remains read-only until separately authorized persistence.
+If hosted acceptance needs a canonical UI action, route Prospect Level Population only to `PROSPECT_LEVEL_POPULATION`; expose no free-form profile selector. Preserve fixed routing for MLBAM, Statcast, and Fantrax Production and preserve `STRICT` unchanged.
 
-Run focused provider/normalization, repository, canonical-input, identity, architecture, and Player Intelligence foundation tests; then the complete `tests/*.test.mjs` suite, JavaScript syntax checks, and `git diff --check`.
+## Required tests
+
+Add deterministic coverage proving:
+
+1. the profile is registered;
+2. its exact allowed set matches Migration 014;
+3. the `updated_at` decision is explicit;
+4. identities, ownership, roster state, position, age, `is_minor_leaguer`, and unrelated player fields remain protected;
+5. scores, metrics, teams, managers, and league settings remain protected;
+6. only allowed level fields changing yields `EXPECTED_MUTATION`;
+7. any protected player/domain change yields `CHANGED`, including simultaneous allowed changes;
+8. deterministic ordering, object ordering, nulls, and hashes;
+9. capture works before the new columns exist;
+10. unavailable, permission-blocked, and query-failed reads remain fail-closed;
+11. all existing profiles retain their semantics; and
+12. fixed UI routing cannot be weakened or selected freely.
+
+Run focused protected-baseline/service/UI tests, existing profile regressions, architecture and auth tests, the complete `tests/*.test.mjs` suite, JavaScript syntax checks, and `git diff --check`.
 
 ## Completion gate
 
-Record the selected factual authority, canonical vocabulary and aliases, source/freshness model, storage decision, read/write boundaries, files changed, tests, and known limitations in `docs/NEXT_TASK_RESULT.md`. Stop for architect review before deployment, migration application, provider refresh, production backfill, or resuming G1 unless separately authorized.
+Record the profile implementation, exact allowed fields, `updated_at` decision, pre-migration capture design, protected partitions, routing, files changed, and exact validation results in `docs/NEXT_TASK_RESULT.md`. Stop for architect review before committing unless separately authorized.
 
-After G0 is locally validated, reviewed, and checkpointed, resume V5.5B-6G1, followed by G2 Statcast Canonical Input Repair, G3 Evidence Sufficiency / Missingness Repair, and G4 Real-Player Recalibration.
+After G0B is locally validated, reviewed, and checkpointed, resume V5.5B-6G0A Migration / Data Population Acceptance. Only accepted schema and data evidence may unblock G1.
