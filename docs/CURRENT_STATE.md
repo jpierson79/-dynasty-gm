@@ -1,5 +1,15 @@
 # Current State
 
+## V5.5B-6F Trusted Deployment Workflow Activated (2026-08-15)
+
+- V5.5B-6E immutable module-graph implementation is checkpointed at `bbf9369213b7eb4606c63c7541369a7d7e0d8c6a`. The registration blocker and trust-boundary review are checkpointed through `797c9de10a1897f380ed07142fc693fa75718c88`.
+- The accepted review classification is **`REGISTRATION_ARCHITECTURE_REQUIRES_REVIEW`**. The prior workflow would deploy on registration because it contained a main push trigger, and it executed target-provided packaging code with Pages/OIDC privileges.
+- Active task: **V5.5B-6F Trusted Default-Branch Deployment Workflow**. Required model: dispatch-only trusted main workflow, trusted main-sourced packager, and an exact target SHA checked out separately and treated only as static input.
+- The implementation must reject traversal and escaping links, use an explicit hosted-content allowlist, generate its own manifest from emitted bytes, preserve the immutable module-graph guarantees, and never execute target scripts.
+- Local feature implementation and validation must precede architect review and a separately authorized minimal file-level main installation. Registering the eventual workflow must not deploy Pages.
+- Pages remains source `main`, path `/`, status `built`, at `df89840de0ea8563968b99b7acc75b528e02983f`. Calibration remains **`REAL_PLAYER_ACCEPTANCE_REQUIRED`** and V5.5C remains **`BLOCKED`**.
+- No deployment, main modification, calibration retry, production/data access, import, refresh, persistence, synchronization, application/model change, or migration is authorized during activation.
+
 ## V5.5B-6E Activated (2026-08-14)
 
 - V5.5B-6D Hosted Module Integrity Diagnosis is complete at commit `00fef1770d066101be2a34c5b502a790b06a531a` with classification **`MIXED_VERSION_MODULE_GRAPH_CONFIRMED`** and retained feature artifact result **`ARTIFACT_MATCHES_COMMIT`**.

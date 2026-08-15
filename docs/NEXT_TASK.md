@@ -1,104 +1,112 @@
-# Next Task: V5.5B-6E Deployment Module-Graph Integrity Repair
+# Next Task: V5.5B-6F Trusted Default-Branch Deployment Workflow
 
 ## Status and authority
 
-- V5.5B-6D is complete at diagnosis commit `00fef1770d066101be2a34c5b502a790b06a531a`.
-- Accepted diagnosis: `MIXED_VERSION_MODULE_GRAPH_CONFIRMED`.
-- Retained Pages artifact result: `ARTIFACT_MATCHES_COMMIT` for feature commit `7130399b4162989e5b1f6ed893e3158f2e411b23` after line-ending normalization.
+- V5.5B-6E immutable module-graph implementation is checkpointed at `bbf9369213b7eb4606c63c7541369a7d7e0d8c6a`.
+- V5.5B-6F registration review is checkpointed at `797c9de10a1897f380ed07142fc693fa75718c88` with classification `REGISTRATION_ARCHITECTURE_REQUIRES_REVIEW`.
+- Proven defects are `MAIN_PUSH_WOULD_DEPLOY` and `TARGET_CODE_ENTERS_PAGES_TRUST_BOUNDARY`.
 - Calibration remains `REAL_PLAYER_ACCEPTANCE_REQUIRED`; V5.5C remains blocked.
-- This task authorizes local deployment-integrity implementation only. Deployment and calibration remain separately gated.
+- This task authorizes local feature-branch implementation and validation only. It does not authorize modifying main, deploying, or retrying calibration.
 
 ## Objective
 
-Guarantee architecturally that one hosted V5 session cannot assemble JavaScript modules from more than one deployment version. Replace mutable cross-deployment module identity with a deterministic, inspectable, immutable deployment namespace without changing application behavior.
-
-## Required architecture
-
-Prefer immutable commit-versioned static asset paths, conceptually:
+Design and implement the minimum trusted deployment infrastructure whose security model is:
 
 ```text
-/v5-builds/<commit-sha>/index.html
-/v5-builds/<commit-sha>/js/main.js
-/v5-builds/<commit-sha>/js/services/...
-/v5-builds/<commit-sha>/js/repositories/...
-/v5-builds/<commit-sha>/js/views/...
+TRUSTED MAIN WORKFLOW
+  + TRUSTED MAIN PACKAGER
+  + TARGET SHA AS STATIC INPUT ONLY
 ```
 
-Preserve the V5 relative directory structure so every nested relative ES-module import remains within the same immutable `/v5-builds/<commit-sha>/` namespace. An equivalent immutable namespace is acceptable only when required by existing Pages packaging and proven equally coherent.
+The target application commit must never execute code merely because it is being packaged.
 
-Mutable asset URLs such as `/v5/js/main.js`, `/v5/js/services/foo.js`, and `/v5/js/repositories/bar.js` are unsafe across feature/main publications because caches can combine valid bytes from different commits. Immutable URLs may remain cacheable; commit identity makes cached bytes correct for that URL.
+## Workflow and privilege contract
 
-## Prohibited partial fixes
+1. The acceptance workflow must use `workflow_dispatch` only. It must not contain a push-to-main trigger, so registering or updating it on main cannot deploy Pages.
+2. Code executed with `pages: write` or `id-token: write` must come only from trusted default-branch deployment infrastructure.
+3. Prefer an explicit full 40-character target SHA input. If a ref is accepted for convenience, resolve it once to an exact SHA before packaging and use only that resolved SHA afterward.
+4. The resolved SHA must drive the separate target checkout, `/v5-builds/<sha>/` directory, trusted manifest commit identity, and acceptance evidence.
+5. Keep trusted infrastructure and target input in separate directories. The workflow must preserve its main-sourced packager while checking the target SHA into a separate static-input directory.
+6. Never import, invoke, source, or otherwise execute target-provided scripts, hooks, package lifecycle code, workflow code, or equivalent executable deployment tooling.
 
-- Do not rely only on `main.js?v=<commit>`. Native nested relative imports do not inherit the entry query token.
-- Do not manually edit version strings throughout source files for each deployment.
-- Do not version only selected modules or allow nested imports to fall back to mutable `/v5` paths.
-- Do not rename, duplicate, or modify `finishAutomatedStatcastJob`; its source contract is valid.
+## Trusted packager contract
 
-If copying the complete V5 tree under an immutable root is infeasible, build-time rewriting/version propagation across every static import may be considered only with evidence that it is safer and complete.
+Implement a main-suitable trusted packager accepting only:
 
-## Deterministic packaging and entry point
+- target directory;
+- exact resolved target SHA; and
+- output directory.
 
-Implement deterministic packaging that:
+It may copy approved static application content, statically parse JavaScript, construct the immutable V5 tree, validate the module graph, hash actual emitted bytes, and generate trusted deployment metadata. It must not execute target JavaScript or accept a target-supplied manifest as integrity evidence.
 
-1. determines the exact deployment commit SHA;
-2. copies/builds the complete V5 static tree into the immutable version namespace;
-3. preserves relative module resolution within that namespace;
-4. generates an integrity manifest;
-5. publishes the exact static artifact; and
-6. routes the hosted entry to the selected versioned `index.html` without importing a versioned entry whose nested modules resolve to mutable paths.
+Define an explicit target-content allowlist containing only the required hosted application files: the V5 static application tree and each shared root static dependency proven necessary. Exclude `.git`, tests, documentation unrelated to the hosted application, local tooling, arbitrary scripts, repository-only configuration, and secrets.
 
-The hosted inspection surface must expose the exact deployment commit before calibration begins. A small generated root redirect/loader is permitted only if it selects one explicit immutable version and cannot mix module roots.
+## Path and input safety
 
-## Integrity manifest
+Treat the target checkout as untrusted input. Fail closed on:
 
-Generate deterministic deployment evidence containing at minimum:
+- `..` traversal or absolute target/output paths;
+- input paths outside the resolved target root;
+- generated paths escaping the output/deployment root;
+- symlinks or junctions escaping the target root;
+- unsupported file types or missing required static files;
+- malformed or non-full target SHAs; and
+- any attempt by target content to override generated deployment evidence.
 
-- exact deployment commit SHA;
-- emitted module path; and
-- SHA-256 of emitted bytes.
+Adopt and test an explicit symlink policy. The preferred policy is rejection of symlinks and junctions in copied input.
 
-Prioritize the complete V5 static dependency graph and make the manifest inspectable during hosted acceptance. It is deployment evidence, not a runtime scoring feature.
+## Module and manifest invariants
 
-## Static module-graph regression
+Preserve all V5.5B-6E guarantees:
 
-Add tooling/tests that walk or validate the emitted V5 static module graph and prove:
+- immutable `/v5-builds/<exact-target-sha>/` namespace;
+- complete required V5 and shared static dependency graph;
+- every local V5 import remains within the same SHA namespace;
+- no mutable `/v5/...` or `/js/...` JavaScript fallback;
+- named-import contracts resolve, including `finishAutomatedStatcastJob` from `importJobRepository.js`;
+- emitted-byte SHA-256 values match the trusted manifest; and
+- different SHAs produce different non-colliding paths.
 
-1. every named import resolves;
-2. every emitted module belongs to the selected deployment namespace;
-3. nested import resolution cannot fall back to mutable shared V5 asset URLs;
-4. no accidental unversioned cross-deployment import is introduced; and
-5. `main.js`, `statcastProviderService.js`, `importJobRepository.js`, and `playerIntelligenceInspectionService.js` match the same manifest/commit.
+The trusted packager, not target content, generates the manifest from emitted bytes. The manifest must include exact target SHA, emitted paths, and SHA-256 hashes.
 
-## Pages workflow and restoration
+## Minimum main installation boundary
 
-Preserve the approved ability to publish an exact feature artifact temporarily and restore GitHub Pages to the approved `main` application afterward. The workflow must make the deployed SHA, immutable namespace, integrity-manifest SHA, and restored SHA easy to verify. A feature acceptance deployment must never remain active after acceptance.
+During local implementation, determine and document the smallest future main file set, expected to be the dispatch-only workflow and trusted packager only. Do not copy Player Intelligence application code, feature documentation, unrelated tests, or application changes to main.
 
-## Hosted acceptance contract
+Sequence is mandatory:
 
-After local validation, architect review, and checkpointing, a separate hosted acceptance must verify:
+1. implement locally on `feature/manager-intelligence`;
+2. run focused security/integrity tests and the required broader suite;
+3. stop for architect review;
+4. checkpoint the approved feature implementation;
+5. obtain separate authorization for file-level installation on main;
+6. verify registration produces no deployment side effect; and
+7. only then schedule immutable hosted acceptance.
 
-- exact feature commit and immutable namespace;
-- integrity-manifest SHA and sampled module hashes;
-- coherent `main.js`, Statcast service, import-job repository, and Player Intelligence inspection service bytes;
-- no sampled module matches restored/older `main` bytes;
-- normal V5 startup completes; and
-- Pages restores to the approved `main` commit.
+## Required regression coverage
 
-Only after module integrity and startup pass may real-player calibration be retried. V5.5B-6E itself cannot produce calibration `PASS`.
+Prove:
 
-## Semantic invariants and boundaries
+1. workflow is dispatch-only and has no push-to-main trigger;
+2. target input resolves to an exact full SHA;
+3. trusted packager source remains separate from the target checkout;
+4. target scripts are never executed;
+5. target and trusted roots are separate;
+6. traversal, absolute paths, escaping symlinks/junctions, and output-root escape are rejected;
+7. the target allowlist excludes repository/tooling content;
+8. namespace and manifest use the exact target SHA;
+9. the trusted packager generates and controls the manifest;
+10. a target-supplied manifest cannot override trusted evidence;
+11. the emitted module graph remains commit-coherent;
+12. named imports and the Statcast finalizer contract resolve;
+13. mutable module fallbacks are rejected;
+14. different SHAs produce distinct paths; and
+15. registering the workflow cannot itself deploy Pages.
 
-Do not change Statcast collection/refresh behavior, import-job lifecycle, protected baselines, Player Intelligence formulas/weights/thresholds/archetypes/performance architecture, Fantrax behavior, Data Health semantics, authentication, league scoping, Engine 5.1.1, or production data semantics.
+Run focused workflow, packaging, path-security, manifest, module-graph, startup/import-contract, architecture, auth, Statcast, Data Health, and Player Intelligence inspection regressions; then the complete `tests/*.test.mjs` suite, JavaScript syntax checks, deterministic reproducibility checks, and `git diff --check`.
 
-Implementation may modify only deterministic static packaging/build tooling, GitHub Pages deployment workflow, immutable versioned paths, root/version-selection plumbing, integrity evidence, and static module-graph tests.
+## Semantic and operational boundaries
 
-Do not deploy, retry calibration, run imports or refreshes, persist Player Intelligence, modify `player_metrics` or `calculated_player_scores`, modify identity/ownership/roster state, implement waiver logic, or create migrations during the local implementation checkpoint.
+Do not modify Player Intelligence, Engine 5.1.1, Statcast or Fantrax behavior, authentication, Data Health, application semantics, identity, ownership, roster state, metrics, scores, schema, or migrations. Do not deploy, modify main, retry calibration, access production application data, run imports/refreshes/synchronization, persist data, or implement V5.5C.
 
-## Validation and handoff
-
-Run focused packaging, manifest, module-graph, startup-import, architecture, auth, Statcast, Data Health, and Player Intelligence inspection regressions; then the complete `tests/*.test.mjs` suite, relevant syntax checks, deterministic build reproducibility checks, and `git diff --check`.
-
-Update `docs/NEXT_TASK_RESULT.md` with emitted structure, deployment identity, manifest/hash evidence, graph validation, semantic-preservation evidence, tests, files, and remaining hosted acceptance. Stop uncommitted for architect review unless separately authorized to checkpoint.
-
-Sequence after implementation: local validation, architect review, checkpoint, exact immutable hosted deployment acceptance, coherent module/startup verification, real-player calibration retry, and only then a possible V5.5C unblock after calibration `PASS`.
+Update `docs/NEXT_TASK_RESULT.md` with the trust architecture, exact main file set, security evidence, tests, files changed, and remaining installation/hosted-acceptance gates. Stop uncommitted for architect review unless separately authorized to checkpoint.
