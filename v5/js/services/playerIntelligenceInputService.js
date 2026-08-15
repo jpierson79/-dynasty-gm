@@ -28,15 +28,25 @@ function chooseMetric(rows,{playerId,season,type}){
 function chooseProductionMetric(rows,{playerId,season}){
   return (rows||[]).filter(row=>row.player_id===playerId&&row.source===FANTRAX_SOURCE&&Number(row.season)===Number(season)&&row.metric_type===FANTRAX_PRODUCTION_TYPE).sort((a,b)=>String(b.imported_at||"").localeCompare(String(a.imported_at||"")))[0]||null;
 }
+export function buildPlayerMetricIndex(rows=[],season){
+  const byPlayerId=new Map();
+  for(const row of rows){
+    if(Number(row.season)!==Number(season)||![STATCAST_SOURCE,FANTRAX_SOURCE].includes(row.source))continue;
+    const current=byPlayerId.get(row.player_id)||{statcast_hitting:null,statcast_pitching:null,fantrax_league_production:null},previous=current[row.metric_type];
+    if(!previous||String(row.imported_at||"").localeCompare(String(previous.imported_at||""))>0)current[row.metric_type]=row;
+    byPlayerId.set(row.player_id,current);
+  }
+  return byPlayerId;
+}
 function leagueContext(league,season){const settings=league?.settings||{};return {leagueId:league?.id||null,name:league?.name||null,teamCount:league?.team_count??settings.teamCount??null,lineupSlots:settings.lineupSlots??settings.lineup_slots??null,rosterLimits:settings.rosterLimits??settings.roster_limits??null,minorLeagueLimit:settings.minorLeagueLimit??settings.minor_league_limit??null,eligibilityRules:settings.eligibilityRules??settings.eligibility_rules??null,scoringConfiguration:settings.scoringConfiguration??settings.scoring??league?.scoring_type??null,currentSeason:season??settings.currentSeason??settings.current_season??null,currentPeriod:settings.currentPeriod??settings.current_period??null};}
 
-export function buildCanonicalPlayerIntelligenceInput({player,league,metricRows=[],season,asOfDate=new Date().toISOString(),staleAfterMs=48*60*60*1000}={}){
+export function buildCanonicalPlayerIntelligenceInput({player,league,metricRows=[],metricsByPlayerId=null,season,asOfDate=new Date().toISOString(),staleAfterMs=48*60*60*1000}={}){
   if(!player?.id)throw new Error("Stable player UUID is required.");
   if(!league?.id)throw new Error("League context is required.");
   if(player.league_id&&player.league_id!==league.id)throw new Error("Player and league context do not match.");
   const positionEligibility=positions(player.positions),pitcher=positionEligibility.eligible.some(item=>item==="SP"||item==="RP"),type=pitcher?"pitcher":"hitter";
-  const metricRow=chooseMetric(metricRows,{playerId:player.id,season,type}),raw=metricRow?.metrics||{},metadata=raw._statcast||raw.statcast||{};
-  const productionRow=chooseProductionMetric(metricRows,{playerId:player.id,season}),productionRaw=productionRow?.metrics||{},productionMetadata=productionRaw._fantraxProduction||{};
+  const indexed=metricsByPlayerId?.get(player.id),metricRow=indexed?indexed[STATCAST_TYPES[type]]:chooseMetric(metricRows,{playerId:player.id,season,type}),raw=metricRow?.metrics||{},metadata=raw._statcast||raw.statcast||{};
+  const productionRow=indexed?indexed[FANTRAX_PRODUCTION_TYPE]:chooseProductionMetric(metricRows,{playerId:player.id,season}),productionRaw=productionRow?.metrics||{},productionMetadata=productionRaw._fantraxProduction||{};
   const statcastFreshness=freshness({source:metricRow?.source,season:metricRow?.season??season,fetchedAt:metadata.fetchedAt||metricRow?.imported_at,asOfDate,maxAgeMs:staleAfterMs});
   const fantraxFreshness=freshness({source:productionRow?.source,season:productionRow?.season??season,fetchedAt:productionMetadata.importedAt||productionRow?.imported_at,asOfDate,maxAgeMs:staleAfterMs});
   const warnings=[];
