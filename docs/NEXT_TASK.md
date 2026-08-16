@@ -1,20 +1,30 @@
-# Next Task: V5.5B-6G0B Prospect Level Protected Baseline Profile
+# Next Task: V5.5B-6G0C Prospect Level Population Workflow
 
 ## Status and authority
 
-- V5.5B-6G0 is checkpointed. V5.5B-6G0A stopped safely before writes because no operation-specific protected-baseline profile exists.
-- Migration 014 remains unapplied. V5.5B-6G1 remains `BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
-- This task is local implementation and validation only. It does not authorize migration application, deployment, provider collection, production/cloud access, imports, prospect-level population, Player Intelligence persistence, Engine 5.1.1 changes, or identity/ownership/roster changes.
+- V5.5B-6G0 and G0B are checkpointed. G0A stopped before deployment or production access because no canonical prospect-level population workflow exists.
+- Migration 014 remains unapplied. Calibration remains `CALIBRATION_REQUIRED`; G1 remains `BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`; V5.5C remains blocked.
+- This task is local implementation and validation only. It does not authorize deployment, cloud access, provider collection against production, migration application, production writes, archetype changes, Player Intelligence persistence, or Engine 5.1.1 recalculation.
 
 ## Objective
 
-Implement a provider-neutral protected-baseline profile named `PROSPECT_LEVEL_POPULATION` for the future authenticated, league-scoped prospect-level population operation. The profile proves mutation boundaries only; it must not apply Migration 014, collect or normalize provider data, or write prospect-level evidence.
+Implement the canonical authenticated preview/review/apply path for populating the five Migration 014 prospect-level evidence fields. Reuse the accepted MLB Stats API provider, `prospectLevelEvidence` normalizer, stable player UUIDs, MLBAM authority, `PROSPECT_LEVEL_POPULATION` protected baseline, normal RLS, and existing import-job/audit architecture where appropriate. Do not create an alternate write path.
 
-Do not overload or weaken `STRICT`, `MLBAM_BACKFILL`, `STATCAST_REFRESH`, or `FANTRAX_PRODUCTION_IMPORT`.
+## Identity and normalization
 
-## Authoritative player-field contract
+Writes may resolve only to an existing stable player UUID through exact MLBAM identity. Names are display evidence only and cannot authorize a match. Missing, duplicate, or ambiguous MLBAM evidence fails closed; no player may be created.
 
-Derive and test the allowed field set directly from `supabase/migrations/014_prospect_level_evidence.sql`. The exact Migration 014 fields are:
+Use only the accepted levels `MLB`, `AAA`, `AA`, `A_PLUS`, `A`, `ROOKIE`, `COMPLEX`, `DSL`, `INACTIVE`, and `UNKNOWN`, with factual conflicts represented as `CONFLICT`. Do not add provider aliases during this phase.
+
+## Read-only preview
+
+Preview must perform no writes and must report provider/source freshness, total records, exact UUID/MLBAM matches, unmatched and ambiguous/conflicting identities, invalid evidence, normalized level distribution, planned updates and no-ops, warnings, and errors.
+
+The reviewed preview must bind authenticated user, active league, provider snapshot/evidence, normalized rows, exact write plan, and `PROSPECT_LEVEL_POPULATION` baseline state. Apply requires explicit review and rejects skipped, stale, user-changed, league-changed, provider-changed, identity-changed, or plan-changed previews.
+
+## Persistence boundary
+
+Add one narrow authenticated, league-scoped repository/service path that requires existing player UUIDs and updates only:
 
 - `current_level`
 - `level_source`
@@ -22,60 +32,38 @@ Derive and test the allowed field set directly from `supabase/migrations/014_pro
 - `level_observed_at`
 - `level_raw_evidence`
 
-Do not include `is_minor_leaguer`; Migration 014 does not authorize it for mutation.
+`updated_at` may change only through the accepted database trigger. Do not include `is_minor_leaguer`, organization, team, position, age, Fantrax/MLBAM identity, ownership, roster state, or any other field. Use bounded batches of at most 250, update existing rows only, and never use broad player upsert or insert.
 
-Determine whether the canonical repository/database update path unavoidably changes `updated_at`. Return exactly one implementation decision in the result:
+Immediately before each write, revalidate session, league, reviewed snapshot, identities, normalized values, exact plan, and fixed protected-baseline profile. If material evidence changed, invalidate review and require a new preview.
 
-- `UPDATED_AT_PROTECTED`; or
-- `UPDATED_AT_EXPECTED_MUTABLE` with the proven mechanism requiring it.
+## Schema and baseline gates
 
-Prefer `UPDATED_AT_PROTECTED`. Do not allow it merely for convenience.
+The workflow always uses `PROSPECT_LEVEL_POPULATION`; no selector is allowed. The baseline action remains read-only and independent.
 
-Every other player field remains protected, including UUID and external identities, name, position, age, minor-leaguer boolean, organization/team data, ownership, roster/free-agent state, scoring/market data, provider identities, and unrelated timestamps.
+Preview may collect and normalize while Migration 014 is absent if the existing architecture supports it, but apply must fail closed when the mutable schema state is `SCHEMA_ABSENT`, partial, unavailable, permission blocked, or query failed. The workflow must never apply Migration 014 automatically.
 
-## Protected domains
+The future acceptance sequence is baseline capture, preview, explicit review, apply, then protected comparison. Do not weaken or duplicate the baseline service.
 
-Fully hash and protect calculated player scores, all player metrics, teams, managers, league settings, ownership and roster state, identities, Fantrax data, Statcast data, and HKB data. No metric partition is expected mutable.
+## Outcomes and idempotency
 
-## Pre-migration capture
+Report `COMPLETED`, `PARTIAL`, or `FAILED` from actual batch outcomes. Preserve attempted, successful, failed, skipped, conflict, and no-op UUIDs/counts plus errors and warnings. A partial run cannot be reported as success, and successful batches cannot be described as rolled back without a real transaction.
 
-The before baseline must be capturable before Migration 014 exists in production. Hash existing protected player fields without querying absent Migration 014 columns as protected data. Represent the expected-mutable partition's absent schema state deterministically without inventing field values. Capture scores, metrics, teams, managers, and other protected domains normally.
+Identical factual evidence after a successful apply must preview entirely as no-op. Do not rewrite unchanged rows. Retain bounded factual raw evidence sufficient for audit; never dump uncontrolled provider payloads or fabricate source/freshness timestamps.
 
-Logically separate protected player evidence from expected-mutable prospect-level evidence. After migration and a future population operation, exact allowed-field changes may produce `EXPECTED_MUTATION`; any protected change produces `CHANGED`, overriding simultaneous expected mutation.
+Determine whether existing `import_jobs` is the canonical audit record. If reused, record source/context, preview distribution, write outcomes, warnings/errors, and bounded source metadata. Do not invent parallel history.
 
-## Comparison and determinism
+## UI workflow
 
-Preserve the fail-closed states `UNCHANGED`, `EXPECTED_MUTATION`, `CHANGED`, `UNAVAILABLE`, `PERMISSION_BLOCKED`, and `QUERY_FAILED`. Unreliable protected reads cannot report success.
+Add a normal authenticated surface showing source/freshness, match and conflict counts, normalized distribution, updates/no-ops, warnings/errors, and protected-baseline readiness. Expose separate Preview, Review/approve, and Apply actions. No hidden or automatic apply, free-form profile selector, or baseline write action is permitted.
 
-Hashes must remain row-order independent, object-field-order independent, stable for nulls, and unaffected by capture time. Timestamps participate only when the profile contract explicitly includes them.
+## Required validation
 
-## Authentication, RLS, and routing
+Tests must prove exact MLBAM-to-existing-UUID matching; missing/ambiguous identity rejection; no name authority or player creation; preview read-only behavior; canonical normalization; exact five-field payload; trigger-only `updated_at`; protected-field exclusion; batch limit at 250; update/no-op classification; partial outcome evidence; stale user/league/provider/identity/plan rejection; reviewed-preview requirement; schema-absent apply block; fixed baseline profile; existing profile independence; correct audit record if reused; and no UI auto-apply.
 
-Capture remains authenticated, league-scoped, read-only, provider-neutral, and subject to normal Supabase RLS. No service role or privileged bypass is permitted.
-
-If hosted acceptance needs a canonical UI action, route Prospect Level Population only to `PROSPECT_LEVEL_POPULATION`; expose no free-form profile selector. Preserve fixed routing for MLBAM, Statcast, and Fantrax Production and preserve `STRICT` unchanged.
-
-## Required tests
-
-Add deterministic coverage proving:
-
-1. the profile is registered;
-2. its exact allowed set matches Migration 014;
-3. the `updated_at` decision is explicit;
-4. identities, ownership, roster state, position, age, `is_minor_leaguer`, and unrelated player fields remain protected;
-5. scores, metrics, teams, managers, and league settings remain protected;
-6. only allowed level fields changing yields `EXPECTED_MUTATION`;
-7. any protected player/domain change yields `CHANGED`, including simultaneous allowed changes;
-8. deterministic ordering, object ordering, nulls, and hashes;
-9. capture works before the new columns exist;
-10. unavailable, permission-blocked, and query-failed reads remain fail-closed;
-11. all existing profiles retain their semantics; and
-12. fixed UI routing cannot be weakened or selected freely.
-
-Run focused protected-baseline/service/UI tests, existing profile regressions, architecture and auth tests, the complete `tests/*.test.mjs` suite, JavaScript syntax checks, and `git diff --check`.
+Run focused prospect population, provider, normalizer, repository, protected-baseline, imports/UI, auth, architecture, identity, and audit tests; all existing profile and Gate 4 regressions; the complete `tests/*.test.mjs` suite; JavaScript syntax checks; and `git diff --check`.
 
 ## Completion gate
 
-Record the profile implementation, exact allowed fields, `updated_at` decision, pre-migration capture design, protected partitions, routing, files changed, and exact validation results in `docs/NEXT_TASK_RESULT.md`. Stop for architect review before committing unless separately authorized.
+Record identity rules, preview manifest, persistence payload, batching, stale guards, schema gate, partial/idempotency behavior, audit decision, UI routing, files changed, and exact tests in `docs/NEXT_TASK_RESULT.md`. Stop uncommitted for architect review.
 
-After G0B is locally validated, reviewed, and checkpointed, resume V5.5B-6G0A Migration / Data Population Acceptance. Only accepted schema and data evidence may unblock G1.
+After G0C is locally validated, reviewed, and checkpointed, resume G0A production acceptance. Only successful migration/population acceptance may unblock G1.

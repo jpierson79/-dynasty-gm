@@ -1,5 +1,14 @@
 # Current State
 
+## V5.5B-6G0C Prospect Level Population Workflow Activated (2026-08-15)
+
+- G0 and G0B are checkpointed. G0A stopped safely before deployment, cloud access, or migration because no reviewed canonical prospect-level population workflow exists; that blocker evidence is checkpointed.
+- The active task is **V5.5B-6G0C Prospect Level Population Workflow**, a local-only implementation of a preview/review/apply path using the accepted MLB provider, canonical level normalizer, existing player UUIDs, exact MLBAM identity, normal RLS, and fixed `PROSPECT_LEVEL_POPULATION` protection.
+- Preview must be read-only and bind user, league, provider snapshot, exact identity/normalized evidence, write plan, and baseline readiness. Apply requires explicit review, rejects drift, and remains blocked while Migration 014 is absent.
+- Persistence is limited to the five Migration 014 level fields on existing UUID rows, in batches of at most 250; `updated_at` is trigger-driven. No player creation, name matching, upsert, identity, ownership, roster, age, position, organization, or `is_minor_leaguer` mutation is permitted.
+- Outcomes must expose completed/partial/failed batches and UUID-level success/failure evidence. Identical evidence must preview as no-op. The UI must separate preview, approval, and apply and expose no profile selector or auto-apply.
+- Migration 014 remains unapplied. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **`BLOCKED ON PROSPECT LEVEL EVIDENCE FOUNDATION`**; V5.5C remains **BLOCKED**.
+
 ## V5.5B-6G0B Prospect Level Protected Baseline Profile Activated (2026-08-15)
 
 - V5.5B-6G0 is checkpointed. Migration 014 remains unapplied, additive, and scoped to five prospect-level evidence columns.
