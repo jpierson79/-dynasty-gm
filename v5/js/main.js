@@ -43,7 +43,7 @@ import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 import { renderPlayerIntelligenceInspection } from "./views/playerIntelligenceInspectionView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,prospectLevelBaseline:{running:false,evidence:null,error:""},fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
 function resetStatcastRefreshSession(){const contextSignature=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:importUiState.statcast.season,contextSignature})}
 let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
@@ -506,6 +506,11 @@ async function updateWaiverPage(query){
 }
 function bindViewEvents(){
   const updateMlbamReview=changes=>{const current=importUiState.mlbamBackfill;importUiState.mlbamBackfill={...current,review:{...current.review,...changes}};render()};
+  $("#captureProspectLevelProtectedBaseline")?.addEventListener("click",async()=>{
+    importUiState.prospectLevelBaseline={running:true,evidence:null,error:""};render();
+    const evidence=await captureProtectedBaseline({leagueId:appState.activeLeague?.id,profile:"PROSPECT_LEVEL_POPULATION"});
+    importUiState.prospectLevelBaseline={running:false,evidence,error:evidence.status==="AVAILABLE"?"":evidence.errors?.join(" ")||evidence.status};render();
+  });
   $("#loadPlayerIntelligenceInspection")?.addEventListener("click",async()=>{if(!appState.authUser||!appState.activeLeague){invalidatePlayerIntelligenceInspection();return}const contextKey=inspectionContextKey(),started=performance.now();inspectionUi={...emptyInspectionState(),status:"LOADING",contextKey};setState({playerIntelligenceInspection:inspectionUi});try{const season=Number(appState.activeLeague.settings?.currentSeason??appState.activeLeague.settings?.current_season??new Date().getUTCFullYear()),result=await loadPlayerIntelligenceInspection({leagueId:appState.activeLeague.id,season,onProgress:progress=>{if(contextKey!==inspectionContextKey()||inspectionUi.status!=="LOADING")return;inspectionUi={...inspectionUi,...progress};setState({playerIntelligenceInspection:inspectionUi})}});if(contextKey!==inspectionContextKey())return;inspectionUi={...inspectionUi,status:"READY",result,evaluatedPlayers:result.inspection.players.length,totalPlayers:result.inspection.players.length,progressPercent:100,currentPhase:"READY",durationMs:Math.round(performance.now()-started)};refreshInspectionRows()}catch(error){if(contextKey!==inspectionContextKey())return;inspectionUi={...emptyInspectionState(),status:"FAILED",contextKey,durationMs:Math.round(performance.now()-started),error:String(error?.message||error)};setState({playerIntelligenceInspection:inspectionUi})}});
   const updateInspectionFilter=(key,value)=>{inspectionUi={...inspectionUi,page:1,filters:{...inspectionUi.filters,[key]:value}};refreshInspectionRows()};
   $("#inspectionRanking")?.addEventListener("change",event=>{inspectionUi={...inspectionUi,page:1,ranking:event.target.value};refreshInspectionRows()});

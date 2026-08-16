@@ -1,5 +1,8 @@
 import { readProtectedBaselineDomains } from "../repositories/protectedBaselineRepository.js";
 
+export const PROSPECT_LEVEL_MUTABLE_FIELDS=Object.freeze(["current_level","level_source","level_availability","level_observed_at","level_raw_evidence"]);
+export const PROSPECT_LEVEL_UPDATED_AT_DECISION="UPDATED_AT_EXPECTED_MUTABLE";
+
 export const PROTECTED_BASELINE_PROFILES=Object.freeze({
   STRICT:Object.freeze({
     id:"STRICT",version:"1",
@@ -24,6 +27,14 @@ export const PROTECTED_BASELINE_PROFILES=Object.freeze({
       Object.freeze({name:"metrics",label:"PROTECTED NON-PRODUCTION METRICS",filter:Object.freeze({not:Object.freeze({all:Object.freeze([Object.freeze({field:"source",equals:"Fantrax"}),Object.freeze({field:"metric_type",equals:"fantrax_league_production"})])})}),expectedMutable:false}),
       Object.freeze({name:"fantraxProductionMetrics",label:"FANTRAX LEAGUE-PRODUCTION METRICS",filter:Object.freeze({all:Object.freeze([Object.freeze({field:"source",equals:"Fantrax"}),Object.freeze({field:"metric_type",equals:"fantrax_league_production"})])}),expectedMutable:true})
     ])})
+  }),
+  PROSPECT_LEVEL_POPULATION:Object.freeze({
+    id:"PROSPECT_LEVEL_POPULATION",version:"1",
+    allowedChanges:Object.freeze({players:Object.freeze([...PROSPECT_LEVEL_MUTABLE_FIELDS,"updated_at"]),scores:Object.freeze([]),metrics:Object.freeze([]),teams:Object.freeze([]),managers:Object.freeze([]),leagues:Object.freeze([])}),
+    domainPartitions:Object.freeze({players:Object.freeze([
+      Object.freeze({name:"players",label:"PROTECTED PLAYERS",expectedMutable:false}),
+      Object.freeze({name:"prospectLevelEvidence",label:"PROSPECT LEVEL EVIDENCE",expectedMutable:true,fields:Object.freeze([...PROSPECT_LEVEL_MUTABLE_FIELDS,"updated_at"]),schemaFields:PROSPECT_LEVEL_MUTABLE_FIELDS,schemaAware:true})
+    ])})
   })
 });
 
@@ -38,6 +49,14 @@ function normalize(value){
 function omitFields(row,allowed=[]){
   const omitted=new Set(allowed);
   return Object.fromEntries(Object.entries(row||{}).filter(([key])=>!omitted.has(key)));
+}
+function schemaAwareRows(rows,fields,schemaFields=fields){
+  const hasAny=rows.some(row=>schemaFields.some(field=>Object.prototype.hasOwnProperty.call(row||{},field)));
+  const hasAll=rows.every(row=>schemaFields.every(field=>Object.prototype.hasOwnProperty.call(row||{},field)));
+  if(hasAny&&!hasAll)throw new Error("Prospect-level evidence schema is partially available.");
+  const schemaState=hasAny?"PRESENT":"SCHEMA_ABSENT";
+  const evidence=schemaState==="PRESENT"?rows.map(row=>Object.fromEntries([["id",row?.id??null],...fields.map(field=>[field,row?.[field]??null])])):[];
+  return {schemaState,evidence};
 }
 export function canonicalProtectedRows(rows=[],allowed=[]){
   return (rows||[]).map(row=>normalize(omitFields(row,allowed))).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -70,14 +89,17 @@ export async function captureProtectedBaseline({leagueId,profile="MLBAM_BACKFILL
   if(!contract?.id||!contract?.allowedChanges)throw new Error("A supported protected baseline profile is required.");
   const read=dependencies.readProtectedBaselineDomains||readProtectedBaselineDomains;
   try{
-    const rows=await read(leagueId,{dependencies:dependencies.repository});
+    const includeLeague=Object.prototype.hasOwnProperty.call(contract.allowedChanges,"leagues");
+    const rows=await read(leagueId,{dependencies:dependencies.repository,includeLeague});
     const capturedAt=new Date().toISOString(),domains={};
-    for(const sourceName of ["players","scores","metrics","teams","managers"]){
+    for(const sourceName of ["players","scores","metrics","teams","managers",...(includeLeague?["leagues"]:[])]){
+      if(!Object.prototype.hasOwnProperty.call(rows,sourceName))continue;
       const partitions=contract.domainPartitions?.[sourceName]||[{name:sourceName,label:sourceName.toUpperCase(),expectedMutable:false}];
       for(const partition of partitions){
         const selected=(rows[sourceName]||[]).filter(row=>matchesFilter(row,partition.filter));
-        const canonical=canonicalProtectedRows(selected,contract.allowedChanges[sourceName]||[]);
-        domains[partition.name]=Object.freeze({domain:partition.label||partition.name.toUpperCase(),sourceDomain:sourceName,status:"AVAILABLE",count:selected.length,hash:await protectedDigest(canonical,{cryptoImpl:dependencies.cryptoImpl}),expectedMutable:Boolean(partition.expectedMutable),capturedAt,profile:contract.id,contractVersion:contract.version});
+        const schema=partition.schemaAware?schemaAwareRows(selected,partition.fields||[],partition.schemaFields):null;
+        const canonical=schema?canonicalProtectedRows(schema.evidence):canonicalProtectedRows(selected,contract.allowedChanges[sourceName]||[]);
+        domains[partition.name]=Object.freeze({domain:partition.label||partition.name.toUpperCase(),sourceDomain:sourceName,status:"AVAILABLE",count:selected.length,hash:await protectedDigest(canonical,{cryptoImpl:dependencies.cryptoImpl}),expectedMutable:Boolean(partition.expectedMutable),...(schema?{schemaState:schema.schemaState,fields:partition.fields}:{}),capturedAt,profile:contract.id,contractVersion:contract.version});
       }
     }
     return immutable({status:"AVAILABLE",leagueId,profile:contract.id,contractVersion:contract.version,capturedAt,allowedChanges:contract.allowedChanges,domains,errors:[],warnings:[]});
@@ -91,7 +113,7 @@ export function compareProtectedBaselines(before,after){
   if(after?.status!=="AVAILABLE")return immutable({status:after?.status||"UNAVAILABLE",domains:{},errors:after?.errors||["After baseline is unavailable."]});
   if(before.leagueId!==after.leagueId||before.profile!==after.profile||before.contractVersion!==after.contractVersion)return immutable({status:"CHANGED",domains:{},errors:["Protected baseline contract or league changed."]});
   const domains={};let changed=false,expectedMutation=false;
-  for(const name of Object.keys(before.domains)){
+  for(const name of new Set([...Object.keys(before.domains),...Object.keys(after.domains)])){
     const prior=before.domains[name],next=after.domains[name],same=prior?.count===next?.count&&prior?.hash===next?.hash;
     const status=same?"UNCHANGED":prior?.expectedMutable&&next?.expectedMutable?"EXPECTED_MUTATION":"CHANGED";
     domains[name]=Object.freeze({status,before:prior,after:next});if(status==="CHANGED")changed=true;if(status==="EXPECTED_MUTATION")expectedMutation=true;
