@@ -1,5 +1,14 @@
 # Current State
 
+## V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap Activated (2026-08-23)
+
+- V5.5B-6G0, G0B, and G0C are complete/checkpointed. The latest G0A production acceptance is checkpointed as **BLOCKED ON PRE-MIGRATION SCHEMA-ABSENCE BOOTSTRAP**; Migration 014 and Migration 015 remain created and unapplied.
+- The exact G0C artifact authenticated and selected Reddit Phanatics, but the required pre-migration `PROSPECT_LEVEL_POPULATION` capture could not complete because normal league loading failed with `player intelligence paged query: column players_1.current_level does not exist`. Pages was restored to approved main and no migration or production-data write occurred.
+- The active task is **V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap**. It must separate guaranteed core player/league bootstrap fields from optional Migration 014 evidence so complete absence reports `SCHEMA_ABSENT`, complete presence reports `PRESENT`, and partial schema or unrelated errors fail closed.
+- Pre-migration authentication, league loading, Cloud Imports/Data Health navigation, protected-baseline capture, identity, ownership, roster behavior, and pagination must remain intact. Player Intelligence may expose missing factual level evidence but must not infer it from age, minor status, Fantrax, HKB, Statcast, names, or roster heuristics.
+- G0D is local implementation only. After testing, architect review, and checkpointing, G0A must restart from the beginning with a fresh immutable deployment and deterministic pre-migration baseline before either migration is applied.
+- G0A is **BLOCKED ON G0D**. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **BLOCKED**; V5.5C remains **BLOCKED**.
+
 ## V5.5B-6G0C Prospect Level Population Workflow Activated (2026-08-15)
 
 - G0 and G0B are checkpointed. G0A stopped safely before deployment, cloud access, or migration because no reviewed canonical prospect-level population workflow exists; that blocker evidence is checkpointed.
