@@ -14,6 +14,7 @@ import { applyAutomatedStatcastRefresh, previewAutomatedStatcastRefresh } from "
 import { applyStatcastSessionTypes, beginStatcastPreview, createStatcastRefreshSession, failStatcastPreview, finishStatcastPreview, invalidateStatcastRefreshSession, reviewStatcastPreview, statcastTypeCanApply } from "./services/statcastRefreshSessionService.js";
 import { applyMlbamIdentityBackfill, downloadMlbamReviewCsv, hypotheticalStatcastCoverage, previewMlbamIdentityBackfill } from "./services/mlbamIdentityBackfillService.js";
 import { captureProtectedBaseline } from "./services/protectedBaselineService.js";
+import { applyProspectLevelPopulation, createProspectLevelPopulationUiState, previewProspectLevelPopulation } from "./services/prospectLevelPopulationService.js";
 import { presetQuery } from "./config/playerIntelligencePresets.js";
 import { findRosterUpgradeCandidates, getRosterRecommendations, getWaiverRecommendations } from "./services/decisionIntelligenceService.js";
 import { analyzeTrade, findConsolidationTargets, findTradeFits } from "./services/tradeAnalysisService.js";
@@ -43,8 +44,10 @@ import { renderFantraxPreview, renderFantraxTeamIdentityManager } from "./views/
 import { renderFantraxGate4Acceptance } from "./views/fantraxGate4AcceptanceView.js";
 import { renderPlayerIntelligenceInspection } from "./views/playerIntelligenceInspectionView.js";
 
-const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,prospectLevelBaseline:{running:false,evidence:null,error:""},fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
+const importUiState={previews:{},files:{},reviewed:{},preview:null,result:null,running:false,prospectLevelBaseline:{running:false,evidence:null,error:""},prospectLevelPopulation:createProspectLevelPopulationUiState(),fantraxProductionBaseline:{running:false,evidence:null,error:""},mlbamBackfill:{season:new Date().getUTCFullYear(),preview:null,review:{matchClass:"ALL",reasonCode:"ALL",search:"",page:1,pageSize:50},reviewed:false,running:false,result:null,error:"",protectedBaseline:{running:false,evidence:null,error:""}},statcast:createStatcastRefreshSession()};
 function resetStatcastRefreshSession(){const contextSignature=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;importUiState.statcast=invalidateStatcastRefreshSession(importUiState.statcast,{leagueId:appState.activeLeague?.id||"",season:importUiState.statcast.season,contextSignature})}
+function resetProspectLevelPopulationState(reason="Reviewed prospect-level state invalidated."){importUiState.prospectLevelPopulation=createProspectLevelPopulationUiState({season:importUiState.prospectLevelPopulation?.season,status:"INVALIDATED",invalidationReason:reason});importUiState.prospectLevelBaseline={running:false,evidence:null,error:""}}
+let prospectLevelContextSignature="";
 let mlbamEvidenceSearchTimer=null;
 let dashboardOverview={dashboardStats:null};
 let playerPage={rows:[],count:0,page:1,pageSize:50};
@@ -424,6 +427,7 @@ function enableInspectionEntry(){
   playersButton.insertAdjacentHTML("afterend",'<button class="nav-link" data-view="playerIntelligenceInspection">Player Intelligence Inspection</button>');
 }
 function render(){
+  const prospectContext=`${appState.authUser?.id||""}|${appState.activeLeague?.id||""}`;if(prospectLevelContextSignature!==prospectContext){resetProspectLevelPopulationState("Authenticated user or active league changed.");prospectLevelContextSignature=prospectContext}
   const badge=$("#modeBadge");
   if(badge){
     badge.textContent=modeLabel();
@@ -510,6 +514,19 @@ function bindViewEvents(){
     importUiState.prospectLevelBaseline={running:true,evidence:null,error:""};render();
     const evidence=await captureProtectedBaseline({leagueId:appState.activeLeague?.id,profile:"PROSPECT_LEVEL_POPULATION"});
     importUiState.prospectLevelBaseline={running:false,evidence,error:evidence.status==="AVAILABLE"?"":evidence.errors?.join(" ")||evidence.status};render();
+  });
+  $("#prospectLevelSeason")?.addEventListener("change",event=>{importUiState.prospectLevelPopulation=createProspectLevelPopulationUiState({season:Number(event.target.value),status:"INVALIDATED",invalidationReason:"Provider season changed."});render()});
+  $("#reviewProspectLevelPopulation")?.addEventListener("change",event=>{importUiState.prospectLevelPopulation={...importUiState.prospectLevelPopulation,status:event.target.checked?"REVIEWED":"PREVIEW_READY",reviewed:event.target.checked};render()});
+  $("#previewProspectLevelPopulation")?.addEventListener("click",async()=>{
+    const current=importUiState.prospectLevelPopulation;importUiState.prospectLevelPopulation={...current,status:"PREVIEWING",invalidationReason:"",running:true,preview:null,reviewed:false,result:null,error:""};render();
+    try{const preview=await previewProspectLevelPopulation({leagueId:appState.activeLeague.id,season:current.season,baseline:importUiState.prospectLevelBaseline.evidence});importUiState.prospectLevelPopulation={...current,status:"PREVIEW_READY",invalidationReason:"",running:false,preview,reviewed:false,result:null,error:""}}
+    catch(error){importUiState.prospectLevelPopulation={...current,status:"FAILED_BEFORE_WRITES",invalidationReason:"",running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error)}}render();
+  });
+  $("#applyProspectLevelPopulation")?.addEventListener("click",async()=>{
+    const current=importUiState.prospectLevelPopulation;if(!current.preview||!current.reviewed){setError("Preview and review prospect-level population first.");return}
+    importUiState.prospectLevelPopulation={...current,status:"APPLYING",running:true,result:null,error:""};render();
+    try{const result=await applyProspectLevelPopulation({leagueId:appState.activeLeague.id,reviewedPreview:current.preview,reviewed:true});importUiState.prospectLevelPopulation={...current,status:result.status,running:false,preview:null,reviewed:false,result,error:""};await refreshLeagueData()}
+    catch(error){importUiState.prospectLevelPopulation={...current,status:"FAILED_BEFORE_WRITES",running:false,result:null,error:String(error?.message||error)}}render();
   });
   $("#loadPlayerIntelligenceInspection")?.addEventListener("click",async()=>{if(!appState.authUser||!appState.activeLeague){invalidatePlayerIntelligenceInspection();return}const contextKey=inspectionContextKey(),started=performance.now();inspectionUi={...emptyInspectionState(),status:"LOADING",contextKey};setState({playerIntelligenceInspection:inspectionUi});try{const season=Number(appState.activeLeague.settings?.currentSeason??appState.activeLeague.settings?.current_season??new Date().getUTCFullYear()),result=await loadPlayerIntelligenceInspection({leagueId:appState.activeLeague.id,season,onProgress:progress=>{if(contextKey!==inspectionContextKey()||inspectionUi.status!=="LOADING")return;inspectionUi={...inspectionUi,...progress};setState({playerIntelligenceInspection:inspectionUi})}});if(contextKey!==inspectionContextKey())return;inspectionUi={...inspectionUi,status:"READY",result,evaluatedPlayers:result.inspection.players.length,totalPlayers:result.inspection.players.length,progressPercent:100,currentPhase:"READY",durationMs:Math.round(performance.now()-started)};refreshInspectionRows()}catch(error){if(contextKey!==inspectionContextKey())return;inspectionUi={...emptyInspectionState(),status:"FAILED",contextKey,durationMs:Math.round(performance.now()-started),error:String(error?.message||error)};setState({playerIntelligenceInspection:inspectionUi})}});
   const updateInspectionFilter=(key,value)=>{inspectionUi={...inspectionUi,page:1,filters:{...inspectionUi.filters,[key]:value}};refreshInspectionRows()};
@@ -903,7 +920,7 @@ function bindShellEvents(){
     }
   });
   document.body.addEventListener("click",async event=>{
-    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");resetStatcastRefreshSession();invalidatePlayerIntelligenceInspection();await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
+    if(event.target.id==="signOut"){resetGate4Acceptance("Authentication ended.");resetStatcastRefreshSession();resetProspectLevelPopulationState("Authentication ended.");invalidatePlayerIntelligenceInspection();await signOut();setState({authUser:null,activeLeague:null,dataMode:"offline",fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});render()}
     if(event.target.id==="retryCloud"){await bootstrap()}
     if(event.target.id==="refreshLeague"){await refreshLeagueData();render()}
     if(event.target.id==="runDataHealth"){
@@ -922,6 +939,7 @@ function bindShellEvents(){
     if(event.target.id==="leagueSelect"){
       resetGate4Acceptance("Active league changed.");
       resetStatcastRefreshSession();
+      resetProspectLevelPopulationState("Active league changed.");
       invalidatePlayerIntelligenceInspection();
       setState({fantraxPreview:clearFantraxPendingReviews(fantraxPreviewState({data:null,externalLeagueId:"",period:"",error:""}))});
       await selectLeague(event.target.value);

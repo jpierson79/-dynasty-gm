@@ -42,3 +42,17 @@ export async function finishFantraxProductionJob(leagueId,jobId,{status,processe
   const result=await request(supabase.from("import_jobs").update({status,rows_processed:processed,rows_matched:matched,rows_unmatched:unmatched,rows_inserted:inserted,rows_updated:updated,rows_failed:failed,errors,error_message:errorMessage,source_metadata:sourceMetadata,completed_at:new Date().toISOString()}).eq("league_id",leagueId).eq("id",jobId).select("*").single(),"Fantrax production import job update");
   return result.data;
 }
+
+export async function startProspectLevelPopulationJob(leagueId,{sourceMetadata}={}){
+  if(!leagueId)throw new Error("Active league is required.");
+  const supabase=await client(),auth=await supabase.auth.getUser();
+  if(auth.error||!auth.data?.user?.id)throw new Error("Sign in before populating prospect levels.");
+  const result=await request(supabase.from("import_jobs").insert({league_id:leagueId,user_id:auth.data.user.id,import_type:"prospect_level_population",file_name:null,status:"running",started_at:new Date().toISOString(),source_metadata:sourceMetadata||{}}).select("*").single(),"prospect level import job insert");
+  return result.data;
+}
+export async function finishProspectLevelPopulationJob(leagueId,jobId,{status,processed=0,matched=0,updated=0,failed=0,errors=[],errorMessage=null,sourceMetadata={}}={}){
+  if(!leagueId||!jobId)throw new Error("Active league and prospect level import job are required.");
+  const supabase=await client();
+  const result=await request(supabase.from("import_jobs").update({status,rows_processed:processed,rows_matched:matched,rows_unmatched:0,rows_inserted:0,rows_updated:updated,rows_failed:failed,errors,error_message:errorMessage,source_metadata:sourceMetadata,completed_at:new Date().toISOString()}).eq("league_id",leagueId).eq("id",jobId).select("*").single(),"prospect level import job update");
+  return result.data;
+}
