@@ -1,13 +1,21 @@
 # Current State
 
-## V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap Activated (2026-08-23)
+## V5.5B-6G0A Prospect Level Migration / Data Population Acceptance Activated (2026-08-24)
+
+- V5.5B-6G0D is **COMPLETE / CHECKPOINTED** at implementation commit `f9079ddc7174ad5f0ab87ccdf713fa099df0e1ce` with documentation checkpoint `1476d98a352507a45299e51553df9fbe0c80ce91`. Mandatory bootstrap no longer requires Migration 014; optional prospect evidence is UUID-joined in bounded batches with `SCHEMA_ABSENT`, `PRESENT`, and fail-closed partial/error semantics.
+- The active task is **V5.5B-6G0A Prospect Level Migration / Data Population Acceptance**. It is authorized only for the ordered trusted deployment, pre-migration deterministic `PROSPECT_LEVEL_POPULATION` capture, Migration 014 then 015, protected comparisons, canonical MLB provider Preview -> explicit Review -> Apply, idempotency Preview, Data Health, canonical-input inspection, and Pages restoration defined in `docs/NEXT_TASK.md`.
+- Production mutation is restricted to the five prospect-level evidence fields on existing exact UUID/MLBAM matches, with trigger-driven `updated_at`, batches of at most 250, and normal authenticated league-scoped controls. No player creation, name authority, identity, ownership, roster, score, or other protected mutation is authorized.
+- Migration 014 and Migration 015 remain **CREATED / NOT APPLIED** at activation. G1 remains **BLOCKED PENDING G0A**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
+- Any failed gate stops acceptance. Application/migration repair, ad hoc SQL, service-role bypass, provider inference, G1 implementation, model changes, and V5.5C activation are outside this acceptance.
+
+## V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap Completed (2026-08-23)
 
 - V5.5B-6G0, G0B, and G0C are complete/checkpointed. The latest G0A production acceptance is checkpointed as **BLOCKED ON PRE-MIGRATION SCHEMA-ABSENCE BOOTSTRAP**; Migration 014 and Migration 015 remain created and unapplied.
 - The exact G0C artifact authenticated and selected Reddit Phanatics, but the required pre-migration `PROSPECT_LEVEL_POPULATION` capture could not complete because normal league loading failed with `player intelligence paged query: column players_1.current_level does not exist`. Pages was restored to approved main and no migration or production-data write occurred.
-- The active task is **V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap**. It must separate guaranteed core player/league bootstrap fields from optional Migration 014 evidence so complete absence reports `SCHEMA_ABSENT`, complete presence reports `PRESENT`, and partial schema or unrelated errors fail closed.
+- The completed task separated guaranteed core player/league bootstrap fields from optional Migration 014 evidence so complete absence reports `SCHEMA_ABSENT`, complete presence reports `PRESENT`, and partial schema or unrelated errors fail closed.
 - Pre-migration authentication, league loading, Cloud Imports/Data Health navigation, protected-baseline capture, identity, ownership, roster behavior, and pagination must remain intact. Player Intelligence may expose missing factual level evidence but must not infer it from age, minor status, Fantrax, HKB, Statcast, names, or roster heuristics.
-- G0D is local implementation only. After testing, architect review, and checkpointing, G0A must restart from the beginning with a fresh immutable deployment and deterministic pre-migration baseline before either migration is applied.
-- G0A is **BLOCKED ON G0D**. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **BLOCKED**; V5.5C remains **BLOCKED**.
+- G0D completed local implementation, testing, architect review, and checkpointing. G0A must restart from the beginning with a fresh immutable deployment and deterministic pre-migration baseline before either migration is applied.
+- G0A is now active under the newer section above. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **BLOCKED PENDING G0A**; V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G0C Prospect Level Population Workflow Activated (2026-08-15)
 

@@ -1,11 +1,83 @@
-# Next Task: V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap
+# Next Task: V5.5B-6G0A Prospect Level Migration / Data Population Acceptance
 
 ## Active status and authority
 
+- Baseline: clean `feature/manager-intelligence` at governance activation commit produced from `a46cf6901f882ca9243f67e170041359f29b3157`.
+- V5.5B-6G0D is **COMPLETE / CHECKPOINTED** at implementation commit `f9079ddc7174ad5f0ab87ccdf713fa099df0e1ce` with documentation checkpoint `1476d98a352507a45299e51553df9fbe0c80ce91`.
+- V5.5B-6G0A is **ACTIVE / AUTHORIZED FOR CONTROLLED PRODUCTION ACCEPTANCE**. Migration 014 and Migration 015 are created and unapplied. G1 remains blocked pending successful G0A evidence; calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
+- This authorization is gate-specific. Any failed mandatory gate stops acceptance; production code must not be repaired inside G0A.
+
+## Accepted G0D foundation
+
+The repaired startup chain is `bootstrap -> refreshLeagueData -> loadPlayerPage -> listPlayerIntelligence -> nested player projection`. Mandatory bootstrap no longer requires Migration 014. The five optional fields—`current_level`, `level_source`, `level_availability`, `level_observed_at`, and `level_raw_evidence`—load as UUID-authoritative enrichment in 100-UUID batches, without name matching, identity remapping, or N+1 queries.
+
+Complete absence is `SCHEMA_ABSENT`; complete presence, including all-null values, is `PRESENT`; partial schema fails closed. Permission/RLS, network, malformed, and unexpected database errors remain failures. Pre-migration Player Intelligence invents no prospect evidence; post-migration factual evidence flows through the canonical input. G0B baseline and G0C Preview -> Review -> Apply semantics, identity, ownership, roster behavior, League Production, and Engine 5.1.1 remain unchanged.
+
+## Required acceptance sequence
+
+Execute in this order and stop on any failure:
+
+1. Verify the exact repository baseline and history, then select the reviewed immutable application target. Expected implementation target is `f9079ddc7174ad5f0ab87ccdf713fa099df0e1ce`, subject to history verification.
+2. Deploy that exact target through the trusted immutable deployment workflow and verify application startup before Migration 014.
+3. Authenticate normally and select Reddit Phanatics.
+4. Capture the fixed `PROSPECT_LEVEL_POPULATION` baseline before Migration 014. Require `SCHEMA_ABSENT`.
+5. Capture it again and require deterministic protected hashes.
+6. Apply Migration 014 once through the canonical accepted migration path.
+7. Recapture the baseline. Require `SCHEMA_ABSENT -> PRESENT` while every protected domain remains unchanged.
+8. Apply Migration 015 once through the canonical accepted migration path.
+9. Recapture the baseline and require protected domains unchanged.
+10. Run the canonical MLB Stats API Prospect Level Preview.
+11. Review provider counts, exact MLBAM/UUID matches, unmatched/conflicts, normalized distribution, write plan, warnings/errors, source snapshot, protected-baseline binding, and preview digest.
+12. Explicitly approve Review, revalidate every gate, and Apply through the governed prospect-level population workflow.
+13. Capture the protected baseline after writes.
+14. Run a read-only idempotency Preview, Data Health, and canonical Player Intelligence input inspection.
+15. Decide whether G1 may become `UNBLOCKED FOR LOCAL IMPLEMENTATION`.
+16. Restore normal approved Pages if a temporary immutable feature artifact was deployed.
+
+## Migration and mutation boundary
+
+- Only Migration 014 followed by Migration 015 may be applied. Do not edit them, create Migration 016, or use ad hoc SQL.
+- Only `current_level`, `level_source`, `level_availability`, `level_observed_at`, and `level_raw_evidence` may be mutated. `players.updated_at` may change only through the existing trigger.
+- Existing player UUID, exact MLBAM ID, league scope, and expected prior values may be identity/authorization/concurrency guards only, never mutation targets.
+- Apply batches must contain at most 250 rows.
+
+## Identity, provider, and evidence contract
+
+- Existing stable player UUID plus exact MLBAM mapping is authoritative. Names are display-only. No normalized/fuzzy name matching, ambiguous match, player creation, or identity remapping is allowed.
+- Prospect-level authority is the accepted MLB Stats API provider/adapter. Do not infer level from Statcast, HKB, Fantrax production, age, name, roster heuristics, position, or organization assumptions.
+- Canonical levels remain `MLB`, `AAA`, `AA`, `A_PLUS`, `A`, `ROOKIE`, `COMPLEX`, `DSL`, `INACTIVE`, and `UNKNOWN`; `CONFLICT` remains distinct. Acceptance must not change normalization.
+- `level_raw_evidence` must remain allowlisted, deterministic, bounded to at most 16 sport observations, and explicit about truncation. Arbitrary provider payload dumping is prohibited.
+- `CONFLICT` never guesses or overwrites valid factual evidence with a guessed level. `UNKNOWN` remains distinct and cannot become a factual level through heuristics.
+
+## Review, protection, outcome, and idempotency gates
+
+- Apply requires Preview -> explicit Review -> Apply. Review binds authenticated user/session, league, provider snapshot, exact identity mapping, normalized evidence, exact write plan, fixed protected baseline, and preview digest. Any material change invalidates Review.
+- The only baseline profile is `PROSPECT_LEVEL_POPULATION`; no alternate selector is permitted. Protected domains include every non-authorized player field, calculated scores, all metrics, teams, managers, league settings, identities, ownership, and roster state. Any protected change fails acceptance.
+- Preserve truthful player-write and import-job audit outcomes. Successful, failed, and unattempted UUIDs must remain distinct; audit-finalization failure must not relabel successful writes as failed or imply replay.
+- After successful Apply, an identical fresh Preview must report `NO_OP` for persisted rows and must not rewrite them merely to change `updated_at`.
+
+## G1 decision gate
+
+G1 remains blocked unless G0A proves: pre-migration `SCHEMA_ABSENT`; deterministic baselines; safe ordered application of Migrations 014 and 015; unchanged protected domains after each boundary; structurally plausible provider Preview; exact identity; meaningful MiLB coverage; acceptable Apply; passing post-write protection and idempotency; acceptable Data Health; factual canonical Player Intelligence input; and no player creation or identity, ownership, roster, or score mutation.
+
+Successful G0A does not equal calibration pass. Calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
+
+## Explicit prohibitions
+
+Do not edit application code or either migration during acceptance; create Migration 016; use ad hoc SQL or service-role workarounds; bypass Preview or Review; match by name; create players; alter identity, ownership, roster, team/organization, position, Statcast, Fantrax, Engine 5.1.1, or Player Intelligence scores; implement G1; change archetypes/model weights; or activate V5.5C.
+
+## Failure and completion policy
+
+On any mandatory gate failure, stop, preserve exact evidence, restore Pages when applicable, and open a separately reviewed repair task. Record the immutable target, every baseline/schema/migration/provider/write outcome, protected comparisons, idempotency, Data Health, canonical-input result, restoration, and G1 decision in `docs/NEXT_TASK_RESULT.md`.
+
+# Completed Contract: V5.5B-6G0D Pre-Migration Schema-Absence Bootstrap
+
+## Historical activation status and authority
+
 - Baseline: clean `feature/manager-intelligence` at `f35700cd401be5cee63b26dfd6ef221e314321bf`.
 - V5.5B-6G0, G0B, and G0C are checkpointed. The latest G0A acceptance stopped before migration or data writes because mandatory application bootstrap queried Migration 014 columns before the required pre-migration protected baseline could complete.
-- G0A is `BLOCKED ON G0D`. Migration 014 and Migration 015 are created and unapplied. Calibration remains `CALIBRATION_REQUIRED`; G1 and V5.5C remain blocked.
-- G0D is local implementation and validation only. It does not authorize deployment, migration application, production/cloud access, provider collection, production writes, G1 implementation, model changes, or V5.5C activation.
+- At activation, G0A was `BLOCKED ON G0D`; Migration 014 and Migration 015 were created and unapplied; calibration was `CALIBRATION_REQUIRED`; and G1 and V5.5C were blocked.
+- This completed G0D contract authorized local implementation and validation only. Its implementation and documentation checkpoints are recorded above; the active authority is now the G0A contract at the top of this file.
 
 ## Objective
 
