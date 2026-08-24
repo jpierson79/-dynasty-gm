@@ -28,8 +28,9 @@ const unknown=build({...base,is_minor_leaguer:true,current_level:null,level_sour
 const absent=build(Object.fromEntries(Object.entries(base).filter(([key])=>!key.startsWith("is_minor"))));assert.equal(absent.player.isMinorLeaguer,null,"unloaded minor status remains unknown, not false");
 const mlb=build({...base,is_minor_leaguer:false,current_level:"MLB"});assert.equal(mlb.player.isMinorLeaguer,false);assert.equal(mlb.role.mlbStatus,"MLB");
 
-const root=new URL("../",import.meta.url),repository=await readFile(new URL("v5/js/repositories/playerIntelligenceRepository.js",root),"utf8"),migration=await readFile(new URL("supabase/migrations/014_prospect_level_evidence.sql",root),"utf8"),composite=await readFile(new URL("v5/js/engine/playerIntelligenceComposite.js",root),"utf8");
-for(const column of ["is_minor_leaguer","current_level","level_source","level_availability","level_observed_at","level_raw_evidence"])assert.match(repository,new RegExp(column));
+const root=new URL("../",import.meta.url),repository=await readFile(new URL("v5/js/repositories/playerIntelligenceRepository.js",root),"utf8"),evidenceService=await readFile(new URL("v5/js/services/prospectLevelEvidence.js",root),"utf8"),migration=await readFile(new URL("supabase/migrations/014_prospect_level_evidence.sql",root),"utf8"),composite=await readFile(new URL("v5/js/engine/playerIntelligenceComposite.js",root),"utf8");
+assert.match(repository,/is_minor_leaguer/);assert.match(repository,/PROSPECT_LEVEL_SCHEMA_FIELDS/);
+for(const column of ["current_level","level_source","level_availability","level_observed_at","level_raw_evidence"])assert.match(evidenceService,new RegExp(column));
 assert.match(migration,/add column if not exists current_level text/);assert.match(migration,/level_raw_evidence jsonb/);assert.match(migration,/level_availability in \('AVAILABLE','UNKNOWN','STALE','CONFLICT'\)/);assert.match(migration,/current_level is null and level_source is null/);assert.doesNotMatch(migration,/update public\.players|insert into|delete from/);
 assert.doesNotMatch(composite,/current_level|level_source|level_observed_at/,"G0 does not resume archetype classification");
 console.log("v5ProspectLevelEvidence tests passed");

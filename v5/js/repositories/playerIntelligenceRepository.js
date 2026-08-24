@@ -1,6 +1,7 @@
 import { client, request } from "./baseRepository.js";
 import { scoresForPlayers } from "./scoreRepository.js";
 import { ENGINE_VERSION } from "../engine/dynastyEngine.js";
+import { PROSPECT_LEVEL_SCHEMA_FIELDS, PROSPECT_LEVEL_SCHEMA_STATES, inspectProspectLevelColumnPresence, isMissingProspectLevelColumnError, requireHealthyProspectLevelSchemaInspection, requireHealthyProspectLevelSchemaRows } from "../services/prospectLevelEvidence.js";
 
 const SCORE_COLUMNS={
   dynasty_asset_score:"dynasty_asset_score",
@@ -11,8 +12,70 @@ const SCORE_COLUMNS={
   breakout_probability:"breakout_score",
   overall_score:"gm_score"
 };
-const PLAYER_COLUMNS="id,league_id,name,fantrax_id,mlbam_id,age,positions,mlb_team,owner_team_id,roster_status,is_minor_leaguer,is_free_agent,hkb_value,current_level,level_source,level_availability,level_observed_at,level_raw_evidence,teams:owner_team_id(id,name,abbreviation)";
-const SCORE_SELECT=`id,league_id,player_id,score_version,gm_score,breakout_score,championship_impact,scarcity_score,trade_liquidity,market_appreciation,risk_score,dynasty_asset_score,roster_pressure_score,explanation,calculated_at,players!inner(${PLAYER_COLUMNS})`;
+export const PLAYER_INTELLIGENCE_BASE_PLAYER_COLUMNS="id,league_id,name,fantrax_id,mlbam_id,age,positions,mlb_team,owner_team_id,roster_status,is_minor_leaguer,is_free_agent,hkb_value,teams:owner_team_id(id,name,abbreviation)";
+export const PROSPECT_LEVEL_EVIDENCE_BATCH_SIZE=100;
+const PROSPECT_LEVEL_EVIDENCE_COLUMNS=`id,${PROSPECT_LEVEL_SCHEMA_FIELDS.join(",")}`;
+const SCORE_SELECT=`id,league_id,player_id,score_version,gm_score,breakout_score,championship_impact,scarcity_score,trade_liquidity,market_appreciation,risk_score,dynasty_asset_score,roster_pressure_score,explanation,calculated_at,players!inner(${PLAYER_INTELLIGENCE_BASE_PLAYER_COLUMNS})`;
+
+async function readProspectLevelEvidenceBatch(leagueId,playerIds){
+  const supabase=await client();
+  const result=await request(supabase.from("players").select(PROSPECT_LEVEL_EVIDENCE_COLUMNS).eq("league_id",leagueId).in("id",playerIds).order("id",{ascending:true}),"prospect level evidence query");
+  if(!Array.isArray(result?.data))throw new Error("Prospect-level evidence query returned a malformed response.");
+  return result.data;
+}
+async function probeProspectLevelColumn(leagueId,field){
+  const supabase=await client();
+  try{
+    await request(supabase.from("players").select(`id,${field}`).eq("league_id",leagueId).limit(1),`prospect level schema probe ${field}`);
+    return true;
+  }catch(error){
+    if(isMissingProspectLevelColumnError(error,field))return false;
+    throw error;
+  }
+}
+export async function enrichPlayersWithProspectLevelEvidence(leagueId,players=[],dependencies={}){
+  if(!leagueId)throw new Error("Active league is required.");
+  if(!Array.isArray(players)||!players.length)return [];
+  const readBatch=dependencies.readEvidenceBatch||readProspectLevelEvidenceBatch,probeColumn=dependencies.probeColumn||probeProspectLevelColumn;
+  const playerById=new Map();
+  for(const player of players){
+    if(!player?.id)throw new Error("Stable player UUID is required for prospect-level enrichment.");
+    if(playerById.has(player.id))throw new Error(`Duplicate player UUID in prospect-level enrichment: ${player.id}`);
+    playerById.set(player.id,player);
+  }
+  const ids=[...playerById.keys()],evidenceById=new Map();
+  for(let offset=0;offset<ids.length;offset+=PROSPECT_LEVEL_EVIDENCE_BATCH_SIZE){
+    const batchIds=ids.slice(offset,offset+PROSPECT_LEVEL_EVIDENCE_BATCH_SIZE);
+    let evidence;
+    try{evidence=await readBatch(leagueId,batchIds)}catch(error){
+      if(!isMissingProspectLevelColumnError(error))throw error;
+      if(offset)throw new Error("Prospect-level evidence schema changed during paginated enrichment.");
+      const presence={};
+      for(const field of PROSPECT_LEVEL_SCHEMA_FIELDS)presence[field]=await probeColumn(leagueId,field);
+      const inspection=requireHealthyProspectLevelSchemaInspection(inspectProspectLevelColumnPresence(presence));
+      if(inspection.schemaState!==PROSPECT_LEVEL_SCHEMA_STATES.SCHEMA_ABSENT)throw error;
+      return players.map(player=>({...player,prospectLevelSchemaState:PROSPECT_LEVEL_SCHEMA_STATES.SCHEMA_ABSENT}));
+    }
+    if(!Array.isArray(evidence))throw new Error("Prospect-level evidence query returned a malformed response.");
+    const inspection=requireHealthyProspectLevelSchemaRows(evidence);
+    if(inspection.schemaState!==PROSPECT_LEVEL_SCHEMA_STATES.PRESENT)throw new Error("Prospect-level evidence query did not return the complete optional schema.");
+    const expected=new Set(batchIds);
+    for(const row of evidence){
+      if(!expected.has(row?.id)||evidenceById.has(row.id))throw new Error("Prospect-level evidence returned an unexpected or duplicate player UUID.");
+      evidenceById.set(row.id,row);
+    }
+    if(batchIds.some(id=>!evidenceById.has(id)))throw new Error("Prospect-level evidence query did not return every requested player UUID.");
+  }
+  return players.map(player=>{
+    const evidence=evidenceById.get(player.id);
+    return {...player,...Object.fromEntries(PROSPECT_LEVEL_SCHEMA_FIELDS.map(field=>[field,evidence[field]??null])),prospectLevelSchemaState:PROSPECT_LEVEL_SCHEMA_STATES.PRESENT};
+  });
+}
+async function enrichScoreRows(leagueId,scoreRows){
+  const enriched=await enrichPlayersWithProspectLevelEvidence(leagueId,scoreRows.map(row=>row.players||row.player));
+  const byId=new Map(enriched.map(player=>[player.id,player]));
+  return scoreRows.map(row=>({...row,players:byId.get((row.players||row.player)?.id)}));
+}
 
 function num(value){
   const n=Number(value);
@@ -124,7 +187,8 @@ export async function listPlayerIntelligence(leagueId,query={}){
   else dbQuery=dbQuery.order("dynasty_asset_score",{ascending:false});
   dbQuery=dbQuery.order("player_id",{ascending:true}).range((page-1)*pageSize,page*pageSize-1);
   const result=await request(dbQuery,"player intelligence paged query");
-  const rows=sortRows(localFilterRows((result.data||[]).map(intelligenceRow),query),sort,ascending);
+  const scoreRows=await enrichScoreRows(leagueId,result.data||[]);
+  const rows=sortRows(localFilterRows(scoreRows.map(intelligenceRow),query),sort,ascending);
   return {rows,count:result.count||0,page,pageSize,scoreVersion:version};
 }
 export async function playerIntelligenceByIds(leagueId,playerIds,scoreVersion){
@@ -132,8 +196,9 @@ export async function playerIntelligenceByIds(leagueId,playerIds,scoreVersion){
   const scoreRows=await scoresForPlayers(leagueId,playerIds);
   const version=scoreVersion||scoreRows[0]?.score_version||ENGINE_VERSION;
   const supabase=await client();
-  const playersResult=await request(supabase.from("players").select(`${PLAYER_COLUMNS}`).eq("league_id",leagueId).in("id",playerIds),"player comparison query");
-  const playerById=new Map((playersResult.data||[]).map(player=>[player.id,player]));
+  const playersResult=await request(supabase.from("players").select(PLAYER_INTELLIGENCE_BASE_PLAYER_COLUMNS).eq("league_id",leagueId).in("id",playerIds),"player comparison query");
+  const enrichedPlayers=await enrichPlayersWithProspectLevelEvidence(leagueId,playersResult.data||[]);
+  const playerById=new Map(enrichedPlayers.map(player=>[player.id,player]));
   return playerIds.map(playerId=>{
     const score=scoreRows.find(row=>row.player_id===playerId&&row.score_version===version)||scoreRows.find(row=>row.player_id===playerId)||null;
     return intelligenceRow({...(score||{player_id:playerId,score_version:version,explanation:{scores:{},metadata:{}}}),players:playerById.get(playerId)||{id:playerId}});

@@ -1,7 +1,7 @@
 import * as leagueRepository from "../repositories/leagueRepository.js";
 import * as metricRepository from "../repositories/metricRepository.js";
 import * as playerRepository from "../repositories/playerRepository.js";
-import {LEVEL_AVAILABILITY,PROSPECT_LEVELS} from "./prospectLevelEvidence.js";
+import {LEVEL_AVAILABILITY,PROSPECT_LEVELS,PROSPECT_LEVEL_SCHEMA_STATES,withProspectLevelSchemaState} from "./prospectLevelEvidence.js";
 
 export const PLAYER_INTELLIGENCE_INPUT_VERSION="5.5B-1";
 export const INPUT_AVAILABILITY=Object.freeze({AVAILABLE:"AVAILABLE",STALE:"STALE",MISSING:"MISSING",UNAVAILABLE:"UNAVAILABLE",QUERY_FAILED:"QUERY_FAILED"});
@@ -60,7 +60,10 @@ export function buildCanonicalPlayerIntelligenceInput({player,league,metricRows=
   else warnings.push(warning("HKB_FRESHNESS_UNAVAILABLE","market","HKB market evidence has no row-level freshness timestamp."));
   if(!player.mlbam_id)warnings.push(warning("MLBAM_IDENTITY_INCOMPLETE","player","MLBAM supporting identity is unavailable."));
   if(!positionEligibility.eligible.length)warnings.push(warning("POSITION_ELIGIBILITY_MISSING","positionEligibility","No supported position eligibility is available."));
-  const minorKnown=typeof player.is_minor_leaguer==="boolean",isMinorLeaguer=minorKnown?player.is_minor_leaguer:null,currentLevel=player.current_level??null,levelSource=player.level_source??null,levelObservedAt=iso(player.level_observed_at),storedLevelAvailability=String(player.level_availability||"").toUpperCase(),levelAvailability=storedLevelAvailability||((currentLevel&&currentLevel!==PROSPECT_LEVELS.UNKNOWN)?LEVEL_AVAILABILITY.AVAILABLE:LEVEL_AVAILABILITY.UNKNOWN);
+  const levelSchemaState=player.prospectLevelSchemaState||null;
+  if(levelSchemaState===PROSPECT_LEVEL_SCHEMA_STATES.PARTIAL)throw new Error("Prospect-level evidence schema is partially available.");
+  const schemaAbsent=levelSchemaState===PROSPECT_LEVEL_SCHEMA_STATES.SCHEMA_ABSENT;
+  const minorKnown=typeof player.is_minor_leaguer==="boolean",isMinorLeaguer=minorKnown?player.is_minor_leaguer:null,currentLevel=schemaAbsent?null:player.current_level??null,levelSource=schemaAbsent?null:player.level_source??null,levelObservedAt=schemaAbsent?null:iso(player.level_observed_at),storedLevelAvailability=schemaAbsent?"":String(player.level_availability||"").toUpperCase(),levelAvailability=schemaAbsent?PROSPECT_LEVEL_SCHEMA_STATES.SCHEMA_ABSENT:storedLevelAvailability||((currentLevel&&currentLevel!==PROSPECT_LEVELS.UNKNOWN)?LEVEL_AVAILABILITY.AVAILABLE:LEVEL_AVAILABILITY.UNKNOWN),levelRawEvidence=schemaAbsent?null:player.level_raw_evidence??null;
   const roleEvidence={mlbStatus:currentLevel===PROSPECT_LEVELS.MLB?"MLB":isMinorLeaguer===true?"MINORS":player.mlb_team?"MLB":"UNKNOWN",rosterStatus:player.roster_status??null,pitcherEligibility:positionEligibility.eligible.filter(item=>item==="SP"||item==="RP"),everydayRole:null,rotationRole:null,bullpenRole:null,savesHoldsOpportunity:null,status:player.roster_status||player.mlb_team||minorKnown||currentLevel?INPUT_AVAILABILITY.AVAILABLE:INPUT_AVAILABILITY.UNAVAILABLE};
   if(!player.roster_status)warnings.push(warning("ROLE_EVIDENCE_INCOMPLETE","role","Role evidence is incomplete; certainty was not inferred."));
   return {schema:"player-intelligence-input-v1",inputVersion:PLAYER_INTELLIGENCE_INPUT_VERSION,playerId:player.id,leagueId:league.id,asOfDate:new Date(asOfDate).toISOString(),season:season??null,
@@ -69,8 +72,8 @@ export function buildCanonicalPlayerIntelligenceInput({player,league,metricRows=
     production:{status:productionRow?fantraxFreshness.status:INPUT_AVAILABILITY.UNAVAILABLE,fantasyPoints:productionRow?productionRaw.fantasyPoints??null:null,fantasyPointsPerGame:productionRow?productionRaw.fantasyPointsPerGame??null:null,gamesPlayed:null,plateAppearances:raw.pa??null,inningsPitched:null,appearances:null,season:productionRow?.season??season??null,source:productionRow?.source??null,metricRowId:productionRow?.id??null,sourceFilename:productionMetadata.sourceFilename??null,sourceJobId:productionMetadata.sourceJobId??null,rosterStatus:player.roster_status??null,ownerTeamId:player.owner_team_id??null,isFreeAgent:player.is_free_agent??player.owner_team_id===null,warning:productionRow?null:"Authoritative player-level league production is not available."},
     underlyingSkill:{status:statcastFreshness.status,playerType:type,metrics:metricRow?canonicalMetrics(raw,type==="pitcher"?PITCHER_KEYS:HITTER_KEYS):{},metricRowId:metricRow?.id??null,metricType:metricRow?.metric_type??null,source:metricRow?.source??null,season:metricRow?.season??season??null,snapshotId:metadata.snapshotId??null},
     market:{status:hkbAvailable?INPUT_AVAILABILITY.AVAILABLE:INPUT_AVAILABILITY.MISSING,provider:"HKB",value:hkbAvailable?Number(player.hkb_value):null,overallRank:player.overall_rank??null,positionRank:player.position_rank??null},
-    role:roleEvidence,ageDevelopment:{status:player.age!==null&&player.age!==undefined?INPUT_AVAILABILITY.AVAILABLE:INPUT_AVAILABILITY.MISSING,age:player.age??null,isMinorLeaguer,organization:player.mlb_team??null,level:currentLevel,levelSource,levelAvailability,levelFreshness:levelObservedAt,levelRawEvidence:player.level_raw_evidence??null,readiness:null},
-    prospectContext:{status:isMinorLeaguer===true?INPUT_AVAILABILITY.AVAILABLE:isMinorLeaguer===false?INPUT_AVAILABILITY.UNAVAILABLE:INPUT_AVAILABILITY.MISSING,isProspect:isMinorLeaguer,level:currentLevel,levelSource,levelAvailability,levelFreshness:levelObservedAt,classification:null,rosterSlotUsed:Boolean(player.owner_team_id),readiness:null},replacementContext:{status:INPUT_AVAILABILITY.UNAVAILABLE,frontier:null,advantage:null},
+    role:roleEvidence,ageDevelopment:{status:player.age!==null&&player.age!==undefined?INPUT_AVAILABILITY.AVAILABLE:INPUT_AVAILABILITY.MISSING,age:player.age??null,isMinorLeaguer,organization:player.mlb_team??null,level:currentLevel,levelSource,levelAvailability,levelSchemaState,levelFreshness:levelObservedAt,levelRawEvidence,readiness:null},
+    prospectContext:{status:isMinorLeaguer===true?INPUT_AVAILABILITY.AVAILABLE:isMinorLeaguer===false?INPUT_AVAILABILITY.UNAVAILABLE:INPUT_AVAILABILITY.MISSING,isProspect:isMinorLeaguer,level:currentLevel,levelSource,levelAvailability,levelSchemaState,levelFreshness:levelObservedAt,classification:null,rosterSlotUsed:Boolean(player.owner_team_id),readiness:null},replacementContext:{status:INPUT_AVAILABILITY.UNAVAILABLE,frontier:null,advantage:null},
     dataFreshness:{statcast:statcastFreshness,hkb:{status:hkbAvailable?INPUT_AVAILABILITY.UNAVAILABLE:INPUT_AVAILABILITY.MISSING,source:"HKB",season:null,fetchedAt:null,ageMs:null},fantrax:fantraxFreshness},warnings};
 }
 
@@ -78,6 +81,6 @@ export async function loadCanonicalPlayerIntelligenceInput({leagueId,playerId,se
   if(!leagueId||!playerId)throw new Error("League ID and stable player UUID are required.");
   const playersRepo=repositories.players||playerRepository,metricsRepo=repositories.metrics||metricRepository,leaguesRepo=repositories.leagues||leagueRepository;
   const [players,metricRows,league]=await Promise.all([playersRepo.allPlayers(leagueId),metricsRepo.listMetrics(leagueId),leaguesRepo.leagueById(leagueId)]);
-  const player=(players||[]).find(row=>row.id===playerId);if(!player)throw new Error("Player UUID was not found in the active league.");
+  const player=withProspectLevelSchemaState(players||[]).find(row=>row.id===playerId);if(!player)throw new Error("Player UUID was not found in the active league.");
   return buildCanonicalPlayerIntelligenceInput({player,league,metricRows,season,asOfDate});
 }

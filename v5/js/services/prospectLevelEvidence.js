@@ -3,6 +3,56 @@ export const PROSPECT_LEVELS=Object.freeze({
   COMPLEX:"COMPLEX",DSL:"DSL",INACTIVE:"INACTIVE",UNKNOWN:"UNKNOWN"
 });
 export const LEVEL_AVAILABILITY=Object.freeze({AVAILABLE:"AVAILABLE",UNKNOWN:"UNKNOWN",STALE:"STALE",CONFLICT:"CONFLICT"});
+export const PROSPECT_LEVEL_SCHEMA_FIELDS=Object.freeze(["current_level","level_source","level_availability","level_observed_at","level_raw_evidence"]);
+export const PROSPECT_LEVEL_SCHEMA_STATES=Object.freeze({PRESENT:"PRESENT",SCHEMA_ABSENT:"SCHEMA_ABSENT",PARTIAL:"PARTIAL"});
+
+const owns=(row,field)=>Object.prototype.hasOwnProperty.call(row||{},field);
+
+export function inspectProspectLevelSchemaRows(rows=[]){
+  const source=Array.isArray(rows)?rows:[];
+  const presentFields=[],absentFields=[],inconsistentFields=[];
+  for(const field of PROSPECT_LEVEL_SCHEMA_FIELDS){
+    const count=source.reduce((total,row)=>total+(owns(row,field)?1:0),0);
+    if(source.length&&count===source.length)presentFields.push(field);
+    else if(count===0)absentFields.push(field);
+    else inconsistentFields.push(field);
+  }
+  const schemaState=inconsistentFields.length||presentFields.length&&absentFields.length?PROSPECT_LEVEL_SCHEMA_STATES.PARTIAL:presentFields.length===PROSPECT_LEVEL_SCHEMA_FIELDS.length?PROSPECT_LEVEL_SCHEMA_STATES.PRESENT:PROSPECT_LEVEL_SCHEMA_STATES.SCHEMA_ABSENT;
+  return Object.freeze({schemaState,presentFields:Object.freeze(presentFields),absentFields:Object.freeze(absentFields),inconsistentFields:Object.freeze(inconsistentFields)});
+}
+
+export function inspectProspectLevelColumnPresence(presence={}){
+  const rows=[Object.fromEntries(PROSPECT_LEVEL_SCHEMA_FIELDS.filter(field=>presence[field]===true).map(field=>[field,null]))];
+  return inspectProspectLevelSchemaRows(rows);
+}
+
+export function requireHealthyProspectLevelSchemaInspection(inspection){
+  if(inspection.schemaState===PROSPECT_LEVEL_SCHEMA_STATES.PARTIAL){
+    const error=new Error("Prospect-level evidence schema is partially available.");
+    error.code="PROSPECT_LEVEL_SCHEMA_PARTIAL";
+    error.schemaInspection=inspection;
+    throw error;
+  }
+  return inspection;
+}
+
+export function requireHealthyProspectLevelSchemaRows(rows=[]){
+  return requireHealthyProspectLevelSchemaInspection(inspectProspectLevelSchemaRows(rows));
+}
+
+export function withProspectLevelSchemaState(rows=[]){
+  const inspection=requireHealthyProspectLevelSchemaRows(rows);
+  return (rows||[]).map(row=>({...row,prospectLevelSchemaState:inspection.schemaState}));
+}
+
+export function isMissingProspectLevelColumnError(error,field=null){
+  const candidates=field?[field]:PROSPECT_LEVEL_SCHEMA_FIELDS;
+  const details=[error?.message,error?.details,error?.hint,error?.cause?.message,error?.cause?.details].filter(Boolean).join(" ");
+  if(!candidates.some(candidate=>details.toLowerCase().includes(String(candidate).toLowerCase())))return false;
+  const code=String(error?.code||error?.cause?.code||"").toUpperCase();
+  const missingLanguage=/does not exist|could not find[^.]*column|schema cache[^.]*column|undefined column/i.test(details);
+  return missingLanguage&&(!code||code==="42703"||code==="PGRST204");
+}
 
 const SPORT_LEVELS=new Map([[1,"MLB"],[11,"AAA"],[12,"AA"],[13,"A_PLUS"],[14,"A"],[16,"ROOKIE"]]);
 const TEXT_LEVELS=new Map([

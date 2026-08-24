@@ -1,6 +1,7 @@
 import { readProtectedBaselineDomains } from "../repositories/protectedBaselineRepository.js";
+import { PROSPECT_LEVEL_SCHEMA_FIELDS, requireHealthyProspectLevelSchemaRows } from "./prospectLevelEvidence.js";
 
-export const PROSPECT_LEVEL_MUTABLE_FIELDS=Object.freeze(["current_level","level_source","level_availability","level_observed_at","level_raw_evidence"]);
+export const PROSPECT_LEVEL_MUTABLE_FIELDS=PROSPECT_LEVEL_SCHEMA_FIELDS;
 export const PROSPECT_LEVEL_UPDATED_AT_DECISION="UPDATED_AT_EXPECTED_MUTABLE";
 
 export const PROTECTED_BASELINE_PROFILES=Object.freeze({
@@ -51,10 +52,7 @@ function omitFields(row,allowed=[]){
   return Object.fromEntries(Object.entries(row||{}).filter(([key])=>!omitted.has(key)));
 }
 function schemaAwareRows(rows,fields,schemaFields=fields){
-  const hasAny=rows.some(row=>schemaFields.some(field=>Object.prototype.hasOwnProperty.call(row||{},field)));
-  const hasAll=rows.every(row=>schemaFields.every(field=>Object.prototype.hasOwnProperty.call(row||{},field)));
-  if(hasAny&&!hasAll)throw new Error("Prospect-level evidence schema is partially available.");
-  const schemaState=hasAny?"PRESENT":"SCHEMA_ABSENT";
+  const {schemaState}=requireHealthyProspectLevelSchemaRows(rows,schemaFields);
   const evidence=schemaState==="PRESENT"?rows.map(row=>Object.fromEntries([["id",row?.id??null],...fields.map(field=>[field,row?.[field]??null])])):[];
   return {schemaState,evidence};
 }
