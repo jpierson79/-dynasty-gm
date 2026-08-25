@@ -7,9 +7,19 @@ import {captureProtectedBaseline,protectedDigest} from "./protectedBaselineServi
 const SCHEMA="prospect-level-population-preview-v1",MAX_AGE=15*60*1000,RAW_SCHEMA="mlb-stats-prospect-level-evidence-v1",MAX_RAW_OBSERVATIONS=16;
 export const PROSPECT_LEVEL_MUTATION_FIELDS=Object.freeze(["current_level","level_source","level_availability","level_observed_at","level_raw_evidence"]);
 export const PROSPECT_LEVEL_IMMUTABLE_GUARD_FIELDS=Object.freeze(["player_id","mlbam_id","expected_current_level","expected_level_source","expected_level_availability","expected_level_observed_at","expected_level_raw_evidence"]);
+export const PROSPECT_LEVEL_CHANGE_REASONS=Object.freeze({current_level:"CURRENT_LEVEL_CHANGED",level_source:"LEVEL_SOURCE_CHANGED",level_availability:"LEVEL_AVAILABILITY_CHANGED",level_observed_at:"LEVEL_OBSERVED_AT_CHANGED",level_raw_evidence:"LEVEL_RAW_EVIDENCE_CHANGED"});
 const clean=value=>String(value??"").trim();
 const canon=value=>value&&typeof value==="object"?Array.isArray(value)?value.map(canon):Object.fromEntries(Object.keys(value).sort().map(key=>[key,canon(value[key])])):value??null;
-const same=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
+export function canonicalProspectLevelTimestamp(value){const text=clean(value);if(!text)return null;const parsed=Date.parse(text);return Number.isFinite(parsed)?new Date(parsed).toISOString():text}
+function canonicalRawEvidence(value){
+  if(!value||typeof value!=="object"||Array.isArray(value)||value.schema!==RAW_SCHEMA)return canon(value);
+  const ids=[...new Set((value.sportIds||[]).map(Number).filter(id=>Number.isInteger(id)&&id>0))].sort((a,b)=>a-b).slice(0,MAX_RAW_OBSERVATIONS);
+  const observations=[...new Map((value.observations||[]).map(row=>[Number(row?.sportId),{sportId:Number(row?.sportId),active:row?.active!==false}]).filter(([id])=>Number.isInteger(id)&&id>0)).values()].sort((a,b)=>a.sportId-b.sportId).slice(0,MAX_RAW_OBSERVATIONS);
+  const currentTeamId=Number(value.currentTeamId);return {schema:RAW_SCHEMA,mlbamId:clean(value.mlbamId).slice(0,20),sportIds:ids,observations,active:value.active!==false,currentTeamId:Number.isInteger(currentTeamId)&&currentTeamId>0?currentTeamId:null,normalization:{inputSportIdCount:Number(value.normalization?.inputSportIdCount)||ids.length,truncatedSportIdCount:Number(value.normalization?.truncatedSportIdCount)||0}};
+}
+export function normalizeProspectLevelPersistedEvidence(value={}){return {current_level:value.current_level??null,level_source:value.level_source==null?null:clean(value.level_source),level_availability:value.level_availability??null,level_observed_at:canonicalProspectLevelTimestamp(value.level_observed_at),level_raw_evidence:canonicalRawEvidence(value.level_raw_evidence)}}
+export function prospectLevelDifferenceReasons(current={},next={}){const before=normalizeProspectLevelPersistedEvidence(current),after=normalizeProspectLevelPersistedEvidence(next);return PROSPECT_LEVEL_MUTATION_FIELDS.filter(field=>JSON.stringify(before[field])!==JSON.stringify(after[field])).map(field=>PROSPECT_LEVEL_CHANGE_REASONS[field])}
+export const areProspectLevelEvidenceEqual=(current,next)=>prospectLevelDifferenceReasons(current,next).length===0;
 function numericSportIds(person,evidence){
   const raw=Array.isArray(evidence.rawEvidence)?evidence.rawEvidence:[evidence.rawEvidence],values=[...(person.sportIds||[]),person.sportId,...raw.map(row=>row?.sportId)];
   return [...new Set(values.map(Number).filter(value=>Number.isInteger(value)&&value>0))].sort((a,b)=>a-b);
@@ -19,7 +29,7 @@ export function serializeProspectLevelRawEvidence(person={},evidence={}){
   for(const sportId of sportIds){const entries=raw.filter(row=>Number(row?.sportId)===sportId),active=entries.some(row=>row?.active===false)?false:person.active!==false;observations.push({sportId,active})}
   return {schema:RAW_SCHEMA,mlbamId:clean(person.mlbamId).slice(0,20),sportIds,observations,active:person.active!==false,currentTeamId:Number.isInteger(Number(person.currentTeam?.id))?Number(person.currentTeam.id):null,normalization:{inputSportIdCount:allSportIds.length,truncatedSportIdCount:Math.max(0,allSportIds.length-sportIds.length)}};
 }
-function payload(player,person){const evidence=person.levelEvidence||{},availability=evidence.levelAvailability||"UNKNOWN",conflict=availability==="CONFLICT";return {current_level:conflict?null:evidence.currentLevel??null,level_source:evidence.levelSource||"MLB_STATS_API",level_availability:availability,level_observed_at:evidence.levelObservedAt||null,level_raw_evidence:serializeProspectLevelRawEvidence(person,evidence)}}
+function payload(player,person){const evidence=person.levelEvidence||{},availability=evidence.levelAvailability||"UNKNOWN",conflict=availability==="CONFLICT";return {current_level:conflict?null:evidence.currentLevel??null,level_source:evidence.levelSource||"MLB_STATS_API",level_availability:availability,level_observed_at:canonicalProspectLevelTimestamp(evidence.levelObservedAt)||canonicalProspectLevelTimestamp(player.level_observed_at),level_raw_evidence:serializeProspectLevelRawEvidence(person,evidence)}}
 export function buildProspectLevelPlan(players=[],catalog={}){
   const groups=new Map();for(const player of players){const id=clean(player.mlbam_id);if(id){if(!groups.has(id))groups.set(id,[]);groups.get(id).push(player)}}
   const rows=[],unmatched=[],conflicts=[],invalid=[];
@@ -30,10 +40,11 @@ export function buildProspectLevelPlan(players=[],catalog={}){
     const player=matches[0],next=payload(player,person),current=Object.fromEntries(PROSPECT_LEVEL_MUTATION_FIELDS.map(field=>[field,player[field]??null]));
     if(next.level_observed_at&&current.level_observed_at&&Date.parse(next.level_observed_at)<Date.parse(current.level_observed_at)){invalid.push({mlbamId:id,playerId:player.id,reason:"STALE_PROVIDER_EVIDENCE"});continue}
     if(next.level_availability==="CONFLICT"&&current.current_level&&["AVAILABLE","STALE"].includes(current.level_availability)){conflicts.push({mlbamId:id,playerId:player.id,reason:"NON_WRITABLE_PROVIDER_CONFLICT_PRESERVES_VALID_LEVEL",incoming:next});continue}
-    rows.push({playerId:player.id,mlbamId:id,playerName:player.name||"",current,next,action:same(current,next)?"NO_OP":"UPDATE"});
+    const changeReasons=prospectLevelDifferenceReasons(current,next);rows.push({playerId:player.id,mlbamId:id,playerName:player.name||"",current,next,changeReasons,action:changeReasons.length?"UPDATE":"NO_OP"});
   }
   const updates=rows.filter(row=>row.action==="UPDATE"),noOps=rows.filter(row=>row.action==="NO_OP"),distribution={};for(const row of rows){const key=row.next.level_availability==="CONFLICT"?"CONFLICT":row.next.level_availability==="UNKNOWN"?"UNKNOWN":row.next.current_level||"UNKNOWN";distribution[key]=(distribution[key]||0)+1}
-  return {rows,updates,noOps,unmatched,conflicts,invalid,distribution,providerConflictCount:rows.filter(row=>row.next.level_availability==="CONFLICT").length+conflicts.filter(row=>row.reason?.includes("PROVIDER_CONFLICT")).length};
+  const changeReasonCounts={};for(const row of updates)for(const reason of row.changeReasons)changeReasonCounts[reason]=(changeReasonCounts[reason]||0)+1;
+  return {rows,updates,noOps,unmatched,conflicts,invalid,distribution,changeReasonCounts,providerConflictCount:rows.filter(row=>row.next.level_availability==="CONFLICT").length+conflicts.filter(row=>row.reason?.includes("PROVIDER_CONFLICT")).length};
 }
 function writeRow(row){return {player_id:row.playerId,mlbam_id:Number(row.mlbamId),...row.next,expected_current_level:row.current.current_level,expected_level_source:row.current.level_source,expected_level_availability:row.current.level_availability,expected_level_observed_at:row.current.level_observed_at,expected_level_raw_evidence:row.current.level_raw_evidence}}
 async function manifestDigest(preview){return protectedDigest({schema:SCHEMA,leagueId:preview.leagueId,userId:preview.userId,snapshot:{provider:preview.provider,season:preview.season,fetchedAt:preview.fetchedAt,sportIds:preview.sportIds},baseline:{profile:preview.baseline.profile,contractVersion:preview.baseline.contractVersion,protectedHash:preview.baseline.domains?.players?.hash,schemaState:preview.baseline.domains?.prospectLevelEvidence?.schemaState},writePlan:preview.plan.updates.map(writeRow)})}

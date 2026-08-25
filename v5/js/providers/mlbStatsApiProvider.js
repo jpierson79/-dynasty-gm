@@ -47,7 +47,6 @@ export async function fetchMlbIdentityCatalog({season=new Date().getUTCFullYear(
     payload.people.forEach((person,rowIndex)=>{const normalized=personRow(person,sportIds[index]);if(!normalized)invalid.push({sportId:sportIds[index],rowIndex,reason:"MALFORMED_PERSON"});else{normalized.currentTeam={...teamById.get(normalized.currentTeam.id),...normalized.currentTeam,parentOrgId:teamById.get(normalized.currentTeam.id)?.parentOrgId||normalized.currentTeam.parentOrgId};people.set(normalized.mlbamId,mergePerson(people.get(normalized.mlbamId),normalized))}});
   });
   const fetchedAt=new Date().toISOString();
-  for(const person of people.values())if(person.levelEvidence)person.levelEvidence={...person.levelEvidence,levelObservedAt:fetchedAt};
   return {provider:"MLB Stats API",season:year,fetchedAt,sportIds:sportIds.map(Number),teams,people:[...people.values()].sort((a,b)=>Number(a.mlbamId)-Number(b.mlbamId)),invalid,warnings:invalid.map(row=>({reason:row.reason,sportId:row.sportId}))};
 }
 

@@ -16,7 +16,8 @@ assert.equal(conflict.levelAvailability,LEVEL_AVAILABILITY.CONFLICT);assert.equa
 const response=payload=>({ok:true,status:200,headers:{get:()=>"application/json"},json:async()=>payload});
 const catalog=await fetchMlbIdentityCatalog({season:2026,sportIds:[11,14],fetchImpl:async url=>url.includes("/teams?")?response({teams:[]}):response({people:[{id:101,fullName:"Fixture",active:true,primaryPosition:{abbreviation:"SS"}}]})});
 assert.equal(catalog.people[0].levelEvidence.levelAvailability,LEVEL_AVAILABILITY.CONFLICT,"multiple factual levels fail closed rather than choosing one");
-assert.ok(catalog.people[0].levelEvidence.levelObservedAt);
+assert.equal(catalog.people[0].levelEvidence.levelObservedAt,null,"collection time remains catalog audit metadata, not player factual observation time");
+assert.ok(catalog.fetchedAt);
 
 const league={id:"league",settings:{}},base={id:"player",league_id:"league",name:"Fixture",age:20,positions:["SS"],mlb_team:"NYY",is_minor_leaguer:true,current_level:"AAA",level_source:"MLB_STATS_API",level_availability:"AVAILABLE",level_observed_at:"2026-08-15T00:00:00Z",level_raw_evidence:{sportId:11},hkb_value:10};
 const build=player=>buildCanonicalPlayerIntelligenceInput({player,league,season:2026,metricRows:[],asOfDate:"2026-08-15T01:00:00Z"});
