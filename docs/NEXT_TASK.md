@@ -1,4 +1,53 @@
-# Next Task: V5.5B-6G0A Prospect Level Migration / Data Population Acceptance
+# Next Task: V5.5B-6G0E Prospect Level Idempotency Repair
+
+## Active status and authority
+
+- Baseline: clean `feature/manager-intelligence` at `b4e514ca534c754a487756bac06feb1c452f4cd7`.
+- G0D is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON G0E / IDEMPOTENCY** after one successful governed population of 5,440 players.
+- Migration 014 and Migration 015 are **APPLIED**. They must not be reapplied, modified, or treated as pending.
+- G0E is **ACTIVE** for local investigation, repair, and validation only. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
+
+## Proven failure and objective
+
+The first governed Apply completed for 5,440 of 5,440 exact UUID/MLBAM matches. Player writes and audit finalization were `COMPLETED`, protected-domain comparison passed, and no unauthorized mutation occurred. A fresh post-Apply Preview nevertheless classified all 5,440 persisted rows as `UPDATE` and zero as `NO_OP`. No second Apply was performed.
+
+G0E must prove which persisted field creates the false difference: `current_level`, `level_source`, `level_availability`, `level_observed_at`, or `level_raw_evidence`. Expose deterministic field-level planner reasons for each changed field. Do not guess, persist diagnostic reasons, or mass-rewrite the 5,440 rows.
+
+Identical factual evidence must produce `NO_OP` even when irrelevant workflow metadata or equivalent storage representations differ. Meaningful factual changes must remain `UPDATE`, and older evidence must remain stale/non-writable. Prefer one canonical semantic comparator shared by Preview, retry, Apply revalidation, and tests.
+
+## Mandatory investigation and semantic contract
+
+Investigate without assuming: regenerated Preview/collection time; volatile request/job/snapshot metadata; object-key or irrelevant array order; JSON/database round trips; timestamp timezone/precision; null/undefined/missing/empty representations; serialized instead of semantic comparison; unstable conflict evidence; and stored versus normalized type differences.
+
+- `current_level`: identical values compare equal; real changes such as `AA -> AAA` remain updates.
+- `level_source` and `level_availability`: cosmetic representation does not update, but meaningful source or availability transitions do. Preserve distinct `AVAILABLE`, `UNKNOWN`, and `CONFLICT` semantics.
+- `level_observed_at`: determine and document its factual-freshness meaning. A new click/request/job time alone cannot update a player. Equivalent timezone/precision representations compare equal; meaningful newer evidence remains distinguishable. Do not simply ignore this field.
+- `level_raw_evidence`: remain allowlisted, factual, auditable, deterministic, bounded to 16 observations, and explicit about truncation. Separate workflow/audit time from factual player evidence. Canonicalize key order and only array order proven factually irrelevant; preserve meaningful order.
+- Define deterministic null, absent, empty-array, and empty-object behavior without collapsing schema-distinct states.
+
+Identical factual evidence for `MLB`, `AAA`, `AA`, `A_PLUS`, `A`, `ROOKIE`, and `CONFLICT` must become `NO_OP`; UNKNOWN retains its accepted policy. Conflict remains visible, never guesses a level, and must not overwrite valid evidence with a guess.
+
+## Preserved boundaries
+
+Preserve exact UUID plus MLBAM identity, no name authority or player creation, the five-field mutation boundary, batches of at most 250, partial retry, truthful audit finalization, `PROSPECT_LEVEL_POPULATION`, G0C Preview/Review/Apply, and G0D bootstrap. Previously successful rows become no-ops; only failed/unwritten rows remain writable if evidence is valid. Audit/job timestamps cannot drive player updates.
+
+Migration 014 and Migration 015 remain unchanged. Do not create Migration 016 unless investigation proves an unavoidable database-contract contradiction; if so, stop and report. Preserve Fantrax, Statcast, Player Intelligence formulas, and Engine 5.1.1.
+
+## Required validation
+
+Add focused tests for identical normal/conflict evidence, accepted UNKNOWN behavior, volatile run times, JSON ordering/round trips, equivalent timestamps, deterministic null/absent handling, real factual changes, stale evidence, conflict safety, exact mutation fields, Migration 015, 250-row batching, partial retry, audit failures, G0B/G0C/G0D, Fantrax, Statcast, and Engine 5.1.1. Run focused tests, all `tests/*.test.mjs`, syntax checks for changed JavaScript, and `git diff --check`.
+
+Record the root cause, field diagnostics, equality/freshness/raw-evidence contracts, files, and tests in `docs/NEXT_TASK_RESULT.md`; stop uncommitted for architect review unless separately authorized.
+
+## Resumed G0A starting state
+
+After G0E is implemented, tested, reviewed, and checkpointed, G0A resumes from the **current production state**. Verify Migrations 014/015 and protected domains are healthy, deploy the reviewed immutable G0E artifact, and run a fresh Preview. The 5,440 prior successes must be `NO_OP` except for proven genuine factual source changes. Do not restart at `SCHEMA_ABSENT` or reapply either migration. Data Health, canonical Player Intelligence production-input inspection, and the G1 decision remain pending; G0E completion alone does not unblock G1.
+
+## Prohibitions
+
+Do not deploy, access production/cloud data, run provider Preview/Review/Apply, rewrite or roll back the 5,440 rows, modify/reapply Migrations 014/015, implement G1, change Player Intelligence formulas, refresh Statcast, run Fantrax import/sync, or activate V5.5C.
+
+# Superseded Contract: V5.5B-6G0A Prospect Level Migration / Data Population Acceptance
 
 ## Active status and authority
 

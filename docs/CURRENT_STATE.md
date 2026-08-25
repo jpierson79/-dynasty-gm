@@ -1,5 +1,15 @@
 # Current State
 
+## V5.5B-6G0E Prospect Level Idempotency Repair Activated (2026-08-24)
+
+- The active task is **V5.5B-6G0E Prospect Level Idempotency Repair**, a local-only repair of the canonical prospect-level planner equality boundary.
+- G0A completed one governed population Apply for **5,440 / 5,440** exact UUID/MLBAM matches. Player writes and audit finalization completed, and protected-domain comparison passed. No second Apply occurred.
+- G0A is **BLOCKED ON G0E / IDEMPOTENCY** because the mandatory fresh post-Apply Preview reported 5,440 updates and zero no-ops for already-persisted evidence.
+- Migration 014 and Migration 015 are **APPLIED**. Production is not pre-migration, and the 5,440 successful writes remain present.
+- G0E must identify the exact differing field among `current_level`, `level_source`, `level_availability`, `level_observed_at`, and `level_raw_evidence`; establish canonical semantic comparison; and preserve factual-change, stale-evidence, conflict, identity, five-field mutation, batching, retry, audit, protected-baseline, G0C, and G0D boundaries.
+- G1 remains **BLOCKED**. Data Health and canonical Player Intelligence production-input acceptance remain pending G0A gates. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
+- This activation is documentation-only; no deployment, provider collection, production/cloud access, migration, or data mutation occurred.
+
 ## V5.5B-6G0A Prospect Level Migration / Data Population Acceptance Activated (2026-08-24)
 
 - V5.5B-6G0D is **COMPLETE / CHECKPOINTED** at implementation commit `f9079ddc7174ad5f0ab87ccdf713fa099df0e1ce` with documentation checkpoint `1476d98a352507a45299e51553df9fbe0c80ce91`. Mandatory bootstrap no longer requires Migration 014; optional prospect evidence is UUID-joined in bounded batches with `SCHEMA_ABSENT`, `PRESENT`, and fail-closed partial/error semantics.
