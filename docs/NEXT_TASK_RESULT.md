@@ -3007,3 +3007,10 @@ Existing top-level score columns remain compatibility/index fields. JSONB is ade
 - JavaScript syntax checks passed for both changed JavaScript files and the changed population test. `git diff --check` passed with line-ending warnings only. Migrations 014 and 015 are unchanged; no Migration 016 exists.
 - Limitation: this is deterministic local proof only. The 5,440 production rows were not read or rewritten, and the repaired no-op count must be confirmed later through the separately authorized resumed G0A fresh Preview.
 - Final local status: G0E is **LOCAL IMPLEMENTATION UNDER ARCHITECT REVIEW**; G0A remains **BLOCKED ON G0E**; G1 remains blocked; calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked. No staging, commit, push, deployment, browser, provider, Preview/Review/Apply, migration, production/cloud access, audit creation, player write, import, refresh, identity/ownership/roster mutation, score recalculation, or Player Intelligence formula change occurred.
+
+### Checkpoint result
+
+- Architect-approved implementation commit: `cecbe15baa057a86a5cfc1da7a564ae23ac4534d` (`Make prospect level population idempotent`). Push to `origin/feature/manager-intelligence` succeeded.
+- G0E is **COMPLETE / CHECKPOINTED**. G0A is **READY TO RESUME FROM THE CURRENT PRODUCTION STATE** under separate authorization. Migration 014 and Migration 015 remain applied in production and unchanged in the repository; the existing 5,440 successful prospect-level rows were not rewritten.
+- Checkpoint validation passed 15/15 focused files, 57/57 standalone test files, four JavaScript syntax checks, the 10,326-player performance regression at 3,044 ms, trusted deployment topology at 105 modules / 123 hashed files, and `git diff --check`.
+- G1 remains blocked pending resumed G0A completion; calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked. No deployment, production/cloud/provider access, live Preview/Review/Apply, migration, import, refresh, player/data write, identity/ownership/roster mutation, score recalculation, or Player Intelligence formula change occurred during checkpointing.
