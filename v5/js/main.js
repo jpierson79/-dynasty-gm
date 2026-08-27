@@ -516,11 +516,15 @@ function bindViewEvents(){
     importUiState.prospectLevelBaseline={running:false,evidence,error:evidence.status==="AVAILABLE"?"":evidence.errors?.join(" ")||evidence.status};render();
   });
   $("#prospectLevelSeason")?.addEventListener("change",event=>{importUiState.prospectLevelPopulation=createProspectLevelPopulationUiState({season:Number(event.target.value),status:"INVALIDATED",invalidationReason:"Provider season changed."});render()});
+  const updateProspectDiagnostics=changes=>{const current=importUiState.prospectLevelPopulation;importUiState.prospectLevelPopulation={...current,diagnostics:{...current.diagnostics,...changes}};render()};
+  [["prospectDiagnosticAction","action"],["prospectDiagnosticReason","reason"],["prospectDiagnosticAvailability","availability"],["prospectDiagnosticPageSize","pageSize"]].forEach(([id,key])=>$("#"+id)?.addEventListener("change",event=>updateProspectDiagnostics({[key]:key==="pageSize"?Number(event.target.value):event.target.value,page:1})));
+  $("#prospectDiagnosticPrevious")?.addEventListener("click",()=>updateProspectDiagnostics({page:Math.max(1,(importUiState.prospectLevelPopulation.diagnostics?.page||1)-1)}));
+  $("#prospectDiagnosticNext")?.addEventListener("click",()=>updateProspectDiagnostics({page:(importUiState.prospectLevelPopulation.diagnostics?.page||1)+1}));
   $("#reviewProspectLevelPopulation")?.addEventListener("change",event=>{importUiState.prospectLevelPopulation={...importUiState.prospectLevelPopulation,status:event.target.checked?"REVIEWED":"PREVIEW_READY",reviewed:event.target.checked};render()});
   $("#previewProspectLevelPopulation")?.addEventListener("click",async()=>{
-    const current=importUiState.prospectLevelPopulation;importUiState.prospectLevelPopulation={...current,status:"PREVIEWING",invalidationReason:"",running:true,preview:null,reviewed:false,result:null,error:""};render();
-    try{const preview=await previewProspectLevelPopulation({leagueId:appState.activeLeague.id,season:current.season,baseline:importUiState.prospectLevelBaseline.evidence});importUiState.prospectLevelPopulation={...current,status:"PREVIEW_READY",invalidationReason:"",running:false,preview,reviewed:false,result:null,error:""}}
-    catch(error){importUiState.prospectLevelPopulation={...current,status:"FAILED_BEFORE_WRITES",invalidationReason:"",running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error)}}render();
+    const current=importUiState.prospectLevelPopulation,diagnostics=createProspectLevelPopulationUiState({season:current.season}).diagnostics;importUiState.prospectLevelPopulation={...current,status:"PREVIEWING",invalidationReason:"",running:true,preview:null,reviewed:false,result:null,error:"",diagnostics};render();
+    try{const preview=await previewProspectLevelPopulation({leagueId:appState.activeLeague.id,season:current.season,baseline:importUiState.prospectLevelBaseline.evidence});importUiState.prospectLevelPopulation={...current,status:"PREVIEW_READY",invalidationReason:"",running:false,preview,reviewed:false,result:null,error:"",diagnostics}}
+    catch(error){importUiState.prospectLevelPopulation={...current,status:"FAILED_BEFORE_WRITES",invalidationReason:"",running:false,preview:null,reviewed:false,result:null,error:String(error?.message||error),diagnostics}}render();
   });
   $("#applyProspectLevelPopulation")?.addEventListener("click",async()=>{
     const current=importUiState.prospectLevelPopulation;if(!current.preview||!current.reviewed){setError("Preview and review prospect-level population first.");return}
