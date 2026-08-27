@@ -1,14 +1,15 @@
 # Current State
 
-## V5.5B-6G0G Trusted Immutable Pages Delivery Repair Active (2026-08-27)
+## V5.5B-6G0H GitHub Pages Actions Cutover & Hosted Immutable Delivery Acceptance Active (2026-08-27)
 
-- G0G is **ACTIVE / LOCAL IMPLEMENTATION AND CONFIGURATION DIAGNOSIS ONLY** at governance baseline `f8022d7b95fc77d21ef20eddfc2f422575b07eae`.
-- G0F remains **COMPLETE / CHECKPOINTED** at application commit `f67088c84eb79eab227a4a5759a37269e6c9f631`. G0A is **BLOCKED ON IMMUTABLE ARTIFACT DELIVERY**.
+- G0G is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `105b4bc15e98b0af88890053ccf84f7f02f49759` and documentation checkpoint `42187b3774108c4efb8088131077924e6b85ce39`.
+- G0H is **ACTIVE / REMOTE CUTOVER + HOSTED DELIVERY ACCEPTANCE AUTHORIZED**. Its only authorized repository-setting mutation is Pages source from legacy branch publication to GitHub Actions (`build_type=workflow`).
+- G0F remains **COMPLETE / CHECKPOINTED** at application commit `f67088c84eb79eab227a4a5759a37269e6c9f631`. G0A is **BLOCKED ON G0H**.
 - Trusted workflow run `33099352271` successfully built and reported the reviewed 105-module/123-file topology and manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, but the immutable directory and exact index returned 404 while Pages remained configured for legacy main-branch publication. Workflow success therefore did not establish hosted availability.
 - Pages was restored successfully to approved main. No hosted G0F startup, authentication, production diagnostic, Preview/Review/Apply, migration, or data mutation occurred in that attempt.
-- G0G is limited to proving and repairing the trusted immutable delivery chain. It preserves SHA allowlisting, immutable paths, module-graph validation, manifest hashing, trusted workflow authority, and main restoration. Mutable `/v5/` is not an acceptable fallback.
+- G0H authorizes deployment of exact reviewed target `f67088c84eb79eab227a4a5759a37269e6c9f631`, immutable index/manifest/module and module-graph verification, startup/authentication/Reddit Phanatics smoke testing, and restoration of runtime-verified approved main through the same Actions architecture.
 - Migrations 014/015 remain **APPLIED / DO NOT REAPPLY**. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
-- This activation is documentation-only. It performs no workflow edit, deployment, cloud access, provider operation, or production/data mutation.
+- Provider Preview/Review/Apply, Data Health, canonical Player Intelligence inspection, imports, synchronization, recalculation, and production/data mutation remain unauthorized. Migrations 014/015 remain **APPLIED / DO NOT REAPPLY**; no Migration 016 is authorized.
 
 ## V5.5B-6G0E Prospect Level Idempotency Repair Completed (2026-08-24)
 

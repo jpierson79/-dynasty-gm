@@ -1,42 +1,46 @@
-# Next Task: V5.5B-6G0G Trusted Immutable Pages Delivery Repair
+# Next Task: V5.5B-6G0H GitHub Pages Actions Cutover & Hosted Immutable Delivery Acceptance
 
 ## Active authority and status
 
-- Baseline: `feature/manager-intelligence` after immutable-delivery blocker checkpoint `f8022d7b95fc77d21ef20eddfc2f422575b07eae`.
-- G0G is **ACTIVE / LOCAL IMPLEMENTATION AND CONFIGURATION DIAGNOSIS ONLY**.
-- G0F is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON IMMUTABLE ARTIFACT DELIVERY** and must not resume in G0G.
+- Baseline: `feature/manager-intelligence` after G0G implementation `105b4bc15e98b0af88890053ccf84f7f02f49759` and checkpoint `42187b3774108c4efb8088131077924e6b85ce39`.
+- G0G is **COMPLETE / CHECKPOINTED LOCALLY**. G0H is **ACTIVE / AUTHORIZED FOR CONTROLLED REMOTE PAGES CUTOVER AND HOSTED IMMUTABLE DELIVERY ACCEPTANCE**.
+- G0F is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON G0H** and must not resume in this task.
 - Migrations 014/015 are **APPLIED / DO NOT REAPPLY**. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
 
-## Objective and critical distinction
+## Objective and authorized remote boundary
 
-Repair the trusted immutable Pages delivery boundary so a reviewed SHA is actually published and available at `/v5-builds/<sha>/v5/`. A successful workflow, build, package, or manifest is not proof that the public artifact exists.
+Perform the one-time publication-mode cutover and prove the repaired trusted immutable artifact is actually hosted. The sole authorized repository-setting mutation is GitHub repository **Settings → Pages → Source → GitHub Actions**, equivalently `build_type=workflow`. Do not change any other repository, environment, security, domain, branch, Actions, secret, or variable setting.
 
-The proven failure is workflow run `33099352271`: target `f67088c84eb79eab227a4a5759a37269e6c9f631`, manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, and reviewed 105-module/123-file topology all passed, while both immutable public URLs returned 404 and Pages remained legacy main-branch source. Main was restored successfully.
+The exact reviewed immutable application target is `f67088c84eb79eab227a4a5759a37269e6c9f631`. Verify later commits are infrastructure/documentation only. Capture the current Pages configuration first; if already `workflow`, do not mutate redundantly. If legacy, make only the authorized cutover and require the setting to persist before deployment.
 
-## Required investigation and repair contract
+## Required hosted acceptance sequence
 
-Trace the entire chain and identify the exact break:
+Execute in order and stop on any failure:
 
-1. Reviewed application SHA and immutable build input.
-2. Build output and exact artifact tree.
-3. Artifact upload and Pages deployment action.
-4. Repository Pages source/build configuration and environment permissions.
-5. Published root, repository base path, `.nojekyll`, routing, and generated URLs.
-6. Immutable directory URL and exact `index.html` HTTP availability.
+1. Verify repository/governance state, G0G checkpoint, repaired workflow, and exact reviewed target.
+2. Capture Pages `build_type`, legacy source when present, Pages URL, and relevant `github-pages` environment state.
+3. Change only legacy Pages publication to `build_type=workflow`, then re-read and require it.
+4. Dispatch the repaired default-branch workflow for exact target `f67088c84eb79eab227a4a5759a37269e6c9f631`.
+5. Require configure, build/package, artifact upload, `deploy-pages`, and environment deployment success.
+6. Use bounded verification to require HTTP 200 for the exact immutable index, manifest, and representative module; verify manifest target/hash and module hash.
+7. Require the hosted 105-module/123-file graph, no mutable leakage, no mixed versions, and normal immutable startup with a clean console.
+8. Authenticate normally and require Reddit Phanatics selectable/selected. Do not enter provider or data diagnostics.
+9. Determine the current approved main SHA at runtime, restore it through the same Actions workflow, and verify normal V5 startup/authentication/league/console health.
+10. Leave Pages configured for GitHub Actions. Record and checkpoint the evidence only if every gate passes.
 
-Investigate, without assuming, whether the cause is: an artifact built but never deployed; legacy source ignoring an Actions deployment; a missing deploy action; incompatible Pages source configuration; wrong output root; wrong base URL; Jekyll/`.nojekyll`/routing behavior; permissions or environment configuration; a build-only workflow reported as successful; or another proven topology mismatch.
+The reviewed workflow contract remains `configure-pages@v5`, `upload-pages-artifact@v4`, `deploy-pages@v4`, permissions `contents: read`, `pages: write`, and `id-token: write`, environment `github-pages`, artifact root `_site`, and immutable namespace `v5-builds/<sha>/`.
 
-Before editing, inspect the current deploy and restore workflows, produced artifact layout, manifest paths, repository base-path assumptions, `.nojekyll`, and existing Pages configuration evidence. Make the smallest deployment-infrastructure repair. Preserve SHA allowlisting, immutable paths, module-graph verification, manifest hashing, trusted default-branch workflow authority, and restoration to approved main.
+Required paths are `v5-builds/<sha>/v5/index.html`, `v5-builds/<sha>/integrity-manifest.json`, and `v5-builds/<sha>/v5/js/main.js`, derived from the actual Pages project-site base. Directory redirects alone do not pass.
 
-## Required local proof and later hosted acceptance
+## Restoration and failure policy
 
-Local/configuration validation must prove the deployed tree includes `/v5-builds/<sha>/v5/index.html`, its complete module graph, manifest correspondence, correct base path, and the actual GitHub Pages deployment step/configuration. Add focused workflow/static tests for the proven defect and retain existing trusted-deployment tests.
+Each Actions deployment replaces the complete Pages artifact, so approved-main restoration is mandatory. Restoration changes content, not publication mode; never revert Pages to legacy publication. If immutable deployment fails after cutover, attempt safe approved-main restoration through the repaired Actions workflow, preserve evidence, and stop without changing architecture.
 
-A separately authorized hosted acceptance must deploy an exact reviewed SHA, require HTTP 200 for the immutable directory and exact index, verify the served artifact/module graph, and restore Pages to approved main whether it passes or fails. G0G implementation does not itself authorize deployment.
+G0H does not authorize workflow or application repair. Any cutover, deployment, artifact, startup, authentication, or restoration failure stops the task and requires separate review.
 
 ## Explicit prohibitions
 
-Do not use mutable `/v5/` as a substitute for immutable proof; deploy during local implementation; change application semantics; access production data; run provider Preview/Review/Apply; reapply migrations; mutate players/audits/identity/ownership/rosters/metrics/scores; implement G1; change Player Intelligence; or activate V5.5C. Stop on any security, workflow-authority, or repository contradiction.
+Do not modify workflows or application code; alter any remote setting except Pages `build_type`; access production data; run provider Preview, Review, Apply, Data Health, canonical Player Intelligence inspection, imports, sync, or recalculation; reapply migrations; mutate players/audits/leagues/identity/ownership/rosters/metrics/scores; implement G1; or activate V5.5C.
 
 # Completed Contract: V5.5B-6G0E Prospect Level Idempotency Repair
 
