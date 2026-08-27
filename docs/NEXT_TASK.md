@@ -1,47 +1,55 @@
-# Next Task: V5.5B-6G0F Prospect Level Acceptance Diagnostics
+# Next Task: V5.5B-6G0A Prospect Level Production Acceptance — Resumed With G0F Diagnostics
 
 ## Active authority and production state
 
-- Baseline: clean `feature/manager-intelligence` at observability-blocker checkpoint `3956dfa916bcbd7c1860b2a0559036473cd03efe`.
-- V5.5B-6G0F is **ACTIVE / LOCAL IMPLEMENTATION ONLY**. V5.5B-6G0E is **COMPLETE / CHECKPOINTED** at `cecbe15baa057a86a5cfc1da7a564ae23ac4534d`.
-- V5.5B-6G0A is **BLOCKED ON G0F DIAGNOSTIC VISIBILITY**. Migration 014 and Migration 015 are **APPLIED**; the existing governed population contains 5,440 successful writes and no second Apply.
-- The latest read-only production Preview reported 5,398 exact UUID/MLBAM matches, 24 unverified updates, 5,374 no-ops, zero invalid/stale rows, and zero warnings/errors. Data Health reported zero failures and 42 warnings; protected comparison passed unchanged.
-- G1 remains **BLOCKED**. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
+- Baseline: `feature/manager-intelligence` after the G0F checkpoint. G0F is **COMPLETE / CHECKPOINTED** at implementation `f67088c84eb79eab227a4a5759a37269e6c9f631` and documentation checkpoint `19366eb505d903d02de61cf3cc07590b8a7130db`. G0E is also complete/checkpointed.
+- G0A is **ACTIVE / AUTHORIZED FOR CONTROLLED POST-MIGRATION PRODUCTION ACCEPTANCE**. The expected immutable application target is the G0F application commit `f67088c84eb79eab227a4a5759a37269e6c9f631`; verify it from history before deployment.
+- Migration 014 and Migration 015 are **APPLIED / DO NOT REAPPLY**. Schema is `PRESENT`; the existing governed population contains 5,440 successful rows, and no later Apply occurred.
+- Latest known production Preview evidence is 5,398 exact UUID/MLBAM matches, 24 **unverified** updates, 5,374 no-ops, zero invalid/stale rows, and zero warnings/errors. Current live data is authoritative and may differ.
+- G1 remains **BLOCKED PENDING RESUMED G0A**. Calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
 
-## Objective and proven boundary
+## Objective and accepted diagnostic boundary
 
-Expose enough existing planner diagnostics in the hosted read-only Prospect Level Preview surface to determine whether the remaining 24 updates are factual changes or false positives. Do not assume either result. The former 5,440-update/zero-no-op collection-`fetchedAt` loop is gone; do not reopen G0E equality, normalization, timestamp, raw-evidence, freshness, identity, or write-planning semantics without new evidence.
+Use the checkpointed G0F hosted diagnostics to complete the remaining primarily read-only G0A proof. The canonical planner remains the sole semantic authority; the UI only displays its five existing reasons and bounded canonical stored/incoming evidence. UUID is internal identity authority, exact MLBAM is provider identity authority, and names are display-only.
 
-Before editing, trace and record the existing chain from planner change-reason creation through Preview result, application state, and hosted rendering. If the required diagnostics are not available from the existing planner path, stop rather than redesigning planner behavior.
+Do not restart at `SCHEMA_ABSENT`, reapply either migration, or assume the prior 24 updates are factual or false. A fresh provider Preview is required. G0F diagnostics expose evidence; they do not authorize persistence.
 
-## Required diagnostics
+## Required acceptance sequence
 
-- Expose aggregate counts for exactly `CURRENT_LEVEL_CHANGED`, `LEVEL_SOURCE_CHANGED`, `LEVEL_AVAILABILITY_CHANGED`, `LEVEL_OBSERVED_AT_CHANGED`, and `LEVEL_RAW_EVIDENCE_CHANGED`. Explain that multi-reason rows may make the sum exceed the update count.
-- For each update expose stable player UUID, display-only name, MLBAM ID, planner result, change reasons, and stored versus incoming values for current level, source, availability, and observed-at.
-- Expose only bounded, allowlisted, deterministic raw-evidence semantic differences: normalized observations added/removed, factual normalized fields changed, and truncation state. Preserve the maximum-16-observation contract; never dump arbitrary provider payloads.
-- Permit bounded representative no-op and conflict inspection. Unchanged conflict evidence must remain `NO_OP`, changed conflicts must show factual differences, no current level may be guessed, and UNKNOWN remains distinct under its existing policy.
-- Support read-only filtering by `UPDATE` and `NO_OP`, preferably also by change reason, using pagination, sampling, or lazy expansion. Do not eagerly render thousands of deep diff objects.
-- Make observed-at diagnostics distinguish factual observation time from provider fetch, collection, Preview, request, job, or audit time. Make raw-evidence diagnostics distinguish factual change from key/JSONB/irrelevant-array order, primitive/null representation, or workflow metadata.
+Execute in order and stop on any failed gate:
 
-## Read-only, workflow, and performance guarantees
+1. Verify repository state and confirm `f67088c84eb79eab227a4a5759a37269e6c9f631` is the reviewed G0F application target.
+2. Publish that exact target through the trusted immutable Pages workflow and verify the artifact/module graph.
+3. Start normally, authenticate through the existing flow, and select Reddit Phanatics.
+4. Read-only verify Migrations 014/015 are healthy, schema is `PRESENT`, and the existing prospect population is materially present.
+5. Capture `PROSPECT_LEVEL_POPULATION` twice and require deterministic protected evidence.
+6. Run one fresh canonical authenticated provider Preview.
+7. Record provider/match/unmatched/identity-conflict counts, distribution, `UPDATE`, `NO_OP`, `INITIAL_POPULATION`, and stale/non-writable outcomes.
+8. Record aggregate counts for `CURRENT_LEVEL_CHANGED`, `LEVEL_SOURCE_CHANGED`, `LEVEL_AVAILABILITY_CHANGED`, `LEVEL_OBSERVED_AT_CHANGED`, and `LEVEL_RAW_EVIDENCE_CHANGED`. Multi-reason totals may exceed update rows.
+9. Inspect every remaining update using UUID, exact MLBAM, display-only name, planner result/reasons, stored/incoming current level, source, availability, observed-at, and bounded canonical raw-evidence diagnostics.
+10. Classify each update as factual or a residual false positive. Any residual representation-, formatting-, collection-, request-, Preview-, audit-, or job-metadata false positive blocks acceptance.
+11. Inspect representative no-op and conflict rows. Unchanged conflict evidence must remain `NO_OP`; changed conflict evidence requires factual bounded support; no level may be guessed. Preserve UNKNOWN policy.
+12. Capture the protected baseline after Preview and require all protected evidence unchanged.
+13. Only if diagnostic/idempotency acceptance passes, run Data Health, inspect canonical Player Intelligence inputs across available factual categories, and decide whether G1 may become `UNBLOCKED FOR LOCAL IMPLEMENTATION`.
+14. Restore normal approved Pages whether acceptance passes or fails, verify restoration, and checkpoint the evidence.
 
-Opening, filtering, sorting, paginating, or expanding diagnostics must not Review, Apply, mutate approval state, write players or import jobs, recalculate scores, or alter league data. Preserve G0C `Preview -> explicit Review -> Apply`, exact UUID plus MLBAM identity, display-only names, existing batching/mutation boundaries, and normal application behavior.
+## Factual-change acceptance rules
 
-Use aggregate diagnostics plus bounded row details. Prohibit N+1 reads, per-row network requests, repeated whole-preview serialization, synchronous quadratic work, and eager rendering of all 5,374 no-ops.
+- `LEVEL_OBSERVED_AT_CHANGED` must be a genuine factual observation-time change. `fetchedAt`, collection, request, Preview, job, audit, or formatting-only changes are failures.
+- `LEVEL_RAW_EVIDENCE_CHANGED` must reflect factual canonical evidence, not JSON/JSONB key order, irrelevant array order, primitive formatting, null/missing normalization, or workflow metadata.
+- `CURRENT_LEVEL_CHANGED` may pass only for a real canonical transition such as `AA -> AAA`.
+- `LEVEL_SOURCE_CHANGED` must be meaningful under existing source semantics; no alias redesign is authorized.
+- `LEVEL_AVAILABILITY_CHANGED` must be a real canonical transition. UNKNOWN and CONFLICT remain distinct.
 
-## Required validation
+## Read-only and protected boundaries
 
-Test aggregate counts; single- and multi-reason updates; before/after diagnostics for level, source, availability, observed-at, and bounded raw evidence; no-op, conflict, and UNKNOWN inspection; UUID/MLBAM display with no name authority; read-only expansion/filtering/pagination; reason-total semantics; bounded evidence; and large-Preview performance. Keep G0E idempotency, G0C workflow, G0D bootstrap, G0B baseline, and the complete suite green. Run syntax checks for changed JavaScript and `git diff --check`.
+This acceptance is primarily read-only. Do not Review or Apply the remaining rows merely to prove diagnostics. Do not create a write, alter approval state, or invoke persistence through filtering, pagination, or detail inspection. A later separately authorized task may decide whether factual live changes should be persisted.
 
-Record the diagnostic propagation chain, exact drop point, bounded UI design, files, tests, and safety proof in `docs/NEXT_TASK_RESULT.md`. Stop uncommitted for architect review unless separately authorized.
-
-## Future production reacceptance
-
-After G0F is implemented, tested, architect reviewed, and checkpointed, G0A resumes from the current post-migration state. It must deploy the exact G0F artifact, capture a protected baseline, run a fresh Preview, inspect aggregate reasons and a complete bounded representation of all remaining updates, prove factual changes or identify residual false positives, verify unchanged rows/no-op and observed-at/raw-evidence semantics, continue Data Health and canonical-input inspection, decide G1, and restore normal Pages. Do not reapply migrations, expect `SCHEMA_ABSENT`, or automatically Apply the 24 rows.
+The only protected profile is `PROSPECT_LEVEL_POPULATION`. Preview must leave protected evidence unchanged. Do not patch application code during acceptance; any diagnostic insufficiency, false update, Preview mutation, identity problem, Data Health blocker, or canonical-input defect stops the task and becomes a separately reviewed repair.
 
 ## Explicit prohibitions
 
-Do not deploy; access production/cloud data; run Preview, Review, or Apply; modify Migrations 014/015 or create Migration 016; change planner/equality/provider/freshness/identity semantics; mutate players or audit data; implement G1; alter Player Intelligence formulas; or activate V5.5C.
+Do not reapply or modify Migrations 014/015; create Migration 016; run Review or Apply; mutate players, audit records, identities, ownership, rosters, metrics, or scores; use name matching or service-role bypass; implement G1; change planner/provider/equality semantics or Player Intelligence formulas; refresh Statcast; run Fantrax import/sync; or activate V5.5C.
 
 # Completed Contract: V5.5B-6G0E Prospect Level Idempotency Repair
 
