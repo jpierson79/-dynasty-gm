@@ -1,16 +1,14 @@
 # Current State
 
-## V5.5B-6G0A Prospect Level Production Acceptance Resumed With G0F Diagnostics (2026-08-27)
+## V5.5B-6G0G Trusted Immutable Pages Delivery Repair Active (2026-08-27)
 
-- V5.5B-6G0E is **COMPLETE / CHECKPOINTED** at implementation commit `cecbe15baa057a86a5cfc1da7a564ae23ac4534d` with documentation checkpoint `dee21ca57539caa9eaf484cbfb98011a9ce4151e`.
-- The proven G0E cause was collection-level `fetchedAt` masquerading as factual `level_observed_at`. The accepted repair preserves null first-time no-timestamp evidence and existing factual timestamps, keeps collection time in audit metadata, and provides canonical five-field timestamp/JSONB-aware equality with deterministic change reasons.
-- V5.5B-6G0F is **COMPLETE / CHECKPOINTED** at application commit `f67088c84eb79eab227a4a5759a37269e6c9f631` with documentation checkpoint `19366eb505d903d02de61cf3cc07590b8a7130db`. Its hosted surface displays planner-provided five-reason counts and bounded stored/incoming evidence without independent semantic comparison, provider recollection, or persistence.
-- The active task is **V5.5B-6G0A Prospect Level Production Acceptance — RESUMED WITH G0F DIAGNOSTICS**, authorized for controlled post-migration, primarily read-only acceptance using the exact immutable G0F application artifact.
-- Production is already post-migration: Migration 014 and Migration 015 are **APPLIED**. The initial governed population completed **5,440 successful / 0 failed / 0 unattempted** player writes, audit finalization completed, and protected comparison passed. A second Apply was not performed and is not authorized merely to prove idempotency.
-- The latest resumed G0A Preview reported **5,398 exact UUID/MLBAM matches, 24 unverified updates, 5,374 no-ops, 0 invalid/stale, and 0 warnings/errors**. Data Health reported zero failures and 42 warnings; protected comparison passed unchanged; Review and Apply were not performed.
-- The 24 historically observed updates remain unverified until a fresh Preview and complete G0F diagnostic inspection. G0A must not automatically Review or Apply them.
-- G1 remains **BLOCKED PENDING RESUMED G0A**. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
-- This governance handoff is documentation-only. It does not deploy, access production, run Preview/Review/Apply, reapply migrations, or mutate data.
+- G0G is **ACTIVE / LOCAL IMPLEMENTATION AND CONFIGURATION DIAGNOSIS ONLY** at governance baseline `f8022d7b95fc77d21ef20eddfc2f422575b07eae`.
+- G0F remains **COMPLETE / CHECKPOINTED** at application commit `f67088c84eb79eab227a4a5759a37269e6c9f631`. G0A is **BLOCKED ON IMMUTABLE ARTIFACT DELIVERY**.
+- Trusted workflow run `33099352271` successfully built and reported the reviewed 105-module/123-file topology and manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, but the immutable directory and exact index returned 404 while Pages remained configured for legacy main-branch publication. Workflow success therefore did not establish hosted availability.
+- Pages was restored successfully to approved main. No hosted G0F startup, authentication, production diagnostic, Preview/Review/Apply, migration, or data mutation occurred in that attempt.
+- G0G is limited to proving and repairing the trusted immutable delivery chain. It preserves SHA allowlisting, immutable paths, module-graph validation, manifest hashing, trusted workflow authority, and main restoration. Mutable `/v5/` is not an acceptable fallback.
+- Migrations 014/015 remain **APPLIED / DO NOT REAPPLY**. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
+- This activation is documentation-only. It performs no workflow edit, deployment, cloud access, provider operation, or production/data mutation.
 
 ## V5.5B-6G0E Prospect Level Idempotency Repair Completed (2026-08-24)
 

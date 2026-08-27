@@ -1,55 +1,42 @@
-# Next Task: V5.5B-6G0A Prospect Level Production Acceptance — Resumed With G0F Diagnostics
+# Next Task: V5.5B-6G0G Trusted Immutable Pages Delivery Repair
 
-## Active authority and production state
+## Active authority and status
 
-- Baseline: `feature/manager-intelligence` after the G0F checkpoint. G0F is **COMPLETE / CHECKPOINTED** at implementation `f67088c84eb79eab227a4a5759a37269e6c9f631` and documentation checkpoint `19366eb505d903d02de61cf3cc07590b8a7130db`. G0E is also complete/checkpointed.
-- G0A is **ACTIVE / AUTHORIZED FOR CONTROLLED POST-MIGRATION PRODUCTION ACCEPTANCE**. The expected immutable application target is the G0F application commit `f67088c84eb79eab227a4a5759a37269e6c9f631`; verify it from history before deployment.
-- Migration 014 and Migration 015 are **APPLIED / DO NOT REAPPLY**. Schema is `PRESENT`; the existing governed population contains 5,440 successful rows, and no later Apply occurred.
-- Latest known production Preview evidence is 5,398 exact UUID/MLBAM matches, 24 **unverified** updates, 5,374 no-ops, zero invalid/stale rows, and zero warnings/errors. Current live data is authoritative and may differ.
-- G1 remains **BLOCKED PENDING RESUMED G0A**. Calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
+- Baseline: `feature/manager-intelligence` after immutable-delivery blocker checkpoint `f8022d7b95fc77d21ef20eddfc2f422575b07eae`.
+- G0G is **ACTIVE / LOCAL IMPLEMENTATION AND CONFIGURATION DIAGNOSIS ONLY**.
+- G0F is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON IMMUTABLE ARTIFACT DELIVERY** and must not resume in G0G.
+- Migrations 014/015 are **APPLIED / DO NOT REAPPLY**. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
 
-## Objective and accepted diagnostic boundary
+## Objective and critical distinction
 
-Use the checkpointed G0F hosted diagnostics to complete the remaining primarily read-only G0A proof. The canonical planner remains the sole semantic authority; the UI only displays its five existing reasons and bounded canonical stored/incoming evidence. UUID is internal identity authority, exact MLBAM is provider identity authority, and names are display-only.
+Repair the trusted immutable Pages delivery boundary so a reviewed SHA is actually published and available at `/v5-builds/<sha>/v5/`. A successful workflow, build, package, or manifest is not proof that the public artifact exists.
 
-Do not restart at `SCHEMA_ABSENT`, reapply either migration, or assume the prior 24 updates are factual or false. A fresh provider Preview is required. G0F diagnostics expose evidence; they do not authorize persistence.
+The proven failure is workflow run `33099352271`: target `f67088c84eb79eab227a4a5759a37269e6c9f631`, manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, and reviewed 105-module/123-file topology all passed, while both immutable public URLs returned 404 and Pages remained legacy main-branch source. Main was restored successfully.
 
-## Required acceptance sequence
+## Required investigation and repair contract
 
-Execute in order and stop on any failed gate:
+Trace the entire chain and identify the exact break:
 
-1. Verify repository state and confirm `f67088c84eb79eab227a4a5759a37269e6c9f631` is the reviewed G0F application target.
-2. Publish that exact target through the trusted immutable Pages workflow and verify the artifact/module graph.
-3. Start normally, authenticate through the existing flow, and select Reddit Phanatics.
-4. Read-only verify Migrations 014/015 are healthy, schema is `PRESENT`, and the existing prospect population is materially present.
-5. Capture `PROSPECT_LEVEL_POPULATION` twice and require deterministic protected evidence.
-6. Run one fresh canonical authenticated provider Preview.
-7. Record provider/match/unmatched/identity-conflict counts, distribution, `UPDATE`, `NO_OP`, `INITIAL_POPULATION`, and stale/non-writable outcomes.
-8. Record aggregate counts for `CURRENT_LEVEL_CHANGED`, `LEVEL_SOURCE_CHANGED`, `LEVEL_AVAILABILITY_CHANGED`, `LEVEL_OBSERVED_AT_CHANGED`, and `LEVEL_RAW_EVIDENCE_CHANGED`. Multi-reason totals may exceed update rows.
-9. Inspect every remaining update using UUID, exact MLBAM, display-only name, planner result/reasons, stored/incoming current level, source, availability, observed-at, and bounded canonical raw-evidence diagnostics.
-10. Classify each update as factual or a residual false positive. Any residual representation-, formatting-, collection-, request-, Preview-, audit-, or job-metadata false positive blocks acceptance.
-11. Inspect representative no-op and conflict rows. Unchanged conflict evidence must remain `NO_OP`; changed conflict evidence requires factual bounded support; no level may be guessed. Preserve UNKNOWN policy.
-12. Capture the protected baseline after Preview and require all protected evidence unchanged.
-13. Only if diagnostic/idempotency acceptance passes, run Data Health, inspect canonical Player Intelligence inputs across available factual categories, and decide whether G1 may become `UNBLOCKED FOR LOCAL IMPLEMENTATION`.
-14. Restore normal approved Pages whether acceptance passes or fails, verify restoration, and checkpoint the evidence.
+1. Reviewed application SHA and immutable build input.
+2. Build output and exact artifact tree.
+3. Artifact upload and Pages deployment action.
+4. Repository Pages source/build configuration and environment permissions.
+5. Published root, repository base path, `.nojekyll`, routing, and generated URLs.
+6. Immutable directory URL and exact `index.html` HTTP availability.
 
-## Factual-change acceptance rules
+Investigate, without assuming, whether the cause is: an artifact built but never deployed; legacy source ignoring an Actions deployment; a missing deploy action; incompatible Pages source configuration; wrong output root; wrong base URL; Jekyll/`.nojekyll`/routing behavior; permissions or environment configuration; a build-only workflow reported as successful; or another proven topology mismatch.
 
-- `LEVEL_OBSERVED_AT_CHANGED` must be a genuine factual observation-time change. `fetchedAt`, collection, request, Preview, job, audit, or formatting-only changes are failures.
-- `LEVEL_RAW_EVIDENCE_CHANGED` must reflect factual canonical evidence, not JSON/JSONB key order, irrelevant array order, primitive formatting, null/missing normalization, or workflow metadata.
-- `CURRENT_LEVEL_CHANGED` may pass only for a real canonical transition such as `AA -> AAA`.
-- `LEVEL_SOURCE_CHANGED` must be meaningful under existing source semantics; no alias redesign is authorized.
-- `LEVEL_AVAILABILITY_CHANGED` must be a real canonical transition. UNKNOWN and CONFLICT remain distinct.
+Before editing, inspect the current deploy and restore workflows, produced artifact layout, manifest paths, repository base-path assumptions, `.nojekyll`, and existing Pages configuration evidence. Make the smallest deployment-infrastructure repair. Preserve SHA allowlisting, immutable paths, module-graph verification, manifest hashing, trusted default-branch workflow authority, and restoration to approved main.
 
-## Read-only and protected boundaries
+## Required local proof and later hosted acceptance
 
-This acceptance is primarily read-only. Do not Review or Apply the remaining rows merely to prove diagnostics. Do not create a write, alter approval state, or invoke persistence through filtering, pagination, or detail inspection. A later separately authorized task may decide whether factual live changes should be persisted.
+Local/configuration validation must prove the deployed tree includes `/v5-builds/<sha>/v5/index.html`, its complete module graph, manifest correspondence, correct base path, and the actual GitHub Pages deployment step/configuration. Add focused workflow/static tests for the proven defect and retain existing trusted-deployment tests.
 
-The only protected profile is `PROSPECT_LEVEL_POPULATION`. Preview must leave protected evidence unchanged. Do not patch application code during acceptance; any diagnostic insufficiency, false update, Preview mutation, identity problem, Data Health blocker, or canonical-input defect stops the task and becomes a separately reviewed repair.
+A separately authorized hosted acceptance must deploy an exact reviewed SHA, require HTTP 200 for the immutable directory and exact index, verify the served artifact/module graph, and restore Pages to approved main whether it passes or fails. G0G implementation does not itself authorize deployment.
 
 ## Explicit prohibitions
 
-Do not reapply or modify Migrations 014/015; create Migration 016; run Review or Apply; mutate players, audit records, identities, ownership, rosters, metrics, or scores; use name matching or service-role bypass; implement G1; change planner/provider/equality semantics or Player Intelligence formulas; refresh Statcast; run Fantrax import/sync; or activate V5.5C.
+Do not use mutable `/v5/` as a substitute for immutable proof; deploy during local implementation; change application semantics; access production data; run provider Preview/Review/Apply; reapply migrations; mutate players/audits/identity/ownership/rosters/metrics/scores; implement G1; change Player Intelligence; or activate V5.5C. Stop on any security, workflow-authority, or repository contradiction.
 
 # Completed Contract: V5.5B-6G0E Prospect Level Idempotency Repair
 
