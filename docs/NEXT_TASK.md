@@ -1,11 +1,58 @@
-# Next Task: V5.5B-6G0E Prospect Level Idempotency Repair
+# Next Task: V5.5B-6G0A Prospect Level Production Acceptance — Resumed Post-Migration
+
+## Active authority and production state
+
+- Baseline: clean `feature/manager-intelligence` at governance activation commit produced from `dee21ca57539caa9eaf484cbfb98011a9ce4151e`.
+- V5.5B-6G0E is **COMPLETE / CHECKPOINTED** at implementation commit `cecbe15baa057a86a5cfc1da7a564ae23ac4534d` with documentation checkpoint `dee21ca57539caa9eaf484cbfb98011a9ce4151e`.
+- V5.5B-6G0A is **ACTIVE / AUTHORIZED FOR RESUMED POST-MIGRATION PRODUCTION ACCEPTANCE**.
+- Migration 014 and Migration 015 are **APPLIED** in production. The governed initial population completed 5,440 successful writes, zero failures, zero unattempted rows, completed player-write and audit-finalization outcomes, and a passing protected comparison. No second Apply occurred.
+- G1 remains **BLOCKED PENDING RESUMED G0A**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
+
+## Accepted G0E repair
+
+The proven false-update cause was `LEVEL_OBSERVED_AT_CHANGED`: the MLB provider had assigned collection-level `fetchedAt` to factual player `level_observed_at`. The accepted repair keeps collection time in Preview/import audit metadata, leaves first-time evidence without factual observation time null, preserves an existing factual observation time, and retains meaningful provider timestamps when actually supplied.
+
+One canonical semantic comparator covers exactly `current_level`, `level_source`, `level_availability`, `level_observed_at`, and `level_raw_evidence`. Equivalent timestamp and JSONB representations compare equal; raw evidence remains deterministic, allowlisted, bounded to 16 observations, and explicit about truncation. MLB, AAA, AA, A_PLUS, A, ROOKIE, CONFLICT, and the existing writable UNKNOWN policy are idempotent. Genuine factual changes remain updates, older evidence remains non-writable, partial retry and batches of at most 250 remain intact, and G0B/G0C/G0D, both migrations, identity, Player Intelligence formulas, and Engine 5.1.1 remain unchanged.
+
+## Authorized acceptance sequence
+
+Execute in order and stop on any failed mandatory gate:
+
+1. Verify the exact repository baseline and history. The expected reviewed application target is `cecbe15baa057a86a5cfc1da7a564ae23ac4534d`; verify that later commits are documentation-only.
+2. Deploy that exact target through the trusted immutable Pages workflow. Require manifest identity, module-graph integrity, no mixed-version assets, and the reviewed topology of 105 modules and 123 hashed files.
+3. Start the immutable application, authenticate normally, and select Reddit Phanatics. Require clean startup and console/module health.
+4. Read-only verify Migration 014 and Migration 015 are applied/healthy and the prospect-level schema is `PRESENT`. Never execute either migration.
+5. Capture `PROSPECT_LEVEL_POPULATION` twice. Require healthy, deterministic protected counts/hashes and schema state.
+6. Read-only verify the prior prospect-level population is materially present, including field coverage and factual level/availability distribution.
+7. Run the canonical authenticated MLB Stats API prospect-level Preview. Do not Review or Apply.
+8. Inspect exact UUID/MLBAM identity counts, normalization distribution, initial populations, updates, no-ops, stale/non-writable rows, warnings/errors, and the five field-level change-reason totals.
+9. Prove production idempotency: unchanged evidence is `NO_OP`; collection `fetchedAt` and equivalent JSON/database representation alone cause no update; unchanged conflict evidence is a no-op; genuine factual changes remain updates; stale evidence remains blocked; and identity behavior is unchanged. Zero total updates are not required.
+10. Capture the protected baseline again and require Preview caused no protected or expected-mutable change.
+11. Only after idempotency passes, run canonical Data Health and inspect factual canonical Player Intelligence inputs across available levels.
+12. Decide whether G1 may become **UNBLOCKED FOR LOCAL IMPLEMENTATION**. Do not implement G1.
+13. Restore the approved normal Pages target determined at runtime and verify normal startup, authentication, league selection, and console health.
+14. Record complete evidence in `docs/NEXT_TASK_RESULT.md`. If every gate passes, stage only that file, commit `Record resumed prospect level production acceptance`, and push `feature/manager-intelligence`.
+
+## Idempotency and safety gates
+
+- Aggregate only `CURRENT_LEVEL_CHANGED`, `LEVEL_SOURCE_CHANGED`, `LEVEL_AVAILABILITY_CHANGED`, `LEVEL_OBSERVED_AT_CHANGED`, and `LEVEL_RAW_EVIDENCE_CHANGED` (or exact implemented equivalents). Every update must have a factual explanation.
+- Any observed-at-only update caused by collection/Preview/job time fails acceptance. Any raw-evidence-only update caused by key/order, JSONB round trip, null/missing, primitive formatting, or audit metadata fails acceptance.
+- Identity authority remains existing stable UUID plus exact MLBAM. Names are display-only; no fuzzy/name matching, player creation, or remapping is allowed.
+- Continue using `PROSPECT_LEVEL_POPULATION`; protect all unauthorized player fields, scores, metrics, teams, managers, league settings, identity, ownership, and roster state.
+- Data Health and canonical Player Intelligence input inspection remain mandatory before G1 can be unblocked. Successful G0A does not mark calibration passed and does not activate V5.5C.
+
+## Explicit prohibitions
+
+Do not expect `SCHEMA_ABSENT`; reapply or modify Migration 014/015; create Migration 016; invoke Review/Apply merely to prove idempotency; rewrite the 5,440 rows; edit application code during acceptance; improvise SQL or production repair; match by name; create/remap players; change identity, ownership, roster, teams, organization, positions, metrics, scores, or model formulas; refresh Statcast; import/sync Fantrax; implement G1; or activate V5.5C.
+
+# Completed Contract: V5.5B-6G0E Prospect Level Idempotency Repair
 
 ## Active status and authority
 
 - Baseline: clean `feature/manager-intelligence` at `b4e514ca534c754a487756bac06feb1c452f4cd7`.
 - G0D is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON G0E / IDEMPOTENCY** after one successful governed population of 5,440 players.
 - Migration 014 and Migration 015 are **APPLIED**. They must not be reapplied, modified, or treated as pending.
-- G0E is **ACTIVE** for local investigation, repair, and validation only. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
+- At activation, G0E was authorized for local investigation, repair, and validation only. G1 remained **BLOCKED**; calibration remained **`CALIBRATION_REQUIRED`**; V5.5C remained **BLOCKED**. G0E is now complete under the active contract above.
 
 ## Proven failure and objective
 
