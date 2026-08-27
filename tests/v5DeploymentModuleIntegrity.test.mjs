@@ -61,7 +61,7 @@ try {
   const workflow = await readFile(path.join(root, ".github", "workflows", "deploy-pages.yml"), "utf8");
   assert.match(workflow, /git -C target rev-parse HEAD/);
   assert.match(workflow, /build-v5-deployment\.mjs --target-root target --target-sha/);
-  assert.match(workflow, /actions\/upload-pages-artifact@v3/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.doesNotMatch(workflow, /[0-9a-f]{40}/i, "workflow must not hard-code a deployment SHA");
   console.log(`V5 deployment integrity tests passed (${graphA.modules.length} modules, ${manifestA.files.length} hashed files).`);

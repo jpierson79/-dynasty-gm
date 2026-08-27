@@ -14,7 +14,7 @@ assert.match(workflow,/node trusted\/scripts\/build-v5-deployment\.mjs/);
 assert.doesNotMatch(workflow,/node target\//);
 assert.match(workflow,/build:\s*[\s\S]*permissions:\s*\n\s*contents: read/);
 assert.match(workflow,/deploy:\s*[\s\S]*pages: write[\s\S]*id-token: write/);
-assert.match(workflow,/uses: actions\/upload-pages-artifact@v3[\s\S]*deploy:\s*[\s\S]*needs: build/);
+assert.match(workflow,/uses: actions\/upload-pages-artifact@v4[\s\S]*deploy:\s*[\s\S]*needs: build/);
 
 const temp=await mkdtemp(path.join(os.tmpdir(),"trusted-pages-"));
 try{
