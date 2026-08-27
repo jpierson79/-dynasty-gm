@@ -1,17 +1,18 @@
 # Current State
 
-## V5.5B-6G0A Resumed Post-Migration Production Acceptance Activated (2026-08-26)
+## V5.5B-6G0F Prospect Level Acceptance Diagnostics Active (2026-08-27)
 
 - V5.5B-6G0E is **COMPLETE / CHECKPOINTED** at implementation commit `cecbe15baa057a86a5cfc1da7a564ae23ac4534d` with documentation checkpoint `dee21ca57539caa9eaf484cbfb98011a9ce4151e`.
 - The proven G0E cause was collection-level `fetchedAt` masquerading as factual `level_observed_at`. The accepted repair preserves null first-time no-timestamp evidence and existing factual timestamps, keeps collection time in audit metadata, and provides canonical five-field timestamp/JSONB-aware equality with deterministic change reasons.
-- The active task is **V5.5B-6G0A Prospect Level Production Acceptance — Resumed Post-Migration**, authorized for the exact immutable G0E deployment, normal authentication, read-only migration/schema verification, deterministic `PROSPECT_LEVEL_POPULATION` baselines, canonical provider Preview, idempotency diagnostics, post-Preview protection, Data Health, canonical Player Intelligence input inspection, G1 decision, and Pages restoration.
+- The active task is **V5.5B-6G0F Prospect Level Acceptance Diagnostics — LOCAL IMPLEMENTATION ONLY**. It may expose existing field-level planner reasons and bounded stored/incoming evidence through the read-only Preview surface; it may not change planner/equality/provider/freshness/identity or Preview/Review/Apply semantics.
 - Production is already post-migration: Migration 014 and Migration 015 are **APPLIED**. The initial governed population completed **5,440 successful / 0 failed / 0 unattempted** player writes, audit finalization completed, and protected comparison passed. A second Apply was not performed and is not authorized merely to prove idempotency.
-- G1 remains **BLOCKED PENDING RESUMED G0A**. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
-- This governance handoff is documentation-only. It does not itself deploy, access production, run Preview/Review/Apply, reapply migrations, or mutate data.
+- The latest resumed G0A Preview reported **5,398 exact UUID/MLBAM matches, 24 unverified updates, 5,374 no-ops, 0 invalid/stale, and 0 warnings/errors**. Data Health reported zero failures and 42 warnings; protected comparison passed unchanged; Review and Apply were not performed.
+- G0A is **BLOCKED ON G0F DIAGNOSTIC VISIBILITY**. G1 remains **BLOCKED**. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
+- This activation is documentation-only. It does not deploy, access production, run Preview/Review/Apply, reapply migrations, or mutate data.
 
 ## V5.5B-6G0E Prospect Level Idempotency Repair Completed (2026-08-24)
 
-- This historical section records the now-completed local repair of the canonical prospect-level planner equality boundary; the active authority is the resumed G0A section above.
+- This historical section records the now-completed local repair of the canonical prospect-level planner equality boundary; the active authority is the G0F section above.
 - G0A completed one governed population Apply for **5,440 / 5,440** exact UUID/MLBAM matches. Player writes and audit finalization completed, and protected-domain comparison passed. No second Apply occurred.
 - G0A was **BLOCKED ON G0E / IDEMPOTENCY** because the mandatory fresh post-Apply Preview reported 5,440 updates and zero no-ops for already-persisted evidence.
 - Migration 014 and Migration 015 are **APPLIED**. Production is not pre-migration, and the 5,440 successful writes remain present.
@@ -22,7 +23,7 @@
 ## Historical V5.5B-6G0A Pre-Migration Activation (2026-08-24)
 
 - V5.5B-6G0D is **COMPLETE / CHECKPOINTED** at implementation commit `f9079ddc7174ad5f0ab87ccdf713fa099df0e1ce` with documentation checkpoint `1476d98a352507a45299e51553df9fbe0c80ce91`. Mandatory bootstrap no longer requires Migration 014; optional prospect evidence is UUID-joined in bounded batches with `SCHEMA_ABSENT`, `PRESENT`, and fail-closed partial/error semantics.
-- At that historical activation, the task was **V5.5B-6G0A Prospect Level Migration / Data Population Acceptance**, authorized for the then-required ordered pre-migration sequence. The current authority is the resumed post-migration section at the top of this file.
+- At that historical activation, the task was **V5.5B-6G0A Prospect Level Migration / Data Population Acceptance**, authorized for the then-required ordered pre-migration sequence. The current authority is the G0F section at the top of this file.
 - Production mutation is restricted to the five prospect-level evidence fields on existing exact UUID/MLBAM matches, with trigger-driven `updated_at`, batches of at most 250, and normal authenticated league-scoped controls. No player creation, name authority, identity, ownership, roster, score, or other protected mutation is authorized.
 - Migration 014 and Migration 015 were **CREATED / NOT APPLIED** at that historical activation; both are now applied as recorded in the current section above. G1 was blocked pending G0A; calibration was `CALIBRATION_REQUIRED`; V5.5C was blocked.
 - Any failed gate stops acceptance. Application/migration repair, ad hoc SQL, service-role bypass, provider inference, G1 implementation, model changes, and V5.5C activation are outside this acceptance.
@@ -34,7 +35,7 @@
 - The completed task separated guaranteed core player/league bootstrap fields from optional Migration 014 evidence so complete absence reports `SCHEMA_ABSENT`, complete presence reports `PRESENT`, and partial schema or unrelated errors fail closed.
 - Pre-migration authentication, league loading, Cloud Imports/Data Health navigation, protected-baseline capture, identity, ownership, roster behavior, and pagination must remain intact. Player Intelligence may expose missing factual level evidence but must not infer it from age, minor status, Fantrax, HKB, Statcast, names, or roster heuristics.
 - G0D completed local implementation, testing, architect review, and checkpointing. G0A must restart from the beginning with a fresh immutable deployment and deterministic pre-migration baseline before either migration is applied.
-- G0A is now active under the newer section above. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **BLOCKED PENDING G0A**; V5.5C remains **BLOCKED**.
+- G0A is now blocked on G0F under the newer section above. Calibration remains **`CALIBRATION_REQUIRED`**; G1 remains **BLOCKED**; V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G0C Prospect Level Population Workflow Activated (2026-08-15)
 
