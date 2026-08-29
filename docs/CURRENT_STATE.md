@@ -1,15 +1,15 @@
 # Current State
 
-## V5.5B-6G0H Hosted Immutable Delivery Acceptance Resumed After G0I (2026-08-29)
+## V5.5B-6G0A Prospect Level Production Acceptance Resumed After G0H (2026-08-29)
 
-- G0G is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `105b4bc15e98b0af88890053ccf84f7f02f49759` and documentation checkpoint `42187b3774108c4efb8088131077924e6b85ce39`.
-- G0I is **COMPLETE / CHECKPOINTED**. It registered exactly the reviewed workflow and hosted verifier on `origin/main` at `d5218e184397d1bcfede34577ca77c53ef293777`; feature evidence is checkpointed at `89ccb0ff6e40f64fe0cf8188008dd30507ee7923`.
-- G0H is **ACTIVE / REMOTE CUTOVER + HOSTED DELIVERY AUTHORIZED**. The sole authorized repository mutation is Pages Source to GitHub Actions (`build_type=workflow`); exact reviewed G0F target deployment and approved-main restoration are authorized.
-- Trusted workflow run `33099352271` successfully built and reported the reviewed 105-module/123-file topology and manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, but the immutable directory and exact index returned 404 while Pages remained configured for legacy main-branch publication. Workflow success therefore did not establish hosted availability.
-- Pages was restored successfully to approved main. No hosted G0F startup, authentication, production diagnostic, Preview/Review/Apply, migration, or data mutation occurred in that attempt.
-- The prior control-plane blocker is resolved, but hosted delivery is not yet proven. G0F remains complete/checkpointed; G0A is **BLOCKED ON G0H**.
-- Migrations 014/015 remain **APPLIED / DO NOT REAPPLY**. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
-- G0H authorizes delivery acceptance only. Provider Preview/Review/Apply, Data Health, canonical Player Intelligence inspection, imports, synchronization, recalculation, and production/data mutation remain unauthorized. Migrations 014/015 remain applied/unchanged; no Migration 016 is authorized. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
+- G0I is **COMPLETE / CHECKPOINTED**; `origin/main` contains the reviewed deployment controls at `d5218e184397d1bcfede34577ca77c53ef293777`.
+- G0G is **COMPLETE / HOSTED DELIVERY ACCEPTED**; G0H is **COMPLETE / CHECKPOINTED** at evidence commit `892e39653b8d2a8a663cd949373283080f4122d8`; G0F is **COMPLETE / CHECKPOINTED**.
+- G0H proved immutable target `f67088c84eb79eab227a4a5759a37269e6c9f631` through run `33279816095`, then restored approved normal target `a60ce3455b6da5077f5e799307112f36fc6ab6e5` through run `33279972396`.
+- Pages remains **GitHub Actions / `build_type=workflow`**.
+- G0A is **ACTIVE / AUTHORIZED FOR CONTROLLED POST-MIGRATION, PRIMARILY READ-ONLY ACCEPTANCE** using the exact reviewed G0F artifact. Review and Apply are prohibited.
+- Migrations 014/015 are **APPLIED / DO NOT REAPPLY**; schema is `PRESENT`; the existing prospect population contains 5,440 successful rows.
+- G0A must prove current provider-driven updates are factual, unchanged evidence remains no-op, Preview leaves protected evidence unchanged, conflict/unknown semantics remain intact, and canonical prospect evidence reaches Player Intelligence input.
+- G1 remains **BLOCKED PENDING G0A**. Calibration remains **`CALIBRATION_REQUIRED`** and V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G0E Prospect Level Idempotency Repair Completed (2026-08-24)
 
