@@ -1,15 +1,15 @@
 # Current State
 
-## V5.5B-6G0I Default-Branch Deployment Control Registration Active (2026-08-29)
+## V5.5B-6G0H Hosted Immutable Delivery Acceptance Resumed After G0I (2026-08-29)
 
 - G0G is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `105b4bc15e98b0af88890053ccf84f7f02f49759` and documentation checkpoint `42187b3774108c4efb8088131077924e6b85ce39`.
-- G0I is **ACTIVE / CONTROLLED DEFAULT-BRANCH INFRASTRUCTURE REGISTRATION ONLY**. It authorizes a normal non-force `origin/main` push solely for exact reviewed G0G deployment-control registration from `105b4bc15e98b0af88890053ccf84f7f02f49759`; whole-feature merge is prohibited.
-- G0H is **BLOCKED ON G0I** after stopping before all remote Pages actions because default-branch trusted infrastructure lacked the repaired workflow/verifier. G0F remains complete/checkpointed; G0A remains blocked pending G0H.
+- G0I is **COMPLETE / CHECKPOINTED**. It registered exactly the reviewed workflow and hosted verifier on `origin/main` at `d5218e184397d1bcfede34577ca77c53ef293777`; feature evidence is checkpointed at `89ccb0ff6e40f64fe0cf8188008dd30507ee7923`.
+- G0H is **ACTIVE / REMOTE CUTOVER + HOSTED DELIVERY AUTHORIZED**. The sole authorized repository mutation is Pages Source to GitHub Actions (`build_type=workflow`); exact reviewed G0F target deployment and approved-main restoration are authorized.
 - Trusted workflow run `33099352271` successfully built and reported the reviewed 105-module/123-file topology and manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, but the immutable directory and exact index returned 404 while Pages remained configured for legacy main-branch publication. Workflow success therefore did not establish hosted availability.
 - Pages was restored successfully to approved main. No hosted G0F startup, authentication, production diagnostic, Preview/Review/Apply, migration, or data mutation occurred in that attempt.
-- Recorded `origin/main` activation baseline is `a60ce3455b6da5077f5e799307112f36fc6ab6e5`. Minimum eligible registration files are `.github/workflows/deploy-pages.yml` and `scripts/verify-hosted-v5-deployment.mjs`; dependencies and any directly required tests must be proven before inclusion.
+- The prior control-plane blocker is resolved, but hosted delivery is not yet proven. G0F remains complete/checkpointed; G0A is **BLOCKED ON G0H**.
 - Migrations 014/015 remain **APPLIED / DO NOT REAPPLY**. G1 remains **BLOCKED**; calibration remains **`CALIBRATION_REQUIRED`**; V5.5C remains **BLOCKED**.
-- Pages cutover/deployment, provider Preview/Review/Apply, Data Health, canonical Player Intelligence inspection, imports, synchronization, recalculation, application/runtime registration, and production/data mutation remain unauthorized in G0I. Migrations 014/015 remain applied/unchanged; no Migration 016 is authorized. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
+- G0H authorizes delivery acceptance only. Provider Preview/Review/Apply, Data Health, canonical Player Intelligence inspection, imports, synchronization, recalculation, and production/data mutation remain unauthorized. Migrations 014/015 remain applied/unchanged; no Migration 016 is authorized. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
 
 ## V5.5B-6G0E Prospect Level Idempotency Repair Completed (2026-08-24)
 
