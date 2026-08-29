@@ -1,46 +1,45 @@
-# Next Task: V5.5B-6G0H GitHub Pages Actions Cutover & Hosted Immutable Delivery Acceptance
+# Next Task: V5.5B-6G0I Default-Branch Deployment Control Registration
 
 ## Active authority and status
 
-- Baseline: `feature/manager-intelligence` after G0G implementation `105b4bc15e98b0af88890053ccf84f7f02f49759` and checkpoint `42187b3774108c4efb8088131077924e6b85ce39`.
-- G0G is **COMPLETE / CHECKPOINTED LOCALLY**. G0H is **ACTIVE / AUTHORIZED FOR CONTROLLED REMOTE PAGES CUTOVER AND HOSTED IMMUTABLE DELIVERY ACCEPTANCE**.
-- G0F is **COMPLETE / CHECKPOINTED**. G0A is **BLOCKED ON G0H** and must not resume in this task.
+- Baseline: `feature/manager-intelligence` after G0H blocker checkpoint `549c0945c1f66d01c837705887e4d58714c66f45`; recorded `origin/main` baseline is `a60ce3455b6da5077f5e799307112f36fc6ab6e5`.
+- G0G is **COMPLETE / CHECKPOINTED LOCALLY**. G0I is **ACTIVE / CONTROLLED DEFAULT-BRANCH INFRASTRUCTURE REGISTRATION ONLY**.
+- G0H is **BLOCKED ON G0I**. G0F is complete/checkpointed; G0A remains blocked pending G0H.
 - Migrations 014/015 are **APPLIED / DO NOT REAPPLY**. G1 remains blocked, calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
 
-## Objective and authorized remote boundary
+## Objective and controlled main-write authority
 
-Perform the one-time publication-mode cutover and prove the repaired trusted immutable artifact is actually hosted. The sole authorized repository-setting mutation is GitHub repository **Settings → Pages → Source → GitHub Actions**, equivalently `build_type=workflow`. Do not change any other repository, environment, security, domain, branch, Actions, secret, or variable setting.
+Register only the already-reviewed G0G deployment control plane on `origin/main`. A normal non-force push to `main` is authorized solely for this registration after every gate passes. This is not a feature merge, application release, Pages cutover, deployment, or data operation.
 
-The exact reviewed immutable application target is `f67088c84eb79eab227a4a5759a37269e6c9f631`. Verify later commits are infrastructure/documentation only. Capture the current Pages configuration first; if already `workflow`, do not mutate redundantly. If legacy, make only the authorized cutover and require the setting to persist before deployment.
+The authoritative reviewed source is G0G implementation `105b4bc15e98b0af88890053ccf84f7f02f49759`. At minimum, register byte/content-equivalent reviewed versions of `.github/workflows/deploy-pages.yml` and `scripts/verify-hosted-v5-deployment.mjs`. Do not hand-rewrite them or cherry-pick a commit containing unrelated files.
 
-## Required hosted acceptance sequence
+## Required registration sequence
 
 Execute in order and stop on any failure:
 
-1. Verify repository/governance state, G0G checkpoint, repaired workflow, and exact reviewed target.
-2. Capture Pages `build_type`, legacy source when present, Pages URL, and relevant `github-pages` environment state.
-3. Change only legacy Pages publication to `build_type=workflow`, then re-read and require it.
-4. Dispatch the repaired default-branch workflow for exact target `f67088c84eb79eab227a4a5759a37269e6c9f631`.
-5. Require configure, build/package, artifact upload, `deploy-pages`, and environment deployment success.
-6. Use bounded verification to require HTTP 200 for the exact immutable index, manifest, and representative module; verify manifest target/hash and module hash.
-7. Require the hosted 105-module/123-file graph, no mutable leakage, no mixed versions, and normal immutable startup with a clean console.
-8. Authenticate normally and require Reddit Phanatics selectable/selected. Do not enter provider or data diagnostics.
-9. Determine the current approved main SHA at runtime, restore it through the same Actions workflow, and verify normal V5 startup/authentication/league/console health.
-10. Leave Pages configured for GitHub Actions. Record and checkpoint the evidence only if every gate passes.
+1. Fetch and record exact `origin/main`; require it still equals the reviewed starting SHA before push.
+2. Create a clean temporary registration worktree or safe branch based exactly on `origin/main`.
+3. Trace every workflow/verifier dependency and classify it as already on main, registered by G0I, runtime-generated, or blocking.
+4. Copy/extract only approved files directly from `105b4bc15e98b0af88890053ccf84f7f02f49759`; verify exact content equality.
+5. Include reviewed deployment-contract tests only if dependency/governance analysis proves they must accompany the control plane, and document why.
+6. Validate YAML, verifier syntax, trusted artifact construction, relevant deployment tests, main-compatible tests, and `git diff --check`.
+7. Require the proposed main diff contains no application runtime, prospect, migration, scoring, identity, provider, import, or other unrelated file.
+8. Re-fetch immediately before push and stop if `origin/main` moved. Do not rebase, reset, or improvise.
+9. Commit only the approved registration and push normally to `origin/main`; then verify exact registered content and remote HEAD.
 
-The reviewed workflow contract remains `configure-pages@v5`, `upload-pages-artifact@v4`, `deploy-pages@v4`, permissions `contents: read`, `pages: write`, and `id-token: write`, environment `github-pages`, artifact root `_site`, and immutable namespace `v5-builds/<sha>/`.
+Preserve `configure-pages@v5`, `upload-pages-artifact@v4`, `deploy-pages@v4`, permissions `contents: read`, `pages: write`, and `id-token: write`, environment `github-pages`, fail-closed `build_type=workflow`, artifact root `_site`, immutable namespace `v5-builds/<sha>/`, and bounded index/manifest/module verification.
 
-Required paths are `v5-builds/<sha>/v5/index.html`, `v5-builds/<sha>/integrity-manifest.json`, and `v5-builds/<sha>/v5/js/main.js`, derived from the actual Pages project-site base. Directory redirects alone do not pass.
+Do not merge `feature/manager-intelligence`, register G0F/prospect/Player Intelligence application changes, or broaden scope merely because those files exist earlier in feature history. If a required dependency would pull unrelated application changes, stop.
 
-## Restoration and failure policy
+## Main-write and failure policy
 
-Each Actions deployment replaces the complete Pages artifact, so approved-main restoration is mandatory. Restoration changes content, not publication mode; never revert Pages to legacy publication. If immutable deployment fails after cutover, attempt safe approved-main restoration through the repaired Actions workflow, preserve evidence, and stop without changing architecture.
+No force push, history rewrite, reset, broad merge, or stale-baseline update is permitted. Use a clean main-based registration context; do not reuse the alternate worktree. If `origin/main` moves or dependency/content equality fails, stop before main mutation.
 
-G0H does not authorize workflow or application repair. Any cutover, deployment, artifact, startup, authentication, or restoration failure stops the task and requires separate review.
+Successful G0I makes G0H ready for a separate governance resumption; it does not itself resume G0H or authorize Pages cutover/deployment.
 
 ## Explicit prohibitions
 
-Do not modify workflows or application code; alter any remote setting except Pages `build_type`; access production data; run provider Preview, Review, Apply, Data Health, canonical Player Intelligence inspection, imports, sync, or recalculation; reapply migrations; mutate players/audits/leagues/identity/ownership/rosters/metrics/scores; implement G1; or activate V5.5C.
+Do not merge the feature branch; change Pages settings; deploy; access production/cloud data; run provider Preview, Review, Apply, Data Health, canonical Player Intelligence inspection, imports, sync, or recalculation; modify migrations or application semantics; mutate data; implement G1; or activate V5.5C.
 
 # Completed Contract: V5.5B-6G0E Prospect Level Idempotency Repair
 
