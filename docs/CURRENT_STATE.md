@@ -1,12 +1,21 @@
 # Current State
 
+## V5.5B-6G2 Statcast Canonical Evidence Resolution Repair (2026-08-29)
+
+- G0A and the prospect evidence foundation are **COMPLETE / PRODUCTION ACCEPTED**. Migrations 014/015 remain **APPLIED / HEALTHY / DO NOT REAPPLY**. Pages remains healthy on GitHub Actions (`build_type=workflow`).
+- G1 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`. Its accepted factual precedence, level mappings, conservative conflict policy, 59/59 suite, 10,326-player performance, and 105-module/123-file trusted topology remain unchanged.
+- G2 is **ACTIVE / LOCAL IMPLEMENTATION ONLY**. It must prove whether available canonical Statcast evidence is falsely lost across UUID/MLBAM association, metric loading/indexing, source/type selection, canonical key extraction, or Underlying Skill input before changing code.
+- G2 may repair only a proven canonical evidence-resolution defect. Statcast acquisition, scoring formulas, metric/component/composite weights, breakout/regression thresholds, POC, Age/Trajectory, Risk, G1 classification, persistence, deployment, production access, and migrations remain unauthorized.
+- Calibration remains **`CALIBRATION_REQUIRED`**. No next repair slice is automatically active, and V5.5C remains **BLOCKED**.
+
 ## V5.5B-6G1 Prospect / MLB Archetype & Context Classification Repair (2026-08-29)
 
+- This section is historical; G1 is now complete/checkpointed and G2 above is the current active authority.
 - G0A is **COMPLETE / CHECKPOINTED / PRODUCTION ACCEPTED** at evidence commit `b01efa7b909b257034a6e17db7539ccdee285a71`. G0F, G0G, G0H, and G0I remain complete; the prospect evidence foundation is **PRODUCTION ACCEPTED**.
 - Migrations 014/015 are **APPLIED / HEALTHY / DO NOT REAPPLY**. Pages remains healthy on GitHub Actions (`build_type=workflow`).
-- G1 is **ACTIVE / LOCAL IMPLEMENTATION ONLY**. It repairs only the canonical prospect/MLB archetype and developmental-context classification boundary using factual minor/MLB state, canonical prospect level, and roster/call-up context before age.
+- G1 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`.
 - Historical calibration evidence showed 6,162 players in `YOUNG_MLB_OR_RECENT_CALLUP` while near-MLB and distant-prospect groups were effectively absent. G1 must correct that structural collapse without player-specific tuning, name inference, formula/weight changes, persistence, deployment, production access, or migration work.
-- Calibration remains **`CALIBRATION_REQUIRED`**. No later repair slice is active, and V5.5C remains **BLOCKED**.
+- Calibration remains **`CALIBRATION_REQUIRED`**. G2 is now the sole active local repair slice, and V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G0A Prospect Level Production Acceptance Resumed After G0H (2026-08-29)
 
@@ -337,7 +346,7 @@ The B-3 controlled apply path is production-accepted for the exact three-player 
 
 - The active persisted engine is `ENGINE_VERSION = 5.1.1`. It deterministically writes one `calculated_player_scores` row per player/version and stores additional component detail in `explanation` JSONB. Decision and trade services consume stored scores rather than recalculating in views.
 - Current components are mostly fixed 0–100 heuristics using HKB, age, stage, limited Statcast signals, ownership/status, static positional scarcity, and shallow league settings. They do not yet calculate actual Reddit Phanatics scoring production, lineup-based replacement levels, defensive double-play opportunity, role stability, saves/holds opportunity, or prospect slot opportunity cost.
-- Automated Statcast normalization and engine consumption are not fully aligned: the provider writes camelCase contact keys such as `hardHitRate` and `barrelRate`, while several engine modules read legacy snake_case keys. `xwoba` and `xera` overlap; other accepted metrics may currently be ignored by scoring.
+- The historical V5.5B audit identified a possible Statcast normalization/consumption mismatch involving provider camelCase contact keys and legacy snake_case consumers. G2 must prove the actual current false-missing boundary through deterministic repository evidence; this historical suspicion is not itself proof of a present defect.
 - Fantrax player fantasy points/scoring stats are not an accepted data source; public preview exposes team matchup scores only. Exact lineup/scoring settings, role data, injury history, and defensive opportunity inputs are incomplete or not normalized for engine use.
 - The existing score table can support a first V5.5B component contract inside versioned `explanation` JSONB without a migration. Queryable top-level columns remain useful compatibility fields; any future indexed component columns require separate evidence and review.
 - Active implementation plan: B-1 canonical input/component foundation; B-2 league production plus actual replacement/scarcity; B-3 Statcast skill and breakout/regression; B-4 role/age/prospect opportunity cost and scenarios; B-5 explainable UI/calibration. V5.5C follows only after the B contract is accepted.

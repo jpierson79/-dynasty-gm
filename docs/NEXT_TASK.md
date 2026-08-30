@@ -1,133 +1,117 @@
-# V5.5B-6G1 Prospect / MLB Archetype & Context Classification Repair
+# V5.5B-6G2 Statcast Canonical Evidence Resolution Repair
 
 ## Status
 
 **ACTIVE / LOCAL IMPLEMENTATION ONLY**
 
-G0A is complete, checkpointed, and production accepted at `b01efa7b909b257034a6e17db7539ccdee285a71`. The prospect evidence foundation is accepted. G1 is the first post-foundation calibration repair slice; it does not authorize deployment, production access, persistence, migration work, or later calibration phases.
+G0A is complete and production accepted. G1 is complete/checkpointed at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`. Calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
 
-## Required baseline
+## Required baseline and boundaries
 
-- Work only in `C:\Users\joshu\Documents\-dynasty-gm-architect` on `feature/manager-intelligence`.
-- Require clean matching local/remote HEAD and read all repository governance before editing.
+- Work only in `C:\Users\joshu\Documents\-dynasty-gm-architect` on clean, matching local/remote `feature/manager-intelligence` after reading all repository governance.
 - Preserve the alternate `C:\Users\joshu\Documents\-dynasty-gm` worktree, its `codex/v5-season-rollover-reconciliation` branch, and untracked `.codex/`.
-- G0A is **COMPLETE / PRODUCTION ACCEPTED**; G0F/G0G/G0H/G0I are complete.
-- Migrations 014/015 are **APPLIED / HEALTHY / DO NOT REAPPLY**.
-- Pages is healthy on GitHub Actions.
-- Calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
-
-Stop on any material contradiction.
-
-## Accepted G0A foundation
-
-Preserve the accepted evidence: immutable G0F target `f67088c84eb79eab227a4a5759a37269e6c9f631`, deployment run `33281357581`, manifest `a18a6290730a6b56b2e71a7d427ff388bc76ae565d541057b3172d20cbdfd7ae`, 8,809 provider rows, 5,374 exact UUID/MLBAM matches, 33 factual updates, 5,341 no-ops, 3,369 unmatched rows, 66 identity/non-writable conflicts, zero invalid/stale rows, zero residual false positives, zero observed-time false updates, zero raw-representation false updates, Data Health 0 failures / 42 warnings, and canonical Player Intelligence READY for 10,363 players. G0A performed no Review or Apply.
+- Migrations 014/015 are applied, healthy, unchanged, and must not be reapplied. Do not create Migration 016.
+- Pages remains healthy on GitHub Actions. G2 does not authorize deployment, browser/cloud/production access, provider collection, Preview, Review, Apply, import, refresh, persistence, or any data mutation.
+- Stop on any material repository or governance contradiction.
 
 ## Objective
 
-Repair only the canonical upstream archetype/developmental-context classification boundary so factual MLB/minor status and canonical prospect level meaningfully distinguish MLB players, recent call-ups, near-MLB prospects, distant prospects, and conservative unknown/conflict cases. Prevent young age alone from classifying minor leaguers as `YOUNG_MLB_OR_RECENT_CALLUP`.
+Determine whether valid already-imported canonical Statcast evidence is being lost between persistence and canonical Player Intelligence input. If a real resolution defect is reproducible, repair only the UUID/MLBAM lookup, hitter/pitcher selection, metric indexing, or narrowly required canonical plumbing that causes false missingness.
 
-Historical calibration evidence to correct structurally—not by targeting named players—was 6,162 `YOUNG_MLB_OR_RECENT_CALLUP` players with near-MLB and distant-prospect groups effectively absent. Do not set arbitrary target counts; require plausible non-degenerate groups from deterministic fixtures.
+Do not manufacture a defect. If deterministic evidence does not reproduce false missingness, stop and record that the calibration assumption was wrong and identify the actual cause.
 
-## Canonical implementation path
+## Required trace before implementation
 
-Trace and preserve one authoritative path:
+Trace and record in `docs/NEXT_TASK_RESULT.md`:
 
-`playerIntelligenceInputService.buildCanonicalPlayerIntelligenceInput`
-→ canonical `prospectContext` / `ageDevelopment` evidence
-→ `playerIntelligenceContext.evaluatePlayerContextComponents`
-→ context evidence (`level`, `distanceStage`, `recentTransition`)
-→ `playerIntelligenceComposite.classifyPlayerArchetype`
-→ composite evaluation
-→ `playerIntelligenceInspectionService` as a read-only consumer.
+`Statcast import/persistence`
+→ canonical metric storage
+→ player UUID / exact MLBAM association
+→ metric repository loading and pagination
+→ Player Intelligence metric indexing
+→ hitter/pitcher record selection
+→ canonical metric extraction
+→ Underlying Skill input
+→ missingness/confidence interpretation
+→ calibration inspection output.
 
-Do not add classification logic to the UI, inspection view, ranking table, recommendation code, or another service.
+Inventory exact files, functions, metric keys, identity keys, source/type discriminators, index construction, duplicate precedence, fallback behavior, and the exact point where evidence becomes missing. Inspect for naming/casing mismatches, UUID-versus-MLBAM or string-versus-number mismatches, source/type filtering, omitted pagination/index rows, and duplicate-resolution defects without assuming which is responsible.
 
-## Evidence priority and classification rules
+Before changing application code, add or extend a deterministic regression demonstrating valid canonical Statcast evidence that the current Player Intelligence path resolves as missing or unavailable because of the proven defect.
 
-Use canonical factual signals in this order:
+## Identity and evidence rules
 
-1. MLB/minor-league status and contradiction state.
-2. Canonical `currentLevel`: MLB, AAA, AA, A_PLUS, A, ROOKIE, COMPLEX, or DSL.
-3. Canonical roster/call-up context already present in the input.
-4. Age only as supporting context.
+- Internal player UUID remains authoritative; exact MLBAM is used only where provider identity requires it.
+- No player-name, normalized-name, fuzzy, team-plus-name, or position-plus-name matching is permitted.
+- Unresolved or ambiguous identity remains unresolved with an explicit reason.
+- Keep hitter and pitcher Statcast evidence separate. Starter/reliever classification must not alter raw metric resolution unless the existing canonical contract requires it.
+- Preserve the existing two-way-player policy; do not invent aggregation semantics. Hitter and pitcher evidence must remain separately addressable.
+- Genuine missingness remains missing. Do not synthesize MLB Statcast for prospects, small/unavailable samples, unresolved identities, or absent provider rows.
+- Missing individual metrics remain excluded from normalization/weighting rather than becoming zero.
 
-Use existing vocabulary where applicable: `MLB_HITTER`, `MLB_STARTING_PITCHER`, `MLB_RELIEVER`, `MLB_VETERAN`, `YOUNG_MLB_OR_RECENT_CALLUP`, `NEAR_MLB_PROSPECT`, `DISTANT_PROSPECT`, `CONSERVATIVE_UNKNOWN`, and `TWO_WAY_DEFERRED`.
+## Existing Underlying Skill contract to preserve
 
-- MLB classification requires factual MLB context; young age, MLBAM presence, universe membership, or missing production is insufficient.
-- Ground near-MLB prospect context primarily in factual developmental proximity such as AAA/AA under existing canonical semantics.
-- Ground distant-prospect context primarily in farther factual levels such as A_PLUS/A/ROOKIE/COMPLEX/DSL under existing canonical semantics.
-- `CONFLICT` must not yield a guessed level or proximity group.
-- `UNKNOWN` remains distinct from `CONFLICT` and must not be classified from age alone.
-- Material contradictions between `isMinorLeaguer`, MLB status, and level must fail closed with an explicit warning/fallback rather than guessing.
-- Missing age with valid factual level must still permit level-driven classification.
-- A young A-ball player must not become young MLB; an older AAA player must not become established MLB from age.
+Do not change scoring formulas, curves, thresholds, or weights. Hitters continue to use existing canonical evidence including xwOBA, xSLG, xBA, barrel rate, hard-hit rate, exit velocity, and sprint speed. Pitchers continue to use xERA, xwOBA allowed, barrel rate allowed, hard-hit rate allowed, and exit velocity allowed. The breakout/regression comparison threshold remains 20 percentile points.
 
-Do not use player names as evidence, create players, or alter UUID/MLBAM identity. Named players may be post-hoc sanity checks only after deterministic rules exist.
+Confidence may change only naturally because previously hidden valid evidence becomes visible to the unchanged calculation. Do not redesign confidence.
 
-## Scope exclusions
+## Explicit exclusions
 
 Do not change:
 
-- Age/Trajectory formulas or calibration.
-- Prospect Opportunity Cost formulas or weights.
-- Statcast providers or Underlying Skill resolution.
-- League Production, Role Stability, Risk Safety, HKB/market treatment, floor/expected/ceiling, or composite weights.
-- Engine 5.1.1 scoring formulas.
-- Position eligibility, multi-position handling, scarcity, or replacement logic.
-- Migrations 014/015; do not create Migration 016.
-- Production data, calculated scores, provider population, or persisted Player Intelligence.
+- Underlying Skill or Statcast scoring formulas and metric weights;
+- breakout/regression thresholds;
+- composite weights, confidence renormalization, Risk Safety, HKB treatment, floor/expected/ceiling;
+- G1 prospect/MLB classification;
+- Prospect Opportunity Cost, Age/Trajectory, Role Stability, or Risk formulas;
+- provider acquisition/source snapshots except narrowly proven resolution plumbing;
+- Engine 5.1.1, identity, ownership, roster state, positions, scarcity, or replacement logic;
+- migrations, schema, production data, persisted metrics, or calculated scores.
 
-Broader missing-evidence composite inflation and later calibration repairs remain separate tasks.
+Reliever confidence, POC calibration, missing-evidence/composite inflation, age dominance, and weight review remain later separate decisions.
 
-## Required deterministic fixtures
+## Required deterministic coverage
 
 Cover at minimum:
 
-1. Established MLB veteran.
-2. Young established MLB player.
-3. Actual recent MLB call-up.
-4. AAA minor leaguer.
-5. AA minor leaguer.
-6. A+ minor leaguer.
-7. A minor leaguer.
-8. Rookie-level player.
-9. Complex-league player.
-10. DSL player.
-11. `CONFLICT` evidence.
-12. `UNKNOWN` evidence.
-13. Minor flag plus MLB-level contradiction.
-14. MLB flag plus minor-level contradiction.
-15. Missing age with valid level.
-16. Young age with distant minor level.
-17. Older minor leaguer at AAA.
+1. Complete hitter evidence resolves.
+2. Partial hitter evidence resolves and missing metrics are excluded, not zeroed.
+3. Genuine missing hitter evidence remains missing.
+4. A hitter regression reproduces and repairs the proven false-missing lookup.
+5. Hitter identity mismatch remains unresolved.
+6. Complete pitcher evidence resolves.
+7. Partial pitcher evidence resolves.
+8. Genuine missing pitcher evidence remains missing.
+9. A pitcher regression reproduces and repairs the proven false-missing lookup where applicable.
+10. Pitcher identity mismatch remains unresolved.
+11. UUID association and exact MLBAM provider identity remain canonical.
+12. No name matching exists.
+13. Hitter/pitcher evidence stays separated.
+14. Existing two-way policy is preserved.
+15. Metric-name canonicalization and source/type filtering are deterministic.
+16. Duplicate/ambiguous resolution follows the existing fail-closed policy.
+17. Existing confidence naturally reflects only resolved evidence.
+18. The 20-point breakout/regression threshold is unchanged.
+19. Underlying Skill formula is unchanged.
+20. G1 archetype and G0 prospect-evidence behavior remain unchanged.
 
-Require non-zero meaningful `NEAR_MLB_PROSPECT` and `DISTANT_PROSPECT` groups in suitable deterministic populations. Preserve exact UUID and MLBAM values and prove no name matching. Preserve multi-position behavior.
+Run a deterministic/local calibration inspection and report Underlying Skill coverage by established MLB, young/recent MLB, near prospect, distant prospect, and conservative unknown groups. Do not require 100% coverage or invent evidence for prospects; improvement should be limited to MLB players with valid evidence that was previously unresolved.
 
-## Regression boundaries
+## Performance and validation
 
-Prove the repair leaves League Production, Underlying Skill, Role Stability except naturally corrected context input, Age/Trajectory formulas, Prospect Opportunity Cost formulas, Risk, composite weights, floor/expected/ceiling, and Engine 5.1.1 unchanged. Keep G0 prospect evidence, G0E equality, and G0F diagnostics regressions green.
-
-## Performance
-
-Run the existing 10k-player Player Intelligence performance regression. Classification must remain in-memory/indexed, introduce no per-player database/provider read, and avoid O(n²) work. Historical accepted production scale is 10,363 evaluated players.
-
-## Validation
-
-Run focused classification/context/composite/inspection tests; G0 prospect evidence, G0E equality, and G0F diagnostic tests; related component and Engine 5.1.1 regressions; the 10k performance test; JavaScript syntax checks; all `tests/*.test.mjs`; and `git diff --check`.
-
-Run deterministic calibration inspection and report archetype/group distributions against the historical degenerate result. G1 does not require final calibration PASS.
+- Build/load metric evidence once and use an in-memory index. No per-player DB/provider reads, repeated full metric scans, per-player async, or O(n²) behavior.
+- Run focused Statcast/input/index/Underlying Skill/inspection tests, identity tests, G1 and G0 regressions, the 10,326+ player performance regression, JavaScript syntax checks, trusted deployment graph validation if application modules change, all sorted `tests/*.test.mjs`, and `git diff --check`.
+- Confirm formulas, weights, threshold, POC, composite behavior, migrations, and production boundaries remain unchanged.
 
 ## Completion state
 
-If implementation and validation pass:
+G2 is ready for architect review only if the actual false-missing resolution defect is proven and repaired, valid hitter/pitcher evidence resolves, genuine missingness remains missing, identity and type separation remain exact, formulas remain unchanged, and focused/full/performance validation passes.
 
-- G1 becomes **LOCAL IMPLEMENTATION / ARCHITECT REVIEW REQUIRED**.
-- Calibration remains `CALIBRATION_REQUIRED`.
-- No next repair slice is automatically activated.
-- V5.5C remains blocked.
+After local success:
 
-Record exact files/functions, rules, distributions, tests, performance, unchanged formula/weight proof, and no-production-operation evidence in `docs/NEXT_TASK_RESULT.md`. Stop uncommitted unless a later architect instruction explicitly authorizes checkpointing.
+- G2: **LOCAL IMPLEMENTATION COMPLETE / ARCHITECT REVIEW REQUIRED**
+- Calibration: `CALIBRATION_REQUIRED`
+- Next calibration slice: not automatically active
+- V5.5C: blocked
 
-## Prohibited operations
-
-Do not deploy, access production/cloud data, run provider collection or population, Review, Apply, persist scores or Player Intelligence, alter migrations, implement later calibration slices, activate V5.5C, modify the alternate worktree, or touch `.codex/`.
+Record the trace, defect proof, exact repair, fixture outcomes, coverage distribution, validation, unchanged boundaries, and no-production-operation evidence in `docs/NEXT_TASK_RESULT.md`. Leave implementation unstaged/uncommitted unless a later architect instruction authorizes checkpointing.
