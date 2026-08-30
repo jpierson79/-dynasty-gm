@@ -17,7 +17,27 @@ export const ARCHETYPE_MATRIX=Object.freeze({
   [ARCHETYPES.CONSERVATIVE_UNKNOWN]:mlb({leagueProduction:20,underlyingSkill:18,replacementAdvantage:14,positionalScarcityValue:6,roleStability:14,ageTrajectory:14,risk:14})
 });
 const num=v=>typeof v==="number"&&Number.isFinite(v),round=v=>Math.round(Number(v)*100)/100,clamp=v=>Math.max(0,Math.min(100,round(v))),upper=v=>String(v||"").toUpperCase();
-export function classifyPlayerArchetype(input,evidence={}){const pos=input.positionEligibility?.eligible||[],pitch=pos.some(x=>["SP","RP"].includes(x)),hit=pos.some(x=>!["SP","RP"].includes(x));if(pitch&&hit)return {archetype:ARCHETYPES.TWO_WAY_DEFERRED,confidence:0,warnings:["TWO_WAY_COMPOSITE_DEFERRED"]};if(input.player?.isMinorLeaguer){const d=evidence.distanceStage;return {archetype:num(d)&&d<=2?ARCHETYPES.NEAR_MLB_PROSPECT:num(d)?ARCHETYPES.DISTANT_PROSPECT:ARCHETYPES.CONSERVATIVE_UNKNOWN,confidence:num(d)?90:45,warnings:num(d)?[]:["ARCHETYPE_UNCERTAIN"]}}const rawAge=input.player?.age,age=rawAge===null||rawAge===undefined||rawAge===""?null:Number(rawAge),recent=upper(evidence.recentTransition)==="PROMOTED";if(recent||(Number.isFinite(age)&&age<=24))return {archetype:ARCHETYPES.YOUNG_MLB_OR_RECENT_CALLUP,confidence:recent?95:85,warnings:[]};if(Number.isFinite(age)&&age>=33)return {archetype:ARCHETYPES.MLB_VETERAN,confidence:90,warnings:[]};if(pos.includes("RP")&&!pos.includes("SP"))return {archetype:ARCHETYPES.MLB_RELIEVER,confidence:85,warnings:[]};if(pos.includes("SP"))return {archetype:ARCHETYPES.MLB_STARTING_PITCHER,confidence:85,warnings:[]};if(hit)return {archetype:ARCHETYPES.MLB_HITTER,confidence:85,warnings:[]};return {archetype:ARCHETYPES.CONSERVATIVE_UNKNOWN,confidence:35,warnings:["ARCHETYPE_UNCERTAIN"]}}
+const NEAR_MLB_LEVELS=new Set(["AAA","AA"]),DISTANT_PROSPECT_LEVELS=new Set(["A_PLUS","A","ROOKIE","COMPLEX","DSL"]);
+const uncertain=(warning="ARCHETYPE_UNCERTAIN")=>({archetype:ARCHETYPES.CONSERVATIVE_UNKNOWN,confidence:35,warnings:[warning]});
+export function classifyPlayerArchetype(input,evidence={}){
+  const pos=input.positionEligibility?.eligible||[],pitch=pos.some(x=>["SP","RP"].includes(x)),hit=pos.some(x=>!["SP","RP"].includes(x));
+  const prospect=input.prospectContext||{},development=input.ageDevelopment||{},minor=input.player?.isMinorLeaguer,level=upper(prospect.level??development.level),availability=upper(prospect.levelAvailability??development.levelAvailability),mlbStatus=upper(input.role?.mlbStatus),available=availability==="AVAILABLE",minorLevel=NEAR_MLB_LEVELS.has(level)||DISTANT_PROSPECT_LEVELS.has(level);
+  if(availability==="CONFLICT")return uncertain("ARCHETYPE_LEVEL_CONFLICT");
+  if(available&&((level==="MLB"&&(minor===true||mlbStatus==="MINORS"))||(minorLevel&&(minor===false||mlbStatus==="MLB"))))return uncertain("ARCHETYPE_CONTEXT_CONTRADICTION");
+  if(available&&minor===true&&NEAR_MLB_LEVELS.has(level))return {archetype:ARCHETYPES.NEAR_MLB_PROSPECT,confidence:95,warnings:[]};
+  if(available&&minor===true&&DISTANT_PROSPECT_LEVELS.has(level))return {archetype:ARCHETYPES.DISTANT_PROSPECT,confidence:95,warnings:[]};
+  if(minor===true)return uncertain(level==="INACTIVE"?"ARCHETYPE_INACTIVE":"ARCHETYPE_LEVEL_UNKNOWN");
+  const factualMlb=(available&&level==="MLB")||(mlbStatus==="MLB"&&availability!=="CONFLICT"&&!minorLevel);
+  if(!factualMlb)return uncertain(level==="INACTIVE"?"ARCHETYPE_INACTIVE":"ARCHETYPE_STATUS_UNKNOWN");
+  if(pitch&&hit)return {archetype:ARCHETYPES.TWO_WAY_DEFERRED,confidence:0,warnings:["TWO_WAY_COMPOSITE_DEFERRED"]};
+  const rawAge=input.player?.age,age=rawAge===null||rawAge===undefined||rawAge===""?null:Number(rawAge),recent=upper(evidence.recentTransition)==="PROMOTED";
+  if(recent||(Number.isFinite(age)&&age<=24))return {archetype:ARCHETYPES.YOUNG_MLB_OR_RECENT_CALLUP,confidence:recent?95:85,warnings:[]};
+  if(Number.isFinite(age)&&age>=33)return {archetype:ARCHETYPES.MLB_VETERAN,confidence:90,warnings:[]};
+  if(pos.includes("RP")&&!pos.includes("SP"))return {archetype:ARCHETYPES.MLB_RELIEVER,confidence:85,warnings:[]};
+  if(pos.includes("SP"))return {archetype:ARCHETYPES.MLB_STARTING_PITCHER,confidence:85,warnings:[]};
+  if(hit)return {archetype:ARCHETYPES.MLB_HITTER,confidence:85,warnings:[]};
+  return uncertain();
+}
 function signalCodes(result){return (result.signals||[]).map(x=>x.code)}
 export function evaluatePlayerIntelligenceComposite({input,result,marketPercentile=null}={}){if(!input?.playerId||!result?.components)throw new Error("Canonical input and completed component result are required.");const classification=classifyPlayerArchetype(input,result.contextEvidence||result.evidence||{});if(classification.archetype===ARCHETYPES.TWO_WAY_DEFERRED)return {playerId:input.playerId,leagueId:input.leagueId,archetype:classification.archetype,overallPlayerIntelligence:{score:null,confidence:0},floor:null,expected:null,ceiling:null,componentContributions:[],strengths:[],risks:[],warnings:classification.warnings,market:{normalizedMarketValue:marketPercentile,divergence:"MARKET_DATA_UNAVAILABLE",gap:null},dataCoverage:{applicableComponents:[],calculatedComponents:[],missingComponents:[],staleComponents:[]}};
   const matrix=ARCHETYPE_MATRIX[classification.archetype]||ARCHETYPE_MATRIX.CONSERVATIVE_UNKNOWN,rows=[],missing=[],stale=[];let expectedBase=0,confidenceNumerator=0;
