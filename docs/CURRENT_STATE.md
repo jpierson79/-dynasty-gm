@@ -1,7 +1,16 @@
 # Current State
 
+## V5.5B-6G1 Prospect / MLB Archetype & Context Classification Repair (2026-08-29)
+
+- G0A is **COMPLETE / CHECKPOINTED / PRODUCTION ACCEPTED** at evidence commit `b01efa7b909b257034a6e17db7539ccdee285a71`. G0F, G0G, G0H, and G0I remain complete; the prospect evidence foundation is **PRODUCTION ACCEPTED**.
+- Migrations 014/015 are **APPLIED / HEALTHY / DO NOT REAPPLY**. Pages remains healthy on GitHub Actions (`build_type=workflow`).
+- G1 is **ACTIVE / LOCAL IMPLEMENTATION ONLY**. It repairs only the canonical prospect/MLB archetype and developmental-context classification boundary using factual minor/MLB state, canonical prospect level, and roster/call-up context before age.
+- Historical calibration evidence showed 6,162 players in `YOUNG_MLB_OR_RECENT_CALLUP` while near-MLB and distant-prospect groups were effectively absent. G1 must correct that structural collapse without player-specific tuning, name inference, formula/weight changes, persistence, deployment, production access, or migration work.
+- Calibration remains **`CALIBRATION_REQUIRED`**. No later repair slice is active, and V5.5C remains **BLOCKED**.
+
 ## V5.5B-6G0A Prospect Level Production Acceptance Resumed After G0H (2026-08-29)
 
+- This section is historical; the current active authority is G1 above. G0A subsequently passed and was checkpointed at `b01efa7b909b257034a6e17db7539ccdee285a71`.
 - G0I is **COMPLETE / CHECKPOINTED**; `origin/main` contains the reviewed deployment controls at `d5218e184397d1bcfede34577ca77c53ef293777`.
 - G0G is **COMPLETE / HOSTED DELIVERY ACCEPTED**; G0H is **COMPLETE / CHECKPOINTED** at evidence commit `892e39653b8d2a8a663cd949373283080f4122d8`; G0F is **COMPLETE / CHECKPOINTED**.
 - G0H proved immutable target `f67088c84eb79eab227a4a5759a37269e6c9f631` through run `33279816095`, then restored approved normal target `a60ce3455b6da5077f5e799307112f36fc6ab6e5` through run `33279972396`.
