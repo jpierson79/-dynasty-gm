@@ -1,12 +1,20 @@
 # Current State
 
+## V5.5B-6G3 Post-G1/G2 Deterministic Calibration Diagnostic (2026-09-04)
+
+- G0A is **COMPLETE / PRODUCTION ACCEPTED**. G1 is **COMPLETE / CHECKPOINTED** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`. G2 is **COMPLETE / CHECKPOINTED** at implementation `9caea5ab4eacb5ba57bcbd1445b1ad08a7f37bee` and checkpoint `2115674ced67e93b7737095fda998c1b9618d22d`.
+- G3 is **ACTIVE / LOCAL DIAGNOSTIC ONLY**. It must establish the current calibration baseline after G1 corrected archetype/context classification and G2 corrected canonical Statcast source/type indexing. Historical downstream symptoms are comparison evidence, not presumed current defects.
+- G3 changes no formulas, weights, classifiers, confidence semantics, POC, Age/Trajectory, reliever handling, provider/import behavior, runtime persistence, schema, or migrations. It uses deterministic/local cohorts and the existing 10,326+ inspection path; it performs no deployment or production/cloud access.
+- The diagnostic must measure archetype distributions, Statcast/Underlying Skill and component coverage, effective contributions, sparse-evidence composite behavior, POC, Age/Trajectory influence, starter/reliever confidence, Risk, and floor/expected/ceiling invariants. It must classify the remaining candidates and identify exactly one next upstream repair from measured evidence without activating it. Final weight tuning remains last.
+- Calibration remains **`CALIBRATION_REQUIRED`**. No next repair slice is predetermined or automatically active, and V5.5C remains **BLOCKED**. Migrations 014/015 remain applied and unchanged; Migration 016 is absent. Pages remains healthy on GitHub Actions.
+
 ## V5.5B-6G2 Statcast Canonical Evidence Resolution Repair (2026-08-29)
 
+- This section is historical; G3 above is the active authority.
 - G0A and the prospect evidence foundation are **COMPLETE / PRODUCTION ACCEPTED**. Migrations 014/015 remain **APPLIED / HEALTHY / DO NOT REAPPLY**. Pages remains healthy on GitHub Actions (`build_type=workflow`).
-- G1 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`. Its accepted factual precedence, level mappings, conservative conflict policy, 59/59 suite, 10,326-player performance, and 105-module/123-file trusted topology remain unchanged.
-- G2 is **ACTIVE / LOCAL IMPLEMENTATION ONLY**. It must prove whether available canonical Statcast evidence is falsely lost across UUID/MLBAM association, metric loading/indexing, source/type selection, canonical key extraction, or Underlying Skill input before changing code.
-- G2 may repair only a proven canonical evidence-resolution defect. Statcast acquisition, scoring formulas, metric/component/composite weights, breakout/regression thresholds, POC, Age/Trajectory, Risk, G1 classification, persistence, deployment, production access, and migrations remain unauthorized.
-- Calibration remains **`CALIBRATION_REQUIRED`**. No next repair slice is automatically active, and V5.5C remains **BLOCKED**.
+- G1 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`.
+- G2 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `9caea5ab4eacb5ba57bcbd1445b1ad08a7f37bee` and checkpoint `2115674ced67e93b7737095fda998c1b9618d22d`. Its accepted exact source/type index boundary, 60/60 suite, 10,326-player performance, and 105-module/123-file trusted topology remain unchanged.
+- Calibration remains **`CALIBRATION_REQUIRED`**. G3 is the sole active local diagnostic; no repair outcome is predetermined, and V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G1 Prospect / MLB Archetype & Context Classification Repair (2026-08-29)
 
@@ -15,7 +23,7 @@
 - Migrations 014/015 are **APPLIED / HEALTHY / DO NOT REAPPLY**. Pages remains healthy on GitHub Actions (`build_type=workflow`).
 - G1 is **COMPLETE / CHECKPOINTED LOCALLY** at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`.
 - Historical calibration evidence showed 6,162 players in `YOUNG_MLB_OR_RECENT_CALLUP` while near-MLB and distant-prospect groups were effectively absent. G1 must correct that structural collapse without player-specific tuning, name inference, formula/weight changes, persistence, deployment, production access, or migration work.
-- Calibration remains **`CALIBRATION_REQUIRED`**. G2 is now the sole active local repair slice, and V5.5C remains **BLOCKED**.
+- Calibration remains **`CALIBRATION_REQUIRED`**. This historical G1 section is superseded by the active G3 diagnostic above, and V5.5C remains **BLOCKED**.
 
 ## V5.5B-6G0A Prospect Level Production Acceptance Resumed After G0H (2026-08-29)
 
@@ -94,7 +102,7 @@
 - Real-player calibration is **`CALIBRATION_REQUIRED`** because of six demonstrated structural defects: archetype collapse, unresolved persisted Statcast inputs, blank Prospect Opportunity Cost, missing-evidence composite inflation, potential Age/Trajectory dominance, and reliever confidence suppression.
 - The active task is **V5.5B-6G Real-Player Calibration Repair Foundation**, ordered as: archetype/context classification; canonical Statcast resolution; Prospect Opportunity Cost verification; missing-evidence sufficiency; deterministic fixtures; then age/trajectory and reliever review; and only then possible weight review.
 - Repairs must be generic and evidence-based. Named players are regression examples only and cannot authorize special cases or preferred-rank tuning.
-- Preferred implementation slices are V5.5B-6G1 archetype classification, V5.5B-6G2 Statcast canonical input resolution, V5.5B-6G3 evidence sufficiency/composite missingness, and V5.5B-6G4 post-repair real-player recalibration. Each later slice requires evidence from the preceding work.
+- Historical planning proposed G1 archetype classification, G2 Statcast resolution, a presumed missing-evidence G3, and later recalibration. G1/G2 are now complete, and the active G3 diagnostic supersedes that presumed repair sequence: it must measure current behavior before choosing any next repair.
 - V5.5C remains **BLOCKED** until post-repair immutable hosted acceptance produces a new calibration decision. Player Intelligence persistence, production refreshes/imports, identity/ownership/roster changes, Engine 5.1.1 recalculation, and unreviewed schema changes remain unauthorized.
 
 ## V5.5B-6F Trusted Deployment Workflow Activated (2026-08-15)
