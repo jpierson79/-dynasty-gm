@@ -33,6 +33,10 @@ export function buildPlayerMetricIndex(rows=[],season){
   const byPlayerId=new Map();
   for(const row of rows){
     if(Number(row.season)!==Number(season)||![STATCAST_SOURCE,FANTRAX_SOURCE].includes(row.source))continue;
+    const acceptedType=row.source===STATCAST_SOURCE
+      ? Object.values(STATCAST_TYPES).includes(row.metric_type)
+      : row.metric_type===FANTRAX_PRODUCTION_TYPE;
+    if(!acceptedType)continue;
     const current=byPlayerId.get(row.player_id)||{statcast_hitting:null,statcast_pitching:null,fantrax_league_production:null},previous=current[row.metric_type];
     if(!previous||String(row.imported_at||"").localeCompare(String(previous.imported_at||""))>0)current[row.metric_type]=row;
     byPlayerId.set(row.player_id,current);
