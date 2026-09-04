@@ -1,113 +1,162 @@
-# V5.5B-6G3 Post-G1/G2 Deterministic Calibration Diagnostic
+# V5.5B-6G4 Missing-Evidence / Composite Inflation Repair
 
 ## Status
 
-**ACTIVE / LOCAL DIAGNOSTIC ONLY**
+**ACTIVE / LOCAL IMPLEMENTATION ONLY**
 
-G0A is complete and production accepted. G1 is complete/checkpointed at implementation `c659056ace2fe0c7e5175c8724b50983e9ad7ac8` and checkpoint `cb7b00fd647c415a172c0b66b4b3ab930910d4f1`. G2 is complete/checkpointed at implementation `9caea5ab4eacb5ba57bcbd1445b1ad08a7f37bee` and checkpoint `2115674ced67e93b7737095fda998c1b9618d22d`. Calibration remains `CALIBRATION_REQUIRED`; V5.5C remains blocked.
+G0A is complete and production accepted. G1, G2, and G3 are complete/checkpointed. G3 diagnostic implementation is `63eadf00c3c484f77228822aa53430d2f24d8ec8`; its documentation checkpoint is `e66b5ecbb68e7aed3a1920db245e7d759c2d6106`. Calibration remains `CALIBRATION_REQUIRED`, and V5.5C remains blocked.
 
 ## Baseline and boundaries
 
 - Work only in `C:\Users\joshu\Documents\-dynasty-gm-architect` on clean, matching local/remote `feature/manager-intelligence` after reading all repository governance.
-- Preserve the alternate `C:\Users\joshu\Documents\-dynasty-gm` worktree, its `codex/v5-season-rollover-reconciliation` branch, and untracked `.codex/`.
-- Use current post-G1/G2 local code. Do not use the historical G0F immutable artifact for this diagnostic.
-- Migrations 014/015 remain applied, healthy, and unchanged. Do not create Migration 016.
-- Pages remains healthy on GitHub Actions. This task does not authorize deployment, browser/cloud/production access, provider collection, Preview/Review/Apply, import, refresh, persistence, or data mutation.
+- Preserve `C:\Users\joshu\Documents\-dynasty-gm`, its `codex/v5-season-rollover-reconciliation` branch, and untracked `.codex/`.
+- Migrations 014/015 remain applied and unchanged. Migration 016 remains absent.
+- Pages remains healthy on GitHub Actions, but G4 is local only. Do not deploy, access browser/cloud/production data, collect provider data, Preview/Review/Apply, import, refresh, persist, migrate, or mutate data.
 - Stop on any material repository or governance contradiction.
+
+## Accepted G3 evidence
+
+- The deterministic population contained 10,326 players. Exactly 1,549 had reported overall confidence 0 while retaining three calculated components.
+- That zero-confidence cohort had median expected 72.42 and median ceiling 81.32. Representative rows assigned Age/Trajectory a 50% normalized share.
+- Current normalization computes `effectiveWeight = baseWeight * componentConfidence / 100`, renormalizes surviving effective weights to 100%, and does not attenuate expected value by overall confidence. No minimum evidence floor exists.
+- Missing-evidence/composite inflation is a **BLOCKING STRUCTURAL DEFECT**. Age/Trajectory dominance is a material downstream symptom, not the next component-formula repair.
+- G1 and G2 passed. Prospect Opportunity Cost is expected behavior with near/distant medians 63/34. No distinct reliever defect was proven. Global weights are not ready for tuning. Floor/expected/ceiling ordering had zero violations.
 
 ## Objective
 
-Establish a deterministic post-G1/G2 calibration baseline before selecting another repair. Measure current archetype distribution, canonical Statcast/Underlying Skill coverage, component applicability/confidence/contribution, sparse-evidence composite behavior, Prospect Opportunity Cost, Age/Trajectory influence, reliever evidence, Risk, and scenario invariants. Identify exactly one highest-priority remaining upstream defect from measured evidence, but do not implement or automatically activate it.
+Repair the composite evidence-authority boundary so sparse profiles cannot turn a tiny surviving evidence set into a full-strength dynasty score. Less reliable evidence must yield less composite authority and certainty without treating missing evidence as bad performance or arbitrarily collapsing legitimate prospect value.
 
-Historical pre-G1/G2 observations—including 6,162 `YOUNG_MLB_OR_RECENT_CALLUP` rows, absent near/distant prospect groups, broad missing Statcast, sparse-evidence inflation, Age/Trajectory dominance, and reliever-confidence concerns—are comparison evidence only. Do not assume they persist.
+Preserve component formulas and base weights. Change only the narrow confidence/evidence gating and renormalization behavior required to eliminate inflation.
+
+## Required trace before implementation
+
+Trace and record:
+
+`component score`
+→ component confidence
+→ confidence-adjusted eligibility/effective weight
+→ renormalization denominator
+→ expected
+→ floor/ceiling
+→ overall confidence.
+
+Record the exact files, functions, base weights, denominator, zero-confidence behavior, surviving-weight expansion, relationship between overall confidence and composite authority, and the smallest viable evidence gate in `docs/NEXT_TASK_RESULT.md`.
+
+Before implementing, add or extend a deterministic fixture that reproduces a zero/near-zero meaningful-evidence profile receiving a strong expected/ceiling value because one or two surviving evidence sources expand to the full weight budget. Record its exact pre-fix result; it must fail before the repair and pass afterward.
+
+## Authorized scope
+
+G4 may change only:
+
+- composite evidence gating;
+- confidence-to-effective-weight behavior;
+- minimum weighted-evidence requirements;
+- sparse-evidence fallback behavior;
+- a cap on renormalization when evidence authority is low;
+- uncertainty/range widening if already supported by the current architecture; and
+- aggregate composite-confidence semantics only as needed to represent evidence authority.
+
+Trace first and choose the smallest architecture-consistent mechanism. A deterministic aggregate such as `sum(base_weight * component_confidence)` may represent supported model authority if the current design lacks one, but G4 must not add an independent scoring model.
+
+Do not use a flat point penalty, manufacture zero scores for missing components, or invent an external prior without separate authorization. Preserve unallocated authority as uncertainty or otherwise bound redistribution in a way derived from evidence quality. Component count is supporting evidence only; weighted evidence quality is authoritative.
 
 ## Formula and behavior freeze
 
-G3 is diagnostic only. Do not change classifiers, component formulas, component/composite weights, confidence or renormalization, breakout/regression thresholds, Prospect Opportunity Cost, Age/Trajectory, Role Stability, Risk, Statcast lookup, provider/import behavior, floor/expected/ceiling, HKB semantics, Engine 5.1.1, schema, or migrations. Named players may be inspected only after aggregate diagnostics and cannot establish thresholds or tuning rules.
+Do not change:
 
-## Required trace
+- League Production, Underlying Skill, Role Stability, Age/Trajectory, Prospect Opportunity Cost, or Risk formulas;
+- component confidence formulas;
+- component base weights;
+- G1 archetype/context classification;
+- G2 Statcast canonical resolution;
+- prospect evidence, HKB, or provider/import behavior;
+- reliever logic;
+- final global weight tuning;
+- Engine 5.1.1; or
+- schema, migrations, persistence, or production behavior.
 
-Trace and record the current path:
+For identical inputs, all raw component scores and confidences must remain unchanged. POC behavior and near/distant differentiation must remain structurally equivalent. Age/Trajectory may retain importance, but sparse missingness must no longer allow it to acquire half or more of total authority merely because other evidence is absent. HKB remains bounded market/prospect support and cannot substitute for missing skill or production evidence.
 
-`canonical Player Intelligence inputs`
-→ archetype classification
-→ component calculation and status
-→ component confidence
-→ composite confidence renormalization
-→ floor/expected/ceiling
-→ inspection records
-→ group/calibration aggregation.
+## Evidence semantics and fairness
 
-Record exact files, functions, canonical group definitions, component confidence/status fields, missingness fields, contribution calculations, aggregate outputs, and how missing components expand the normalized share of remaining evidence.
+- Missing evidence is not zero or negative evidence.
+- A zero-confidence player need not have a score of zero; the goal is uncertain, not worthless.
+- High-evidence MLB hitters and pitchers must remain identical or nearly identical within a narrow, explained tolerance.
+- Low-evidence MLB profiles must not receive full composite authority from Age/Trajectory or one surviving component.
+- AAA/AA and more distant prospects may retain differentiated value from valid Age/Trajectory, POC, and existing bounded market/context evidence while reflecting limited confidence.
+- Do not hard-code archetype penalties. Let available weighted evidence determine authority.
+- `CONSERVATIVE_UNKNOWN` remains fail-closed and cannot be inflated by one component.
+- Do not double-count uncertainty through Risk or range handling.
 
-## Deterministic diagnostic cohorts
+## Deterministic fixture matrix
 
-Use generic deterministic fixtures representing at least a high-evidence MLB hitter, high-evidence MLB pitcher, low-evidence MLB player, recent call-up, AAA prospect, AA prospect, A prospect, Rookie prospect, conservative unknown/conflict player, reliever, and starter. Do not tune formulas or select desired rankings from named players.
+Cover at minimum:
 
-Measure counts and percentages for every canonical archetype, including MLB hitter/starter/reliever/veteran groups, `YOUNG_MLB_OR_RECENT_CALLUP`, `NEAR_MLB_PROSPECT`, `DISTANT_PROSPECT`, `CONSERVATIVE_UNKNOWN`, and any existing deferred group. Require near/distant groups when the input contains the corresponding factual levels and confirm generic minor leaguers no longer enter the young-MLB group.
+1. high-evidence MLB hitter;
+2. high-evidence MLB pitcher;
+3. zero/near-zero-evidence player;
+4. one-component player;
+5. two-component low-confidence player;
+6. multiple medium-confidence components;
+7. high-confidence prospect-context-only player;
+8. AAA prospect;
+9. distant prospect;
+10. recent call-up with partial evidence;
+11. conservative unknown;
+12. reliever;
+13. starter;
+14. missing Statcast with valid League Production; and
+15. valid Statcast with missing League Production.
 
-## Evidence and component coverage
+Required regressions:
 
-For each archetype, report:
+- one surviving component cannot automatically receive 100% effective authority;
+- adding valid evidence cannot reduce model authority/confidence;
+- removing valid evidence cannot increase authority through renormalization;
+- missing remains distinct from numeric zero;
+- prospects do not collapse into one undifferentiated low score;
+- AAA/AA versus distant-level differentiation remains intact;
+- raw Age/Trajectory, POC, League Production, Underlying Skill, Role Stability, and Risk outputs remain unchanged;
+- exact base weights remain unchanged;
+- G1 archetypes and G2 Statcast resolution remain unchanged;
+- `floor <= expected <= ceiling` has zero violations; and
+- normal high-evidence behavior remains within the narrow accepted tolerance.
 
-- player count;
-- Underlying Skill applicable count, evidence-present count, genuine-missing/not-applicable count, confidence distribution, median confidence, and p25/p75 where practical;
-- availability and confidence for League Production, Underlying Skill, Role Stability, Age/Trajectory, Prospect Opportunity Cost, and Risk;
-- average/median effective contribution for League Production, Underlying Skill, Role Stability, Age/Trajectory, Prospect Opportunity Cost, and Risk Safety after the existing confidence renormalization;
-- the most frequent largest effective contributor, using an explicitly documented contribution comparison.
+## Calibration rerun and acceptance evidence
 
-For established and young/recent MLB groups, separately count canonical Statcast rows, resolved Underlying Skill, and genuine missingness with reason. Do not require 100% coverage. For near/distant prospects, lack of MLB Statcast is not automatically defective; distinguish `NOT_APPLICABLE` or genuine missingness from unexpected resolution failure. If the accepted G2 false-missing regression reappears, stop G3 before downstream conclusions.
+After implementation, rerun the G3 deterministic diagnostic and compare before/after evidence groups (`very low`, `low`, `medium`, `high`). Require:
 
-## Sparse-evidence and confidence analysis
+- material reduction in inflated expected/ceiling values for the zero-confidence cohort;
+- fewer extreme top-25 expected results among the bottom evidence quartile;
+- no broad distortion of high-evidence profiles;
+- reduced Age/Trajectory monopoly when caused by sparse evidence;
+- plausible, unchanged raw POC behavior;
+- no reliever regression;
+- zero floor/expected/ceiling ordering violations; and
+- no requirement for perfect group ordering or a zero score at zero confidence.
 
-Identify zero-confidence or effectively absent components and players. Build diagnostic-only evidence-coverage buckets using the existing confidence representation and document the temporary bucket definition. For each bucket report count, median expected/ceiling, and top-decile expected/ceiling. Inspect the top 25 expected, top 25 ceiling, top 25 lowest-evidence players by expected, and top 25 lowest-evidence players by ceiling only after aggregate results exist.
+Named players may be inspected only after aggregate results as sanity checks. Do not derive thresholds or tuning from them.
 
-Where existing utilities permit, measure the relationship between total evidence confidence and expected/ceiling to find extreme low-evidence/high-score anomalies; do not require a target correlation. Determine whether confidence renormalization causes sparse evidence to receive an excessive effective share without changing it.
+## Performance
 
-## Prospect Opportunity Cost
-
-For every archetype, report POC applicability, confidence, score distribution, and effective composite contribution. Compare near-MLB and distant prospects directly. Determine whether POC applies only where intended, remains absent for appropriate MLB players, differentiates prospect proximity sensibly, or becomes excessive when other evidence is absent. Do not change the formula.
-
-## Age, role, reliever, and risk analysis
-
-- Report Age/Trajectory mean/median score, confidence, effective contribution, and share of total effective evidence by archetype. Separately inspect whether it dominates low-evidence players because production, skill, role, or POC is missing.
-- Compare starters and relievers on Underlying Skill evidence/confidence, Role Stability confidence, League Production confidence, overall confidence, and composite behavior. Lower confidence alone is not a defect; require proof that valid evidence is systematically under-credited before recommending a role-specific repair.
-- Report Risk and Risk Safety distributions by archetype without changing their formulas.
-- Verify `floor <= expected <= ceiling` for every inspected player. Any violation is a blocking defect.
-- Confirm HKB remains only its existing bounded market/prospect support and never becomes skill evidence.
-
-## Scale and performance
-
-Run the existing 10,326+ local Player Intelligence inspection using loaded in-memory fixtures. Record player count, elapsed time, yield count, archetype distribution, and component coverage. Diagnostic aggregation may scan completed inspection output, but it must not add population scans inside per-player classifier/component logic, per-player I/O, provider calls, or O(n²) production behavior.
-
-## Classification and next-slice decision
-
-Classify each candidate issue as `BLOCKING STRUCTURAL DEFECT`, `MATERIAL CALIBRATION DEFECT`, `MINOR CALIBRATION ISSUE`, or `EXPECTED BEHAVIOR / NO REPAIR`:
-
-1. Prospect Opportunity Cost.
-2. Missing-evidence/composite inflation.
-3. Age/Trajectory dominance.
-4. Reliever confidence.
-5. Final weights.
-
-Choose exactly one next repair based on severity, upstream dependency, breadth, and deterministic evidence. Structural evidence defects precede weight tuning; upstream causes precede downstream symptoms; global weights remain last. A POC repair requires proven incorrect application or material prospect distortion. A missing-evidence repair requires proven sparse-evidence inflation from renormalization. An Age/Trajectory repair requires dominance after controlling for sparse evidence and corrected archetypes. A reliever repair requires a distinct reproducible evidence/confidence defect. The selected slice is identified only and is not automatically active.
+Composite evidence gating must remain O(1) per player. Do not add database/provider I/O, population scans, async work per player, or O(n²) behavior. Run the existing 10,326+ inspection and document player count, elapsed time, yields, and diagnostic aggregation.
 
 ## Validation
 
-- Add diagnostic tests/utilities only if required; do not change semantic expectations or the production runtime path.
-- Re-run the G1 archetype and G2 Statcast resolution regressions first.
-- Run focused inspection, composite, component, confidence, POC, age/trajectory, role, risk, Statcast, and prospect tests relevant to the diagnostic.
-- Run the complete sorted `tests/*.test.mjs` suite; baseline is 60/60.
-- Run syntax checks for changed diagnostic JS/test files, the 10,326+ performance regression, trusted deployment graph validation if runtime modules change, and `git diff --check`.
-- Record every diagnostic result, limitation, invariant, and unchanged boundary in `docs/NEXT_TASK_RESULT.md`.
+- Run focused composite, confidence, component, inspection, G3 diagnostic, G1, G2, POC, age/trajectory, role, risk, Statcast, prospect, and performance regressions.
+- Run the complete sorted `tests/*.test.mjs` suite; activation baseline is 61/61.
+- Run syntax checks for changed JavaScript/test files.
+- Run trusted deployment graph validation if runtime modules change.
+- Run `git diff --check`.
+- Record exact commands/results, files changed, limitations, and every unchanged safety boundary in `docs/NEXT_TASK_RESULT.md`.
 
 ## Completion state
 
-If the diagnostic succeeds:
+If local implementation and validation succeed:
 
-- G3: **DIAGNOSTIC COMPLETE / CHECKPOINTED** after separate architect approval and checkpoint authority.
-- Calibration: `CALIBRATION_REQUIRED`.
-- Next repair slice: identified but not automatically active.
+- G4: **LOCAL IMPLEMENTATION COMPLETE / ARCHITECT REVIEW REQUIRED**;
+- calibration: `CALIBRATION_REQUIRED`;
+- next diagnostic or calibration slice: not automatically active; and
 - V5.5C: blocked.
 
-Leave any future diagnostic implementation unstaged and uncommitted unless a later architect instruction explicitly authorizes checkpointing.
+Leave implementation unstaged and uncommitted for architect review unless a later explicit instruction authorizes checkpointing.
